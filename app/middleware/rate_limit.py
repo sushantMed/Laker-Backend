@@ -13,10 +13,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from threading import Lock
 
-from fastapi import HTTPException, status
+from fastapi import status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response, JSONResponse
 
 from app.core.config import settings
 
@@ -51,9 +51,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         ip = self._client_ip(request)
         if not self._consume(ip):
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many requests — please slow down",
+                content="Too many requests — please slow down",
                 headers={"Retry-After": str(settings.rate_limit_window_seconds)},
             )
 
