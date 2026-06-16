@@ -7,6 +7,7 @@ HTTP status mapping is the controller's responsibility.
 """
 
 from __future__ import annotations
+from app.cache.cache_service import CacheService
 from app.utils.pagination import PaginationRequest
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -126,14 +127,22 @@ class MemberService:
         self._repo = MemberRepository(session)
         self._plan_repo = PlanRepository(session)
         self._session = session
+        self._cache = CacheService(namespace="member")
 
     # ── Single member ────────────────────────────────────────────────────────
 
     async def get_member_by_id(self, member_id: str) -> MemberDetail:
+        cached = await self._cache.get(member_id, MemberDetail)
+        if cached:
+            return cached
+        
         member = await self._repo.get_by_member_id(member_id)
         if not member:
             raise MemberNotFoundException(f"Member '{member_id}' not found.")
-        return _to_member_detail(member)
+        
+        detail = _to_member_detail(member)
+        await self._cache.set(member_id, detail)    
+        return detail
 
     # ── Search ───────────────────────────────────────────────────────────────
 

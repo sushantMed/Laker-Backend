@@ -8,8 +8,8 @@ from pydantic.generics import GenericModel
 T = TypeVar('T')
 
 class LoginRequest(BaseModel):
-    email: str = Field(max_length=255, pattern=r"^[^\@\s]+@[^\@\s]+\.[^\@\s]+$")
-    password: str = Field(min_length=8)
+    email: str = Field(max_length=255, pattern=r"^[^\@\s]+@[^\@\s]+\.[^\@\s]+$" ,example="eample@example.com")
+    password: str = Field(min_length=8,example="password123")
     # rememberMe: bool = False
 
 
