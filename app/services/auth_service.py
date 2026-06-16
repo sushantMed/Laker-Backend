@@ -12,7 +12,7 @@ from app.core.security import (
     token_hash,
     verify_password,
 )
-from app.core.constants import REFRESH_TOKEN_EXPIRE_DAYS, REFRESH_TOKEN_REMEMBER_ME_DAYS
+from app.core.constants import REFRESH_TOKEN_REMEMBER_ME_DAYS
 from app.models.auth_model import RefreshTokenModel
 from app.models.user_model import UserModel
 from app.repositories.auth_repository import AuthRepository
@@ -26,6 +26,10 @@ from app.schemas.auth_schema import (
 
 
 class AuthService:
+    credentials_invalid: str = "Invalid credentials"
+    refresh_token_invalid: str = "Invalid refresh token"
+    refresh_token_expired: str = "Refresh token expired"
+    unauthorized: str = "Unauthorized"
     def __init__(self, session: AsyncSession) -> None:
         self.repo = AuthRepository(session)
 
@@ -34,7 +38,9 @@ class AuthService:
     async def login(self, request: LoginRequest) -> LoginResponse:
         user = await self.repo.get_user_by_email(request.email)
         if not user or not verify_password(request.password, user.hashed_password):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.credentials_invalid
+            )
         if user.status != "ACTIVE":
             raise HTTPException(status_code=423, detail="Account locked")
 
@@ -54,12 +60,16 @@ class AuthService:
     async def logout(self, access_token: str) -> None:
         claims = decode_access_token(access_token, verify_exp=False)
         await self.repo.revoke_user_refresh_tokens(int(claims["sub"]))
-        await self.repo.revoke_access_token(token_hash(access_token), token_expires_at(access_token))
+        await self.repo.revoke_access_token(
+            token_hash(access_token), token_expires_at(access_token)
+        )
 
     async def refresh(self, request: RefreshRequest) -> RefreshResponse:
         current = await self.repo.get_refresh_token(request.refreshToken)
         if not current:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.refresh_token_invalid
+            )
 
         now = datetime.now(timezone.utc)
         expires_at = current.expires_at
@@ -69,17 +79,25 @@ class AuthService:
         if current.revoked or current.consumed:
             # Token reuse detected — revoke entire family (rotation protection)
             await self.repo.revoke_refresh_family(current.family_id)
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.refresh_token_invalid
+            )
 
         if expires_at < now:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.refresh_token_expired
+            )
 
         user = await self.repo.get_user_by_id(current.user_id)
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.refresh_token_invalid
+            )
 
         current.consumed = True
-        new_refresh = await self._create_refresh_token(user, family_id=current.family_id)
+        new_refresh = await self._create_refresh_token(
+            user, family_id=current.family_id
+        )
         access_token, _, expires_in = create_access_token(
             subject=str(user.id),
             email=user.email,
@@ -98,10 +116,14 @@ class AuthService:
     async def current_user(self, access_token: str) -> UserModel:
         claims = decode_access_token(access_token)
         if await self.repo.is_access_token_revoked(token_hash(access_token)):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+            )
         user = await self.repo.get_user_by_id(int(claims["sub"]))
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+            )
         return user
 
     # ── Private helpers ───────────────────────────────────────────────────────
@@ -139,9 +161,15 @@ class AuthService:
     @staticmethod
     def _permissions(role: str) -> list[str]:
         _map = {
-            "superadmin": ["users:read", "users:write", "members:read", "claims:read", "auth:read"],
-            "admin":      ["users:read", "members:read", "claims:read", "auth:read"],
-            "readonly":   ["members:read", "claims:read"],
-            "user":       ["members:read", "claims:read"],
+            "superadmin": [
+                "users:read",
+                "users:write",
+                "members:read",
+                "claims:read",
+                "auth:read",
+            ],
+            "admin": ["users:read", "members:read", "claims:read", "auth:read"],
+            "readonly": ["members:read", "claims:read"],
+            "user": ["members:read", "claims:read"],
         }
         return _map.get(role, ["members:read", "claims:read"])

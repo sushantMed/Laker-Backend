@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     db_port: int
     db_name: str
 
+    # ── Redis / Cache ─────────────────────────────────────────────
+    redis_host: str = "redis"
+    redis_port: int = 6379
+    redis_db: int = 0
+    cache_enabled: bool = True
+    cache_default_ttl_seconds: int = 300
+
     # ── Security ──────────────────────────────────────────────────
     jwt_secret_key: str
 
