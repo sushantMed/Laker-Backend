@@ -44,6 +44,8 @@ from app.observability.monitoring import monitor_router
 from app.scripts.seed_users import seed_users
 from app.schemas.auth_schema import ApiResponse
 from app.scripts.seed_members import seed_members
+from app.cache.redis_client import close_redis
+
 
 # ── Import all models so SQLAlchemy can create tables ─────────────────────────
 import app.models.user_model   # noqa: F401
@@ -62,8 +64,8 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     await seed_users()
     await seed_members()    
-     
     yield
+    await close_redis()
 
 
 
@@ -86,20 +88,11 @@ def create_app() -> FastAPI:
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(Exception, generic_error_handler)
     
-    # ── CORS (configure allowed origins for production) ───────────────────────
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"] if not settings.is_production else [],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
     # ── Custom middleware stack ───────────────────────────────────────────────
     # Added bottom-up: last registered = outermost at ASGI level.
     #
     # Desired call order (outermost first):
-    #   CorrelationId → RateLimit → RequestContext → Logging → SecurityHeaders
+    #   CORSMiddleware → CorrelationId → RateLimit → RequestContext → Logging → SecurityHeaders
     #
     # So we register in reverse:
 
@@ -107,7 +100,14 @@ def create_app() -> FastAPI:
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(RateLimitMiddleware)
-    app.add_middleware(CorrelationIdMiddleware)     # outermost → runs first
+    app.add_middleware(CorrelationIdMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"] if not settings.is_production else [],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(api_router)
@@ -118,13 +118,13 @@ def create_app() -> FastAPI:
     return app
 
 
-async def app_exception_handler(request: Request, exc: AppException):
+def app_exception_handler(request: Request, exc: AppException):
     return JSONResponse(
         status_code=exc.status_code,
         content=ApiResponse.fail(message=exc.message).model_dump()
     )
 
-async def http_exception_handler(
+def http_exception_handler(
     request: Request,
     exc: HTTPException,
 ):

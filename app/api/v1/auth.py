@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,12 +22,11 @@ bearer = HTTPBearer()
 
 @router.post(
     "/login",
-    response_model=ApiResponse[LoginResponse],
     summary="Authenticate user and obtain tokens",
 )
 async def login(
     body: LoginRequest,
-    session: AsyncSession = Depends(get_db),
+    session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[LoginResponse]:
     try:
         data = await AuthService(session).login(body)
@@ -39,20 +40,19 @@ async def login(
     summary="Revoke current access + refresh tokens",
 )
 async def logout(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer),
-    session: AsyncSession = Depends(get_db),
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     await AuthService(session).logout(credentials.credentials)
 
 
 @router.post(
     "/refresh",
-    response_model=ApiResponse[RefreshResponse],
     summary="Exchange a refresh token for a new token pair",
 )
 async def refresh(
     body: RefreshRequest,
-    session: AsyncSession = Depends(get_db),
+    session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[RefreshResponse]:
     try:
         data = await AuthService(session).refresh(body)
@@ -63,12 +63,11 @@ async def refresh(
 
 @router.get(
     "/me",
-    response_model=ApiResponse[UserProfile],
     summary="Return the profile of the authenticated user",
 )
 async def me(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer),
-    session: AsyncSession = Depends(get_db),
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[UserProfile]:
     try:
         data = await AuthService(session).me(credentials.credentials)

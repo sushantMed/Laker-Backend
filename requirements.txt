@@ -11,3 +11,4 @@ greenlet==3.5.1
 pytest==9.0.3
 pytest-asyncio==1.4.0
 aiosqlite==0.22.1
+redis==5.0.1
