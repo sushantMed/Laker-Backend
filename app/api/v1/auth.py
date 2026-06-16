@@ -71,6 +71,7 @@ async def me(
 ) -> ApiResponse[UserProfile]:
     try:
         data = await AuthService(session).me(credentials.credentials)
+        print("User profile retrieved successfully:", data)
         return ApiResponse.ok(data, message="User profile retrieved successfully")
     except Exception as e:
         return ApiResponse.fail(message="Failed to retrieve user profile", errors=[str(e)])
