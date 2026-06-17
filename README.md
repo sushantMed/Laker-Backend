@@ -151,6 +151,73 @@ Response
 
 If you are developing on Windows using WSL 2, follow these steps before the quick start.
 
+### 0. Install Ubuntu 24.04 LTS on WSL2
+
+First, ensure WSL2 is installed and then add Ubuntu 24.04 LTS.
+
+#### Prerequisites
+- Windows 10 (Build 19041+) or Windows 11
+- WSL2 enabled (not WSL1)
+
+#### Installation Steps
+
+**Step A: Enable WSL (PowerShell as Administrator)**
+```powershell
+# Check if WSL is installed
+wsl --list --verbose
+
+# If not installed, install WSL2
+wsl --install
+
+# This will install Ubuntu by default. Restart your system if prompted.
+```
+
+**Step B: Install Ubuntu 24.04 LTS from Microsoft Store (Recommended)**
+
+1. Open **Microsoft Store** (search in Windows Start menu)
+2. Search for **"Ubuntu 24.04 LTS"**
+3. Click **Get** to download and install
+4. Once installed, click **Launch** or search for "Ubuntu 24.04" in Start menu
+5. On first launch, it will configure itself (may take 2-3 minutes)
+6. Create a Unix username and password when prompted
+
+**Alternative: Command-line installation**
+```powershell
+# List available distributions
+wsl --list --online
+
+# Install Ubuntu 24.04 LTS
+wsl --install -d Ubuntu-24.04
+
+# Set as default
+wsl --set-default Ubuntu-24.04
+
+# Set WSL2 as default version for new installations
+wsl --set-default-version 2
+```
+
+**Step C: Verify Installation**
+```powershell
+# Open Ubuntu terminal and verify
+wsl -d Ubuntu-24.04
+
+# Inside WSL Ubuntu, verify version
+lsb_release -a
+# Expected output: Ubuntu 24.04 LTS (Noble Numbat)
+
+# Verify WSL2
+wsl --list --verbose
+# Expected: Ubuntu-24.04  Running  2
+```
+
+**Step D: Update Ubuntu packages**
+```bash
+# Inside WSL Ubuntu terminal
+sudo apt-get update && sudo apt-get upgrade -y
+```
+
+---
+
 ### 1. Enable WSL interop
 
 WSL interop must be enabled for Docker Desktop and VS Code to work correctly.
