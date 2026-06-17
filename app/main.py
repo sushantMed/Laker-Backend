@@ -50,7 +50,9 @@ async def lifespan(app: FastAPI):
     setup_logging()
     yield
     await close_redis()
-    await engine.dispose()
+    engine = globals().get("engine")
+    if engine is not None:
+        await engine.dispose()
 
 
 
