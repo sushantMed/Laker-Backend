@@ -2,49 +2,131 @@
 
 Production-ready FastAPI application with a clean layered architecture.
 
-## Structure
+
+## System Requirements & Versions
+
+### Supported Operating Systems
+- **Ubuntu**: 24.04 LTS (Noble)
+- **macOS**: 12.0+ (Intel/Apple Silicon)
+- **Windows**: 10/11 with WSL2 (Ubuntu 24.04 recommended)
+
+### Required Software Versions
+
+| Component | Minimum | Tested | Recommended |
+|-----------|---------|--------|-------------|
+| **Python** | 3.11 | 3.12 | 3.12.x |
+| **Docker** | 20.10 | 27.0+ | Latest |
+| **Docker Compose** | 1.29 | 2.20+ | Latest |
+| **PostgreSQL** | 14 | 16 | 16-alpine |
+| **Redis** | 6.0 | 7.x | 7-alpine |
+| **Git** | 2.25+ | 2.40+ | Latest |
+| **pip** | 21.0 | 23.0+ | Latest |
+
+## Project Structure
 
 ```
-app/
-├── main.py                  # App factory + middleware registration
-├── core/
-│   ├── config.py            # Settings (pydantic-settings + .env)
-│   ├── constants.py         # App-wide constants
-│   ├── exceptions.py        # Typed HTTP errors + handlers
-│   ├── logging.py           # Structured logging setup
-│   └── security.py          # JWT + password utilities
-├── middleware/
-│   ├── correlation_id.py    # X-Correlation-ID propagation
-│   ├── request_context.py   # Per-request ContextVar dict
-│   ├── logging.py           # Access log (request in / response out)
-│   ├── rate_limit.py        # Token-bucket rate limiter per IP
-│   └── security_headers.py  # Hardened HTTP response headers
-├── api/
-│   ├── router.py            # Mounts all v1 routers
-│   └── v1/
-│       ├── auth.py          # /auth  (login, logout, refresh, me)
-│       ├── users.py         # /users
-│       └── health.py        # /health  (liveness + readiness)
-├── services/
-│   └── auth_service.py      # Login / logout / refresh / profile logic
-├── repositories/
-│   └── auth_repository.py   # DB queries for auth entities
-├── models/
-│   ├── user_model.py        # SQLAlchemy UserModel
-│   └── auth_model.py        # RefreshTokenModel, RevokedAccessTokenModel
-├── schemas/
-│   ├── auth_schema.py       # Pydantic request/response schemas
-│   └── common_schema.py     # Pagination, sort, paged response generics
-├── dependencies/
-│   └── auth.py              # get_current_user, require_roles, shortcuts
-├── database/
-│   ├── base.py              # DeclarativeBase
-│   └── session.py           # Engine + async session factory + get_db
-└── observability/
-    ├── metrics.py           # In-process counters / histograms
-    ├── tracing.py           # Span stub (swap for OpenTelemetry)
-    └── monitoring.py        # GET /internal/metrics
+Laker-Backend/
+├── app/                           # Application source code
+│   ├── __init__.py
+│   ├── main.py                    # App factory + middleware registration + lifespan
+│   ├── api/                       # API routes
+│   │   ├── __init__.py
+│   │   ├── router.py              # Main router - mounts all v1 routers
+│   │   └── v1/                    # API v1 endpoints
+│   │       ├── __init__.py
+│   │       ├── auth.py            # POST /auth/login, /logout, /refresh; GET /me
+│   │       ├── health.py          # GET /health, /health/ready
+│   │       ├── members.py         # GET /members (search, details)
+│   │       └── users.py           # User management endpoints
+│   ├── cache/                     # Redis caching
+│   │   ├── cache_service.py       # Cache operations wrapper
+│   │   └── redis_client.py        # Redis connection management
+│   ├── core/                      # Core configuration & utilities
+│   │   ├── __init__.py
+│   │   ├── config.py              # Settings (pydantic-settings + .env)
+│   │   ├── constants.py           # App-wide constants
+│   │   ├── exceptions.py          # Custom exceptions + error handlers
+│   │   ├── logging.py             # Structured logging setup
+│   │   └── security.py            # JWT creation/validation + password hashing
+│   ├── database/                  # Database configuration
+│   │   ├── __init__.py
+│   │   ├── base.py                # SQLAlchemy DeclarativeBase
+│   │   └── session.py             # Engine + async session factory
+│   ├── dependencies/              # FastAPI dependencies
+│   │   ├── __init__.py
+│   │   └── auth.py                # get_current_user, require_roles
+│   ├── middleware/                # Custom ASGI middleware
+│   │   ├── __init__.py
+│   │   ├── correlation_id.py      # X-Correlation-ID propagation
+│   │   ├── logging.py             # Access log (request in/out + latency)
+│   │   ├── rate_limit.py          # Token-bucket rate limiter per IP
+│   │   ├── request_context.py     # Per-request ContextVar context
+│   │   └── security_headers.py    # Hardened HTTP response headers (HSTS, CSP, etc)
+│   ├── models/                    # SQLAlchemy ORM models
+│   │   ├── __init__.py
+│   │   ├── auth_model.py          # RefreshTokenModel, RevokedAccessTokenModel
+│   │   ├── member_model.py        # MemberModel (insurance members)
+│   │   ├── member_address_model.py # MemberAddressModel (1-to-1 with Member)
+│   │   ├── plan_model.py          # PlanModel (insurance plans)
+│   │   └── user_model.py          # UserModel (system users)
+│   ├── observability/             # Monitoring & observability
+│   │   ├── __init__.py
+│   │   ├── metrics.py             # Prometheus metrics + counters
+│   │   ├── monitoring.py          # GET /internal/metrics endpoint
+│   │   └── tracing.py             # Tracing stubs (ready for OpenTelemetry)
+│   ├── repositories/              # Data access layer
+│   │   ├── __init__.py
+│   │   ├── auth_repository.py     # Auth entity queries
+│   │   ├── base_repository.py     # Base repository with common CRUD
+│   │   ├── member_repository.py   # Member queries + search
+│   │   └── plan_repository.py     # Plan queries
+│   ├── schemas/                   # Pydantic request/response schemas
+│   │   ├── __init__.py
+│   │   ├── auth_schema.py         # Login, Refresh, UserProfile, ApiResponse
+│   │   ├── common_schema.py       # Pagination, search, generic response
+│   │   └── member_schema.py       # Member request/response schemas
+│   ├── services/                  # Business logic layer
+│   │   ├── __init__.py
+│   │   ├── auth_service.py        # Auth: login, logout, refresh, profile
+│   │   └── member_service.py      # Member search, detail, family logic
+│   ├── utils/                     # Utility functions & enums
+│   │   ├── enums.py               # Gender, CoverageType, FamilyRole, etc
+│   │   └── pagination.py          # Pagination utilities + models
+│   └── scripts/                   # Database seeding scripts
+│       ├── seed_members.py        # Seed members from members.json
+│       ├── seed_users.py          # Seed test users
+│       ├── members.json           # Sample member data
+│       └── users.json             # Sample user data
+├── tests/                         # Test suite
+│   ├── __init__.py
+│   ├── integration/               # Integration tests
+│   │   ├── __init__.py
+│   │   └── test_auth_endpoints.py # Auth endpoint tests
+│   └── unit/                      # Unit tests
+│       ├── __init__.py
+│       └── test_security.py       # Security utilities tests
+├── Dockerfile                     # Docker image configuration
+├── docker-compose.yml             # Docker Compose services (API, Postgres, Redis)
+├── .env                          # Environment variables (git-ignored)
+├── .env.example                  # Example .env template
+├── .gitignore                    # Git ignore patterns
+├── pytest.ini                    # Pytest configuration
+├── requirements.txt              # Python dependencies
+└── README.md                     # This file
 ```
+
+### Key Architecture Layers
+
+1. **API Layer** (`api/`) — FastAPI route handlers, request validation
+2. **Service Layer** (`services/`) — Business logic, orchestration
+3. **Repository Layer** (`repositories/`) — Data access, database queries
+4. **Model Layer** (`models/`) — SQLAlchemy ORM definitions
+5. **Schema Layer** (`schemas/`) — Pydantic validation models
+6. **Core Layer** (`core/`) — Config, security, exceptions, logging
+7. **Middleware** (`middleware/`) — Cross-cutting concerns (auth, rate limiting, logging)
+8. **Cache** (`cache/`) — Redis integration for session/data caching
+9. **Dependencies** (`dependencies/`) — FastAPI dependency injection
+10. **Observability** (`observability/`) — Metrics, tracing, monitoring
 
 ## Middleware stack
 
@@ -68,6 +150,73 @@ Response
 ## WSL setup (Windows only)
 
 If you are developing on Windows using WSL 2, follow these steps before the quick start.
+
+### 0. Install Ubuntu 24.04 LTS on WSL2
+
+First, ensure WSL2 is installed and then add Ubuntu 24.04 LTS.
+
+#### Prerequisites
+- Windows 10 (Build 19041+) or Windows 11
+- WSL2 enabled (not WSL1)
+
+#### Installation Steps
+
+**Step A: Enable WSL (PowerShell as Administrator)**
+```powershell
+# Check if WSL is installed
+wsl --list --verbose
+
+# If not installed, install WSL2
+wsl --install
+
+# This will install Ubuntu by default. Restart your system if prompted.
+```
+
+**Step B: Install Ubuntu 24.04 LTS from Microsoft Store (Recommended)**
+
+1. Open **Microsoft Store** (search in Windows Start menu)
+2. Search for **"Ubuntu 24.04 LTS"**
+3. Click **Get** to download and install
+4. Once installed, click **Launch** or search for "Ubuntu 24.04" in Start menu
+5. On first launch, it will configure itself (may take 2-3 minutes)
+6. Create a Unix username and password when prompted
+
+**Alternative: Command-line installation**
+```powershell
+# List available distributions
+wsl --list --online
+
+# Install Ubuntu 24.04 LTS
+wsl --install -d Ubuntu-24.04
+
+# Set as default
+wsl --set-default Ubuntu-24.04
+
+# Set WSL2 as default version for new installations
+wsl --set-default-version 2
+```
+
+**Step C: Verify Installation**
+```powershell
+# Open Ubuntu terminal and verify
+wsl -d Ubuntu-24.04
+
+# Inside WSL Ubuntu, verify version
+lsb_release -a
+# Expected output: Ubuntu 24.04 LTS (Noble Numbat)
+
+# Verify WSL2
+wsl --list --verbose
+# Expected: Ubuntu-24.04  Running  2
+```
+
+**Step D: Update Ubuntu packages**
+```bash
+# Inside WSL Ubuntu terminal
+sudo apt-get update && sudo apt-get upgrade -y
+```
+
+---
 
 ### 1. Enable WSL interop
 
@@ -122,40 +271,187 @@ docker ps
 ```
 
 
+## Setup & Running
+
+### Option 1: Docker Setup (Recommended)
+
+#### Prerequisites
+- Docker and Docker Compose installed (see versions above)
+- `.env` file configured with database credentials
+
+#### Quick Start with Docker
+
 ```bash
-docker compose down -v
+# Start all services (PostgreSQL, Redis, API)
 docker compose up --build
+
+# The API will be available at http://localhost:8000
+
+# View logs
+docker compose logs -f laker-api
+
+# Stop all services
+docker compose down
+
+# Stop and remove volumes (reset database)
+docker compose down -v
 ```
 
-## Quick start
+#### Connect to PostgreSQL in DBeaver
+
+1. Open DBeaver → **Database → New Database Connection**
+2. Select **PostgreSQL** and click **Next**
+3. Enter connection details:
+   - **Server Host**: `localhost`
+   - **Port**: `5432`
+   - **Database**: `laker_db` (from `.env`)
+   - **Username**: `your_db_user` (from `.env`)
+   - **Password**: `your_db_password` (from `.env`)
+4. Click **Test Connection** and **Finish**
+
+#### API Documentation
+
+Once running, visit:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+---
+
+### Option 2: Local Setup (Without Docker)
+
+#### Prerequisites
+
+- Python 3.12+
+- PostgreSQL 16+ (installed locally)
+- Redis (optional, for caching)
+
+#### Step 1: Setup Python Environment
 
 ```bash
-# 1. Clone & install
-python -m venv .venv && source .venv/bin/activate
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+# On macOS/Linux:
+source .venv/bin/activate
+# On Windows:
+.venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
+```
 
-# 2. Start Postgres
+#### Step 2: Setup PostgreSQL
 
-# 3. Run
+**Option A: Using Homebrew (macOS)**
+```bash
+brew install postgresql
+brew services start postgresql
+psql postgres
+```
+
+**Option B: Using apt (Linux)**
+```bash
+sudo apt-get update
+sudo apt-get install postgresql postgresql-contrib
+sudo service postgresql start
+psql -U postgres
+```
+
+**Option C: Windows**
+- Download PostgreSQL installer from [postgresql.org](https://www.postgresql.org/download/windows/)
+- Follow the installation wizard
+- Remember the superuser password you set
+
+#### Step 3: Create Database
+
+```bash
+# Connect to PostgreSQL
+psql -U postgres
+
+# Create database and user
+CREATE DATABASE laker_db;
+CREATE USER your_db_user WITH PASSWORD 'your_db_password';
+ALTER ROLE your_db_user SET client_encoding TO 'utf8';
+ALTER ROLE your_db_user SET default_transaction_isolation TO 'read committed';
+ALTER ROLE your_db_user SET default_transaction_deferrable TO on;
+ALTER ROLE your_db_user SET default_transaction_level TO 'read committed';
+ALTER USER your_db_user CREATEDB;
+
+# Exit psql
+\q
+```
+
+#### Step 4: Configure Environment
+
+Copy or update your `.env` file:
+
+```env
+APP_ENV=development
+APP_DEBUG=true
+
+DB_DRIVER=postgresql+asyncpg
+DB_USER=your_db_user
+DB_PASSWORD=your_db_password
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=laker_db
+
+JWT_SECRET_KEY=your_jwt_secret_key_here
+
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS=50
+RATE_LIMIT_WINDOW_SECONDS=60
+
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+CACHE_ENABLED=true
+CACHE_DEFAULT_TTL_SECONDS=300
+```
+
+**Key differences from Docker:**
+- `DB_HOST=localhost` (not `postgres`)
+- `REDIS_HOST=localhost` (not `redis`)
+
+#### Step 5: Run the API
+
+```bash
+# Start the development server with auto-reload
 uvicorn app.main:app --reload
 
-# Docs
-open http://localhost:8000/docs
+# Server will be available at http://localhost:8000
 ```
 
-## Docker (full stack)
+#### Step 6: Verify Setup
+
+Visit in your browser:
+- **Swagger UI**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/api/v1/health
+- **ReDoc**: http://localhost:8000/redoc
+
+---
+
+## Running Tests
 
 ```bash
-docker compose up postgres -d
-docker compose up --build
-```
+# Install test dependencies (if not already installed)
+pip install pytest pytest-asyncio httpx
 
-## Tests
-
-```bash
-pip install pytest pytest-asyncio httpx aiosqlite
+# Run all tests
 pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/unit/test_security.py
+
+# Run with coverage
+pytest --cov=app
 ```
+
+
 
 ## Auth flow
 

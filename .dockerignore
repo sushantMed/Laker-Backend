@@ -1,0 +1,93 @@
+# Git & Version Control
+.git
+.gitignore
+.gitattributes
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Documentation
+README.md
+CHANGELOG.md
+*.md
+docs/
+
+# Testing & CI/CD
+tests/
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.editorconfig
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+ENV/
+env/
+
+# Environment Variables (SECRETS - NEVER INCLUDE)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Docker build artifacts
+Dockerfile.dev
+docker-compose.override.yml
+docker-compose.local.yml
+.docker/
+
+# OS & System
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+tmp/
+temp/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Node.js (if applicable)
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Setup files (not needed in container)
+setup.sh
+setup.py.bak
+Makefile
+
+# Local development
+.venv
+.env.local
+debug.log
