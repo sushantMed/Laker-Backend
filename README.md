@@ -21,7 +21,6 @@ Production-ready FastAPI application with a clean layered architecture.
 | **Redis** | 6.0 | 7.x | 7-alpine |
 | **Git** | 2.25+ | 2.40+ | Latest |
 | **pip** | 21.0 | 23.0+ | Latest |
-| **Node.js** (optional, for frontend) | 16 | 18 LTS | 20 LTS |
 
 ## Project Structure
 
