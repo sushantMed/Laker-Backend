@@ -1,3 +1,4 @@
+from datetime import date
 from enum import Enum
 
 
@@ -7,9 +8,6 @@ class MemberStatus(str, Enum):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
     PENDING = "PENDING"
-
-
-from datetime import date
 
 
 def derive_status(start_date: date, end_date: date) -> MemberStatus:

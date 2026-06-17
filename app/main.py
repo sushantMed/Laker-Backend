@@ -66,6 +66,7 @@ async def lifespan(app: FastAPI):
     await seed_members()    
     yield
     await close_redis()
+    await engine.dispose()
 
 
 

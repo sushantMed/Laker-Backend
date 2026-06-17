@@ -183,12 +183,82 @@ VS Code will install a small Linux-compatible server inside WSL on first connect
 docker ps
 ```
 
+## System Requirements & Versions
+
+### Supported Operating Systems
+- **Ubuntu**: 24.04 LTS (Noble)
+- **macOS**: 12.0+ (Intel/Apple Silicon)
+- **Windows**: 10/11 with WSL2 (Ubuntu 22.04 recommended)
+
+### Required Software Versions
+
+| Component | Minimum | Tested | Recommended |
+|-----------|---------|--------|-------------|
+| **Python** | 3.11 | 3.12 | 3.12.x |
+| **Docker** | 20.10 | 27.0+ | Latest |
+| **Docker Compose** | 1.29 | 2.20+ | Latest |
+| **PostgreSQL** | 14 | 16 | 16-alpine |
+| **Redis** | 6.0 | 7.x | 7-alpine |
+| **Git** | 2.25+ | 2.40+ | Latest |
+| **pip** | 21.0 | 23.0+ | Latest |
+| **Node.js** (optional, for frontend) | 16 | 18 LTS | 20 LTS |
+
+### Python Dependency Versions
+
+```
+FastAPI==0.115.5
+Uvicorn[standard]==0.32.1
+SQLAlchemy==2.0.36
+asyncpg==0.30.0
+Alembic==1.14.0
+Pydantic==2.10.3
+Pydantic-Settings==2.6.1
+python-dotenv==1.0.1
+email-validator==2.2.0
+pytest==9.0.3
+pytest-asyncio==1.4.0
+Redis==5.0.1
+```
+
+### Ubuntu/Debian System Packages
+
+For development on Ubuntu 22.04/24.04, install:
+
+```bash
+sudo apt-get update && sudo apt-get install -y \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    python3-pip \
+    libpq-dev \
+    gcc \
+    git \
+    curl \
+    postgresql-client \
+    redis-tools
+```
+
+For Ubuntu 20.04:
+```bash
+sudo apt-get update && sudo apt-get install -y \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
+    python3-pip \
+    libpq-dev \
+    gcc \
+    git \
+    curl \
+    postgresql-client \
+    redis-tools
+```
+
 ## Setup & Running
 
 ### Option 1: Docker Setup (Recommended)
 
 #### Prerequisites
-- Docker and Docker Compose installed
+- Docker and Docker Compose installed (see versions above)
 - `.env` file configured with database credentials
 
 #### Quick Start with Docker
