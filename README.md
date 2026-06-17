@@ -8,7 +8,7 @@ Production-ready FastAPI application with a clean layered architecture.
 ### Supported Operating Systems
 - **Ubuntu**: 24.04 LTS (Noble)
 - **macOS**: 12.0+ (Intel/Apple Silicon)
-- **Windows**: 10/11 with WSL2 (Ubuntu 22.04 recommended)
+- **Windows**: 10/11 with WSL2 (Ubuntu 24.04 recommended)
 
 ### Required Software Versions
 
