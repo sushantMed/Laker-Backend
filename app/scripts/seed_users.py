@@ -77,3 +77,9 @@ async def seed_users():
         await session.commit()
 
     print("\nUsers seeded successfully.")
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(seed_users())

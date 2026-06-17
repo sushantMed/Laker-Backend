@@ -33,26 +33,14 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.exceptions import AppError, app_error_handler, generic_error_handler
 from app.core.logging import setup_logging
-from app.database.base import Base
-from app.database.session import engine
 from app.middleware.correlation_id import CorrelationIdMiddleware
 from app.middleware.logging import LoggingMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.observability.monitoring import monitor_router
-from app.scripts.seed_users import seed_users
 from app.schemas.auth_schema import ApiResponse
-from app.scripts.seed_members import seed_members
 from app.cache.redis_client import close_redis
-
-
-# ── Import all models so SQLAlchemy can create tables ─────────────────────────
-import app.models.user_model   # noqa: F401
-import app.models.auth_model   # noqa: F401
-import app.models.plan_model   # noqa: F401
-import app.models.member_model # noqa: F401     
-import app.models.member_address_model # noqa: F401
 
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -60,10 +48,6 @@ import app.models.member_address_model # noqa: F401
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    await seed_users()
-    await seed_members()    
     yield
     await close_redis()
     await engine.dispose()
