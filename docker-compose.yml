@@ -50,7 +50,7 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --workers 2
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --workers 2"
 
 volumes:
   laker_postgres_data:
