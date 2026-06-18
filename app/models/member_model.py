@@ -14,21 +14,24 @@ from datetime import datetime, date
 
 from app.database.base import Base
 from app.utils.enums import Gender, CoverageType
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 class MemberModel(Base):
     __tablename__ = "members"
 
     # ── Primary key ──────────────────────────────────────────────────────────
-    member_id: Mapped[UUID] = mapped_column(String(20), primary_key=True, default=lambda: str(uuid4()), index=True)
+    member_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
 
     # ── Family linkage ───────────────────────────────────────────────────────
     # NULL means this member IS the subscriber (cardholder).
     subscriber_member_id: Mapped[UUID | None] = mapped_column(
-        String(20),
+        PG_UUID(as_uuid=True),
         ForeignKey("members.member_id", ondelete="RESTRICT"),
         nullable=True,
         index=True,
     )
+
+
 
     # ── Name ─────────────────────────────────────────────────────────────────
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)

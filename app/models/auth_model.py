@@ -5,12 +5,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
 from uuid import uuid4, UUID
-
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 class RefreshTokenModel(Base):
     __tablename__ = "refresh_tokens"
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     token: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
     family_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)

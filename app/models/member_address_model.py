@@ -6,14 +6,15 @@ from app.database.base import Base
 from uuid import uuid4, UUID
 
 from app.models.member_model import MemberModel
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 class MemberAddressModel(Base):
     __tablename__ = "member_addresses"
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
 
     member_id: Mapped[UUID] = mapped_column(
-        String(20),
+        PG_UUID(as_uuid=True),
         ForeignKey("members.member_id", ondelete="CASCADE"),
         nullable=False,
         unique=True,  # 1-to-1 with Member
