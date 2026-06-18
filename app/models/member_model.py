@@ -1,4 +1,3 @@
-from uuid import UUID, uuid4
 
 from sqlalchemy import (
     String,
@@ -18,17 +17,20 @@ from app.utils.enums import Gender, CoverageType
 class MemberModel(Base):
     __tablename__ = "members"
 
+
     # ── Primary key ──────────────────────────────────────────────────────────
-    member_id: Mapped[UUID] = mapped_column(String(20), primary_key=True, default=lambda: str(uuid4()), index=True)
+    member_id: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
 
     # ── Family linkage ───────────────────────────────────────────────────────
     # NULL means this member IS the subscriber (cardholder).
-    subscriber_member_id: Mapped[UUID | None] = mapped_column(
+    subscriber_member_id: Mapped[str | None] = mapped_column(
         String(20),
         ForeignKey("members.member_id", ondelete="RESTRICT"),
         nullable=True,
         index=True,
     )
+
+
 
     # ── Name ─────────────────────────────────────────────────────────────────
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)

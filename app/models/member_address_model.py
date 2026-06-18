@@ -1,18 +1,17 @@
+import string
 from typing import TYPE_CHECKING
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from app.database.base import Base
-from uuid import uuid4, UUID
 
 from app.models.member_model import MemberModel
 
 class MemberAddressModel(Base):
     __tablename__ = "member_addresses"
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
 
-    member_id: Mapped[UUID] = mapped_column(
+    member_id: Mapped[str | None] = mapped_column(
         String(20),
         ForeignKey("members.member_id", ondelete="CASCADE"),
         nullable=False,

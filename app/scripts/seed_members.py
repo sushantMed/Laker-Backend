@@ -148,3 +148,9 @@ async def seed_members():
         await session.commit()
 
         print("✓ Members seeded successfully")
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(seed_members())

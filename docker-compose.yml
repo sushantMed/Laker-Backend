@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   redis:
       image: redis:7-alpine
@@ -21,15 +19,15 @@ services:
     container_name: laker-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: laker_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - laker_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d laker_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -40,7 +38,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DB_HOST: postgres
+      DB_HOST: ${DB_HOST}
     volumes:
       - .:/app
     ports:
@@ -50,7 +48,7 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --workers 2
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --workers 2"
 
 volumes:
   laker_postgres_data:

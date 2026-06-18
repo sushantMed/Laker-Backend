@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,17 +113,18 @@ class AuthService:
         user = await self.current_user(access_token)
         return self._profile(user)
 
+
     async def current_user(self, access_token: str) -> UserModel:
         claims = decode_access_token(access_token)
         if await self.repo.is_access_token_revoked(token_hash(access_token)):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
-            )
-        user = await self.repo.get_user_by_id(int(claims["sub"]))
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized)
+        try:
+            user_id = UUID(claims["sub"])
+        except (KeyError, ValueError):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized)
+        user = await self.repo.get_user_by_id(user_id)
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
-            )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized)
         return user
 
     # ── Private helpers ───────────────────────────────────────────────────────

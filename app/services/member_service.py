@@ -294,7 +294,7 @@ class MemberService:
 
         # 5. Build and persist new member
         new_member_id = MemberRepository.generate_member_id()
-        # new_member_id = await self._repo.generate_member_id()
+        
 
         # 6. Generate family_position
         max_fp = await self._repo.get_max_family_position(subscriber_member_id)
