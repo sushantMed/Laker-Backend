@@ -31,7 +31,7 @@ class LoginResponse(BaseModel):
     refreshToken: str
     expiresIn: int
     tokenType: str = "Bearer"
-    # user: UserProfile
+    user: UserProfile
 
 
 class RefreshRequest(BaseModel):

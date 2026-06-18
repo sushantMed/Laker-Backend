@@ -1,0 +1,100 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.3, pluggy-1.6.0
+rootdir: C:\Users\dhanush.lokesh\Programs\LCP\Laker-Backend
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.14.0, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 12 items
+
+tests\integration\test_auth_endpoints.py FF.FFF.                         [ 58%]
+tests\unit\test_security.py .....                                        [100%]
+
+================================== FAILURES ===================================
+_____________________________ test_login_success ______________________________
+
+client = <httpx.AsyncClient object at 0x00000264EF6F7440>
+seeded_user = {'email': 'test@example.com', 'password': 'Password1!'}
+
+    @pytest.mark.asyncio
+    async def test_login_success(client, seeded_user):
+        resp = await client.post("/api/v1/auth/login", json=seeded_user)
+        assert resp.status_code == 200
+        data = resp.json()
+>       assert "accessToken" in data
+E       AssertionError: assert 'accessToken' in {'data': {'accessToken': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwicm9...3p3gO4rKIplTc8ijnrV6LNO6OmoJsDm', 'tokenType': 'Bearer'}, 'errors': [], 'message': 'Login successful', 'success': True}
+
+tests\integration\test_auth_endpoints.py:76: AssertionError
+__________________________ test_login_wrong_password __________________________
+
+client = <httpx.AsyncClient object at 0x00000264EF7C98B0>
+seeded_user = {'email': 'test@example.com', 'password': 'Password1!'}
+
+    @pytest.mark.asyncio
+    async def test_login_wrong_password(client, seeded_user):
+        resp = await client.post(
+            "/api/v1/auth/login",
+            json={"email": seeded_user["email"], "password": "WrongPass1!"},
+        )
+>       assert resp.status_code == 401
+E       assert 200 == 401
+E        +  where 200 = <Response [200 OK]>.status_code
+
+tests\integration\test_auth_endpoints.py:87: AssertionError
+_______________________________ test_me_success _______________________________
+
+client = <httpx.AsyncClient object at 0x00000264EF7EED80>
+seeded_user = {'email': 'test@example.com', 'password': 'Password1!'}
+
+    @pytest.mark.asyncio
+    async def test_me_success(client, seeded_user):
+        login = await client.post("/api/v1/auth/login", json=seeded_user)
+>       token = login.json()["accessToken"]
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'accessToken'
+
+tests\integration\test_auth_endpoints.py:99: KeyError
+_________________________ test_refresh_token_rotation _________________________
+
+client = <httpx.AsyncClient object at 0x00000264F0849DC0>
+seeded_user = {'email': 'test@example.com', 'password': 'Password1!'}
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_rotation(client, seeded_user):
+        login = await client.post("/api/v1/auth/login", json=seeded_user)
+>       refresh_token = login.json()["refreshToken"]
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'refreshToken'
+
+tests\integration\test_auth_endpoints.py:108: KeyError
+_________________________________ test_logout _________________________________
+
+client = <httpx.AsyncClient object at 0x00000264EF7EEA80>
+seeded_user = {'email': 'test@example.com', 'password': 'Password1!'}
+
+    @pytest.mark.asyncio
+    async def test_logout(client, seeded_user):
+        login = await client.post("/api/v1/auth/login", json=seeded_user)
+>       token = login.json()["accessToken"]
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'accessToken'
+
+tests\integration\test_auth_endpoints.py:118: KeyError
+============================== warnings summary ===============================
+venv\Lib\site-packages\pydantic\_migration.py:283
+  C:\Users\dhanush.lokesh\Programs\LCP\Laker-Backend\venv\Lib\site-packages\pydantic\_migration.py:283: UserWarning: `pydantic.generics:GenericModel` has been moved to `pydantic.BaseModel`.
+    warnings.warn(f'`{import_path}` has been moved to `{new_location}`.')
+
+venv\Lib\site-packages\pydantic\fields.py:1042
+venv\Lib\site-packages\pydantic\fields.py:1042
+  C:\Users\dhanush.lokesh\Programs\LCP\Laker-Backend\venv\Lib\site-packages\pydantic\fields.py:1042: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/integration/test_auth_endpoints.py::test_login_success - Asserti...
+FAILED tests/integration/test_auth_endpoints.py::test_login_wrong_password - ...
+FAILED tests/integration/test_auth_endpoints.py::test_me_success - KeyError: ...
+FAILED tests/integration/test_auth_endpoints.py::test_refresh_token_rotation
+FAILED tests/integration/test_auth_endpoints.py::test_logout - KeyError: 'acc...
+=================== 5 failed, 7 passed, 3 warnings in 2.52s ===================

@@ -54,16 +54,16 @@ async def seeded_user(client):
 
     async with TestSession() as session:
         user = UserModel(
-            email="test@example.com",
+            email="User@example.com",
             first_name="Test",
             last_name="User",
-            hashed_password=hash_password("Password1!"),
+            hashed_password=hash_password("User@123"),
             role="user",
             status="ACTIVE",
         )
         session.add(user)
         await session.commit()
-    return {"email": "test@example.com", "password": "Password1!"}
+    return {"email": "User@example.com", "password": "User@123"}
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────

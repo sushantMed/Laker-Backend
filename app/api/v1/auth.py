@@ -12,7 +12,6 @@ from app.schemas.auth_schema import (
     RefreshRequest,
     RefreshResponse,
     UserProfile,
-    ApiResponse
 )
 from app.services.auth_service import AuthService
 
@@ -27,12 +26,8 @@ bearer = HTTPBearer()
 async def login(
     body: LoginRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> ApiResponse[LoginResponse]:
-    try:
-        data = await AuthService(session).login(body)
-        return ApiResponse.ok(data, message="Login successful")
-    except Exception as e:
-        return ApiResponse.fail(message="Login failed", errors=[str(e)])
+) -> LoginResponse:
+    return await AuthService(session).login(body)
 
 @router.post(
     "/logout",
@@ -53,12 +48,8 @@ async def logout(
 async def refresh(
     body: RefreshRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> ApiResponse[RefreshResponse]:
-    try:
-        data = await AuthService(session).refresh(body)
-        return ApiResponse.ok(data, message="Token refresh successful")
-    except Exception as e:
-        return ApiResponse.fail(message="Token refresh failed", errors=[str(e)])
+) -> RefreshResponse:
+    return await AuthService(session).refresh(body)
 
 
 @router.get(
@@ -68,9 +59,5 @@ async def refresh(
 async def me(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> ApiResponse[UserProfile]:
-    try:
-        data = await AuthService(session).me(credentials.credentials)
-        return ApiResponse.ok(data, message="User profile retrieved successfully")
-    except Exception as e:
-        return ApiResponse.fail(message="Failed to retrieve user profile", errors=[str(e)])
+) -> UserProfile:
+    return await AuthService(session).me(credentials.credentials)
