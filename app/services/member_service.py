@@ -7,6 +7,7 @@ HTTP status mapping is the controller's responsibility.
 """
 
 from __future__ import annotations
+import hashlib
 from app.cache.cache_service import CacheService
 from app.utils.pagination import PaginationRequest
 
@@ -149,6 +150,11 @@ class MemberService:
     async def search_members(
         self, request: MemberSearchRequest
     ) -> PagedResponse[MemberSummary]:
+        cache_key = self._search_cache_key(request)
+        cached = await self._cache.get(cache_key, PagedResponse[MemberSummary])
+        if cached:
+            return cached
+
         items, total = await self._repo.search(
             request.searchRequest,
             page=request.pagination.page,
@@ -161,12 +167,19 @@ class MemberService:
             raise MemberNotFoundException(
                 "No members found matching the search criteria."
             )
-        return PagedResponse.of(
+        result = PagedResponse.of(
             data=[_to_member_summary(m) for m in items],
             page=request.pagination.page,
             page_size=request.pagination.page_size,
             total=total,
         )
+        await self._cache.set(cache_key, result)
+        return result
+
+    @staticmethod
+    def _search_cache_key(request: MemberSearchRequest) -> str:
+        digest = hashlib.sha256(request.model_dump_json().encode()).hexdigest()
+        return f"search:{digest}"
 
     # ── Eligibility ──────────────────────────────────────────────────────────
 
@@ -175,15 +188,22 @@ class MemberService:
         Eligibility lives inside Member — this endpoint is a dedicated
         view over the same data for convenience.
         """
+        cache_key = f"eligibility:{member_id}"
+        cached = await self._cache.get(cache_key, EligibilityResponse)
+        if cached:
+            return cached
+
         member = await self._repo.get_by_member_id(member_id)
         if not member:
             raise MemberNotFoundException(f"Member '{member_id}' not found.")
-        return EligibilityResponse(
+        response = EligibilityResponse(
             memberId=member.member_id,
             status=derive_status(member.start_date, member.end_date),
             startDate=member.start_date,
             endDate=member.end_date,
         )
+        await self._cache.set(cache_key, response)
+        return response
 
     # ── Family ───────────────────────────────────────────────────────────────
 
@@ -206,6 +226,14 @@ class MemberService:
                 "Family can only be retrieved from a subscriber."
             )
 
+        cache_key = (
+            f"family:{member_id}:{request.page}:{request.page_size}:"
+            f"{request.sort_by}:{request.sort_dir}"
+        )
+        cached = await self._cache.get(cache_key, PagedResponse[MemberSummary])
+        if cached:
+            return cached
+
         items, total = await self._repo.get_family_members(
             member_id,
             page=request.page,
@@ -213,12 +241,14 @@ class MemberService:
             sort_by=request.sort_by,
             sort_dir=request.sort_dir,
         )
-        return PagedResponse.of(
+        result = PagedResponse.of(
             data=[_to_member_summary(m) for m in items],
             page=request.page,
             page_size=request.page_size,
             total=total,
         )
+        await self._cache.set(cache_key, result)
+        return result
 
     async def add_family_member(
         self,
@@ -306,4 +336,10 @@ class MemberService:
         saved = await self._repo.add(member)
         await self._session.commit()
         await self._session.refresh(saved)
+
+        # Invalidate caches affected by the new member: the subscriber's family
+        # listings and any cached search results (the new member may now match).
+        await self._cache.delete_pattern(f"family:{subscriber_member_id}:*")
+        await self._cache.delete_pattern("search:*")
+
         return _to_member_detail(saved)
