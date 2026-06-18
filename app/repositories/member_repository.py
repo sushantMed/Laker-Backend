@@ -178,7 +178,6 @@ class MemberRepository(BaseRepository[MemberModel]):
     def generate_member_id() -> str:
         """Generate a unique member_id. In production, replace with
         a sequence or domain-specific algorithm."""
-        # return str(uuid.uuid4()).replace("-", "").upper()[:20]
         suffix = str(int(time.time() * 1000))[-3:]
         return f"MBR{suffix}"
 
