@@ -15,6 +15,7 @@ import app.models.auth_model  # noqa: F401
 import app.models.plan_model  # noqa: F401
 import app.models.member_model  # noqa: F401
 import app.models.member_address_model  # noqa: F401
+import app.models.claim_model  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

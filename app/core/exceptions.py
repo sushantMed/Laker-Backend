@@ -105,3 +105,32 @@ class MissingSearchCriteriaException(AppException):
         self, message: str = "At least one search criterion must be provided."
     ) -> None:
         super().__init__(message, status_code=400)
+
+class ClaimNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)
+
+
+class DrugNotFoundException(AppException):
+    def __init__(self, ndc: str) -> None:
+        super().__init__(f"Drug with NDC '{ndc}' not found.", status_code=404)
+        self.ndc = ndc
+
+class InvalidDateRangeException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=422)  
+
+class NoSearchCriteriaException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=400)  
+
+class PharmacyNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)
+
+
+class PrescriberNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)  
+
+
