@@ -20,5 +20,5 @@ class RefreshTokenModel(Base):
 class RevokedAccessTokenModel(Base):
     __tablename__ = "revoked_access_tokens"
 
-    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
