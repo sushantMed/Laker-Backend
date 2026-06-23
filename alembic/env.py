@@ -18,6 +18,7 @@ import app.models.member_address_model  # noqa: F401
 import app.models.drug_model  # noqa: F401
 import app.models.pharmacy_model  # noqa: F401
 import app.models.prescriber_model  # noqa: F401
+import app.models.claim_model  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
