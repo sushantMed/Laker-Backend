@@ -60,3 +60,13 @@ class CoverageType(str, Enum):
     FAMILY = "Family"
     SPOUSE = "Spouse"
     DEPENDENT = "Dependent"
+
+
+class BrandGeneric(str, Enum):
+    BRAND = "Brand Name"
+    GENERIC = "Generic Name"
+
+
+class Maintenance(str, Enum):
+    YES = "YES"
+    NO = "NO"
