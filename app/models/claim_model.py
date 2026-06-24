@@ -27,7 +27,6 @@ class ClaimModel(Base):
     __tablename__ = "claims"
 
     __table_args__ = (
-        # Covers the common search pattern: member's claims, in date order,
         Index(
             "ix_claims_member_id_date_filled_is_test_claim",
             "member_id",
@@ -60,7 +59,7 @@ class ClaimModel(Base):
     days_supply: Mapped[int | None] = mapped_column(Integer, nullable=True)
     refills_remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    # ── Pharmacy ─────────────────────────────────────────────────────────────
+    # ── Pharmacy(NABP) ─────────────────────────────────────────────────────────────
     pharmacy_npi: Mapped[str | None] = mapped_column(String(10), nullable=True)
     pharmacy_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 

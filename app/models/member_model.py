@@ -14,6 +14,7 @@ from datetime import datetime, date
 from app.database.base import Base
 from app.utils.enums import Gender, CoverageType
 
+
 class MemberModel(Base):
     __tablename__ = "members"
 
