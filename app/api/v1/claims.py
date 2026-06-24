@@ -29,13 +29,13 @@ from app.services.claim_service import ClaimService
 from app.utils.pagination import PaginationRequest
 from fastapi import status
 
-router = APIRouter(prefix="/api/v1", tags=["Claims"])
+router = APIRouter(prefix="/claims", tags=["Claims"])
 
 
 CLAIM_RETRIEVAL_SUCCESS_MESSAGE = "Claims retrieved successfully."
 
 
-@router.post("/claims/search")
+@router.post("/search")
 async def search_claims(
     request: ClaimSearchRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -49,7 +49,7 @@ async def search_claims(
 
 
 
-@router.get("/claims/{authNum}", status_code=status.HTTP_200_OK)
+@router.get("/{authNum}", status_code=status.HTTP_200_OK)
 async def get_claim(
     authNum: str,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -60,7 +60,7 @@ async def get_claim(
 
 
 
-@router.post("/members/{memberId}/claims/search")
+@router.post("/{memberId}/claims/search")
 async def search_claims_for_member(
     memberId: str,
     request: ClaimSearchRequestByMemberPath,
