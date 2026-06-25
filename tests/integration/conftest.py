@@ -53,7 +53,342 @@ async def client():
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
+# from __future__ import annotations
 
+# import uuid
+# from datetime import date, timedelta
+# from typing import AsyncGenerator
+
+# import pytest
+# import pytest_asyncio
+# from httpx import ASGITransport, AsyncClient
+# from sqlalchemy import event
+# from sqlalchemy.ext.asyncio import (
+#     AsyncSession,
+#     async_sessionmaker,
+#     create_async_engine,
+# )
+
+# # ── App imports ───────────────────────────────────────────────────────────────
+# from app.main import app                               
+# from app.database.base import Base                     
+# from app.database.session import get_db               
+# from app.api.v1.auth import bearer                     
+# from app.models.claim_model import ClaimModel 
+
+# def pytest_configure(config):
+#     config.addinivalue_line(
+#         "markers", "asyncio: mark test as async"
+#     )
+
+
+
+
+
+# # ── Route base path ───────────────────────────────────────────────────────────
+# BASE_PATH = "/api/v1"
+
+
+# # ── Test database setup ───────────────────────────────────────────────────────
+
+# TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+# engine = create_async_engine(
+#     TEST_DB_URL,
+#     connect_args={"check_same_thread": False},
+#     echo=False,
+# )
+
+# # Enable FK enforcement for SQLite
+# @event.listens_for(engine.sync_engine, "connect")
+# def _set_sqlite_pragma(dbapi_conn, _):
+#     dbapi_conn.execute("PRAGMA foreign_keys=OFF")
+
+# TestSessionLocal = async_sessionmaker(
+#     bind=engine, class_=AsyncSession, expire_on_commit=False
+# )
+
+
+# @pytest_asyncio.fixture(scope="session", autouse=True)
+# async def _create_tables():
+#     """Create all tables once for the test session."""
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.create_all)
+#     yield
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.drop_all)
+
+
+# @pytest_asyncio.fixture()
+# async def db_session() -> AsyncGenerator[AsyncSession, None]:
+#     """
+#     Yields a session isolated inside a savepoint that is rolled back after
+#     each test. Compatible with SQLAlchemy 2.0 (no deprecated `bind=` kwarg).
+
+#     Pattern:
+#       1. Open a connection and begin an outer transaction.
+#       2. Create the AsyncSession bound to that connection directly.
+#       3. Open a SAVEPOINT so session flushes/commits stay within the outer tx.
+#       4. Roll back the outer transaction after the test — all rows vanish.
+#     """
+#     async with engine.connect() as conn:
+#         await conn.begin()
+#         session = AsyncSession(conn, expire_on_commit=False)
+#         await conn.begin_nested()   # SAVEPOINT
+
+#         try:
+#             yield session
+#         finally:
+#             await session.close()
+#             await conn.rollback()
+
+
+# # ── Dependency overrides ──────────────────────────────────────────────────────
+
+# def _make_db_override(session: AsyncSession):
+#     """
+#     Returns a zero-argument async generator function suitable for use as a
+#     FastAPI dependency override for get_db.
+#     FastAPI calls the dependency as `async for db in override()`, so the
+#     override must be a *callable* that returns an async generator — not a
+#     coroutine and not the generator itself.
+#     """
+#     async def _override():
+#         yield session
+#     return _override
+
+
+# async def _noop_bearer():
+#     """Skip real JWT verification during tests."""
+#     return None
+
+
+
+
+# # ── HTTP client fixture ───────────────────────────────────────────────────────
+
+# @pytest_asyncio.fixture()
+# async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+#     """
+#     AsyncClient wired to the app with:
+#     • get_db  → test session
+#     • bearer  → no-op (auth skipped)
+#     """
+#     app.dependency_overrides[get_db] = _make_db_override(db_session)
+#     app.dependency_overrides[bearer] = _noop_bearer
+
+#     async with AsyncClient(
+#         transport=ASGITransport(app=app), base_url="http://testserver"
+#     ) as ac:
+#         yield ac
+
+#     app.dependency_overrides.clear()
+
+
+# # ── Helpers / factories ───────────────────────────────────────────────────────
+
+# VALID_AUTH_TOKEN = "Bearer test-token"
+
+# def _auth_header() -> dict[str, str]:
+#     return {"Authorization": VALID_AUTH_TOKEN}
+
+
+# def _make_claim(
+#     *,
+#     member_id: str = "MBR001",
+#     auth_num: str | None = None,
+#     rx_number: str = "RX100",
+#     drug_name: str = "Lipitor",
+#     ndc: str = "00071015423",
+#     date_filled: date = date(2024, 3, 15),
+#     date_written: date | None = date(2024, 3, 10),
+#     pharmacy_npi: str | None = "1234567890",
+#     pharmacy_name: str | None = "Health Pharmacy",
+#     prescriber_npi: str | None = "9876543210",
+#     prescriber_name: str | None = "Dr. Smith",
+#     is_test_claim: bool = False,
+#     plan_id: str | None = None,
+#     ingredient_cost: float = 50.0,
+#     dispensing_fee: float = 2.5,
+#     copay: float = 10.0,
+#     total_paid: float = 62.5,
+# ) -> ClaimModel:
+#     unique_suffix = uuid.uuid4().hex[:8]
+#     return ClaimModel(
+#         id=uuid.uuid4(),
+#         claim_id=f"CLM-{unique_suffix}",
+#         auth_num=auth_num or f"AUTH-{unique_suffix}",
+#         member_id=member_id,
+#         rx_number=rx_number,
+#         drug_name=drug_name,
+#         ndc=ndc,
+#         date_filled=date_filled,
+#         date_written=date_written,
+#         pharmacy_npi=pharmacy_npi,
+#         pharmacy_name=pharmacy_name,
+#         prescriber_npi=prescriber_npi,
+#         prescriber_name=prescriber_name,
+#         is_test_claim=is_test_claim,
+#         plan_id=plan_id,
+#         ingredient_cost=ingredient_cost,
+#         dispensing_fee=dispensing_fee,
+#         copay=copay,
+#         total_paid=total_paid,
+#     )
+
+
+# async def _seed(session: AsyncSession, *claims: ClaimModel) -> list[ClaimModel]:
+#     session.add_all(claims)
+#     await session.flush()
+#     return list(claims)
+
+
+from __future__ import annotations
+
+import uuid
+from datetime import date
+from typing import AsyncGenerator
+
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+from app.main import app
+from app.database.base import Base
+from app.database.session import get_db
+from app.api.v1.auth import bearer
+from app.models.claim_model import ClaimModel
+
+# ── Test database ─────────────────────────────────────────────────────────────
+
+TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+engine = create_async_engine(
+    TEST_DB_URL,
+    connect_args={"check_same_thread": False},
+    echo=False,
+)
+
+@event.listens_for(engine.sync_engine, "connect")
+def _set_sqlite_pragma(dbapi_conn, _):
+    dbapi_conn.execute("PRAGMA foreign_keys=OFF")
+
+TestSessionLocal = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _create_tables():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest_asyncio.fixture()
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    async with engine.connect() as conn:
+        await conn.begin()
+        session = AsyncSession(conn, expire_on_commit=False)
+        await conn.begin_nested()
+        try:
+            yield session
+        finally:
+            await session.close()
+            await conn.rollback()
+
+
+# ── Dependency overrides ──────────────────────────────────────────────────────
+
+def _make_db_override(session: AsyncSession):
+    async def _override():
+        yield session
+    return _override
+
+
+async def _noop_bearer():
+    return None
+
+
+# ── HTTP client fixture ───────────────────────────────────────────────────────
+
+BASE_PATH = "/api/v1"
+
+@pytest_asyncio.fixture()
+async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    app.dependency_overrides[get_db] = _make_db_override(db_session)
+    app.dependency_overrides[bearer] = _noop_bearer
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
+
+
+# ── Helpers / factories ───────────────────────────────────────────────────────
+
+VALID_AUTH_TOKEN = "Bearer test-token"
+
+def _auth_header() -> dict[str, str]:
+    return {"Authorization": VALID_AUTH_TOKEN}
+
+
+def _make_claim(
+    *,
+    member_id: str = "MBR001",
+    auth_num: str | None = None,
+    rx_number: str = "RX100",
+    drug_name: str = "Lipitor",
+    ndc: str = "00071015423",
+    date_filled: date = date(2024, 3, 15),
+    date_written: date | None = date(2024, 3, 10),
+    pharmacy_npi: str | None = "1234567890",
+    pharmacy_name: str | None = "Health Pharmacy",
+    prescriber_npi: str | None = "9876543210",
+    prescriber_name: str | None = "Dr. Smith",
+    is_test_claim: bool = False,
+    plan_id: str | None = None,
+    ingredient_cost: float = 50.0,
+    dispensing_fee: float = 2.5,
+    copay: float = 10.0,
+    total_paid: float = 62.5,
+) -> ClaimModel:
+    unique_suffix = uuid.uuid4().hex[:8]
+    return ClaimModel(
+        id=uuid.uuid4(),
+        claim_id=f"CLM-{unique_suffix}",
+        auth_num=auth_num or f"AUTH-{unique_suffix}",
+        member_id=member_id,
+        rx_number=rx_number,
+        drug_name=drug_name,
+        ndc=ndc,
+        date_filled=date_filled,
+        date_written=date_written,
+        pharmacy_npi=pharmacy_npi,
+        pharmacy_name=pharmacy_name,
+        prescriber_npi=prescriber_npi,
+        prescriber_name=prescriber_name,
+        is_test_claim=is_test_claim,
+        plan_id=plan_id,
+        ingredient_cost=ingredient_cost,
+        dispensing_fee=dispensing_fee,
+        copay=copay,
+        total_paid=total_paid,
+    )
+
+
+async def _seed(session: AsyncSession, *claims: ClaimModel) -> list[ClaimModel]:
+    session.add_all(claims)
+    await session.flush()
+    return list(claims)
 @pytest_asyncio.fixture
 async def seeded_lookups():
     async with TestSession() as session:

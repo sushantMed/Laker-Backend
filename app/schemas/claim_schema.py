@@ -11,8 +11,8 @@ from datetime import date
 from typing import Optional
 from app.utils.pagination import SortRequest, PaginationRequest
 
-from pydantic import BaseModel, Field, model_validator, ConfigDict
-from pydantic.alias_generators import to_camel
+from pydantic import BaseModel, Field, model_validator, ConfigDict          #type:ignore
+from pydantic.alias_generators import to_camel                              #type:ignore
 
 from app.schemas.common_schema import SearchRequest
 
