@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
-from fastapi.security import HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, Query  #type: ignore
+from fastapi.security import HTTPAuthorizationCredentials  #type: ignore
+from sqlalchemy.ext.asyncio import AsyncSession  #type: ignore
 
 from app.api.v1.auth import bearer
 from app.database.session import get_db
@@ -29,7 +29,7 @@ from app.services.claim_service import ClaimService
 from app.utils.pagination import PaginationRequest
 from fastapi import status
 
-router = APIRouter(prefix="", tags=["Claims"])
+router = APIRouter(tags=["Claims"])
 
 
 CLAIM_RETRIEVAL_SUCCESS_MESSAGE = "Claims retrieved successfully."
