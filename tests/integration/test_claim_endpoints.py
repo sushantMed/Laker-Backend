@@ -35,7 +35,6 @@ from .conftest import BASE_PATH, _auth_header, _make_claim, _seed
 # ═════════════════════════════════════════════════════════════════════════════
 # POST /api/v1/claims/search
 # ═════════════════════════════════════════════════════════════════════════════
-
 class TestSearchClaims:
     """Tests for POST /api/v1/claims/search"""
 
@@ -228,4 +227,227 @@ class TestSearchClaims:
 
         assert resp.status_code in (200, 400, 401, 422)
 
+#  ═════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/claims/{authNum}
+# ═════════════════════════════════════════════════════════════════════════════
+class TestGetClaim:
+    """Tests for GET /api/v1/claims/{authNum}"""
+
+    # ── Happy-path ────────────────────────────────────────────────────────────
+
+    async def test_get_claim_returns_full_detail(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        claim = _make_claim(auth_num="AUTH-DETAIL-01", member_id="MBR-DET")
+        await _seed(db_session, claim)
+
+        resp = await client.get(
+            f"{BASE_PATH}/claims/{claim.auth_num}", headers=_auth_header()
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["authNum"] == "AUTH-DETAIL-01"
+        assert body["memberId"] == "MBR-DET"
+
+    async def test_get_claim_response_contains_pharmacy_and_prescriber(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        claim = _make_claim(
+            auth_num="AUTH-PHARM-01",
+            pharmacy_npi="1111111111",
+            pharmacy_name="Test Pharmacy",
+            prescriber_npi="2222222222",
+            prescriber_name="Dr. Test",
+        )
+        await _seed(db_session, claim)
+
+        resp = await client.get(
+            f"{BASE_PATH}/claims/{claim.auth_num}", headers=_auth_header()
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        print(body)
+        assert body["pharmacy"]["pharmacyNpi"] == "1111111111"
+        assert body["pharmacy"]["pharmacyName"] == "Test Pharmacy"
+        assert body["prescriber"]["prescriberNpi"] == "2222222222"
+        assert body["prescriber"]["prescriberName"] == "Dr. Test"
+
+    async def test_get_claim_response_contains_cost_fields(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        claim = _make_claim(
+            auth_num="AUTH-COST-01",
+            ingredient_cost=45.0,
+            dispensing_fee=3.0,
+            copay=15.0,
+            total_paid=63.0,
+        )
+        await _seed(db_session, claim)
+
+        resp = await client.get(
+            f"{BASE_PATH}/claims/{claim.auth_num}", headers=_auth_header()
+        )
+
+        body = resp.json()
+        assert body["ingredientCost"] == 45.0
+        assert body["dispensingFee"] == 3.0
+        assert body["copay"] == 15.0
+        assert body["totalPaid"] == 63.0
+
+    async def test_get_claim_camelcase_fields_returned(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        claim = _make_claim(auth_num="AUTH-CAMEL-01", date_filled=date(2024, 5, 20))
+        await _seed(db_session, claim)
+
+        resp = await client.get(
+            f"{BASE_PATH}/claims/{claim.auth_num}", headers=_auth_header()
+        )
+
+        body = resp.json()
+        # Verify API surface uses camelCase keys
+        assert "authNum" in body
+        assert "memberId" in body
+        assert "rxNumber" in body
+        assert "dateFilled" in body
+        assert "isTestClaim" in body
+
+    # ── Not found ─────────────────────────────────────────────────────────────
+
+    async def test_get_claim_unknown_auth_num_returns_404(
+        self, client: AsyncClient
+    ):
+        resp = await client.get(
+            f"{BASE_PATH}/claims/DOES-NOT-EXIST", headers=_auth_header()
+        )
+        assert resp.status_code == 404
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# POST /api/v1/claims/{memberId}/claims/search
+# ═════════════════════════════════════════════════════════════════════════════
+class TestSearchClaimsForMember:
+    """Tests for POST /api/v1/members/{memberId}/claims/search"""
+
+    def _url(self, member_id: str) -> str:
+        return f"{BASE_PATH}/members/{member_id}/claims/search"
+
+    # ── Happy-path ────────────────────────────────────────────────────────────
+
+    async def test_search_returns_only_target_member_claims(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        target_claim = _make_claim(member_id="MBR-TARGET")
+        other_claim = _make_claim(member_id="MBR-OTHER")
+        await _seed(db_session, target_claim, other_claim)
+        resp = await client.post(
+            self._url("MBR-TARGET"),
+            json={"searchRequest": {"excludeTestClaims": True}},
+            headers=_auth_header(),
+        )
+        print(await _seed(db_session, target_claim, other_claim))
+        print(f"Request: {resp.request.url}====================================")
+        print(f"Request body: {resp.request.content}====================================")
+        print(f"Request headers: {resp.request.headers}====================================")
+        print(f"Response: {resp}====================================")
+
+        assert resp.status_code == 200
+        auth_nums = [r["authNum"] for r in resp.json()["data"]]
+        assert target_claim.auth_num in auth_nums
+        assert other_claim.auth_num not in auth_nums
+
+    async def test_member_search_with_auth_num_filter(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        c1 = _make_claim(member_id="MBR-AN-01", auth_num="AUTH-AN-FILTER")
+        c2 = _make_claim(member_id="MBR-AN-01")
+        await _seed(db_session, c1, c2)
+
+        resp = await client.post(
+            self._url("MBR-AN-01"),
+            json={"searchRequest": {"authNum": "AUTH-AN-FILTER", "excludeTestClaims": False}},
+            headers=_auth_header(),
+        )
+
+        assert resp.status_code == 200
+        auth_nums = [r["authNum"] for r in resp.json()["data"]]
+        assert "AUTH-AN-FILTER" in auth_nums
+        assert c2.auth_num not in auth_nums
+
+    async def test_member_search_with_date_range_filter(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        in_range = _make_claim(member_id="MBR-DR-01", date_filled=date(2024, 5, 15))
+        out_range = _make_claim(member_id="MBR-DR-01", date_filled=date(2023, 1, 1))
+        await _seed(db_session, in_range, out_range)
+
+        resp = await client.post(
+            self._url("MBR-DR-01"),
+            json={
+                "searchRequest": {
+                    "dateFilledStart": "2024-01-01",
+                    "dateFilledEnd": "2024-12-31",
+                    "excludeTestClaims": False,
+                }
+            },
+            headers=_auth_header(),
+        )
+
+        assert resp.status_code == 200
+        auth_nums = [r["authNum"] for r in resp.json()["data"]]
+        assert in_range.auth_num in auth_nums
+        assert out_range.auth_num not in auth_nums
+
+    async def test_member_search_empty_body_returns_all_member_claims(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """No body criteria — should return all claims for the member."""
+        c1 = _make_claim(member_id="MBR-EMPTY-01")
+        c2 = _make_claim(member_id="MBR-EMPTY-01")
+        await _seed(db_session, c1, c2)
+
+        resp = await client.post(
+            self._url("MBR-EMPTY-01"),
+            json={"searchRequest": {}},
+            headers=_auth_header(),
+        )
+
+        assert resp.status_code == 200
+        auth_nums = [r["authNum"] for r in resp.json()["data"]]
+        assert c1.auth_num in auth_nums
+        assert c2.auth_num in auth_nums
+
+    # ── Validation errors ─────────────────────────────────────────────────────
+
+    async def test_member_search_date_range_exceeds_12_months(
+        self, client: AsyncClient
+    ):
+        resp = await client.post(
+            self._url("MBR-001"),
+            json={
+                "searchRequest": {
+                    "dateFilledStart": "2023-01-01",
+                    "dateFilledEnd": "2024-06-01",
+                }
+            },
+            headers=_auth_header(),
+        )
+        assert resp.status_code in (400, 422)
+
+    async def test_member_search_end_before_start_returns_error(
+        self, client: AsyncClient
+    ):
+        resp = await client.post(
+            self._url("MBR-001"),
+            json={
+                "searchRequest": {
+                    "dateFilledStart": "2024-12-01",
+                    "dateFilledEnd": "2024-01-01",
+                }
+            },
+            headers=_auth_header(),
+        )
+        assert resp.status_code in (400, 422)
 
