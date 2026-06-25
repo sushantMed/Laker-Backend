@@ -4,11 +4,11 @@ import uuid
 from datetime import date
 from typing import AsyncGenerator
 
-import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+import pytest  #type: ignore
+import pytest_asyncio  #type: ignore
+from httpx import ASGITransport, AsyncClient  #type: ignore
+from sqlalchemy import event  #type: ignore
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  #type: ignore
 
 from app.core.config import settings
 from app.database.base import Base

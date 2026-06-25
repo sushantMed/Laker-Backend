@@ -23,9 +23,8 @@ Test strategy
 from __future__ import annotations
 from datetime import date
  
-import pytest
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+from httpx import AsyncClient #type: ignore
+from sqlalchemy.ext.asyncio import AsyncSession #type: ignore
  
 from .conftest import BASE_PATH, _auth_header, _make_claim, _seed
 
@@ -331,8 +330,8 @@ class TestGetClaim:
 class TestSearchClaimsForMember:
     """Tests for POST /api/v1/members/{memberId}/claims/search"""
 
-    def _url(self, member_id: str) -> str:
-        return f"{BASE_PATH}/members/{member_id}/claims/search"
+    def _url(self, memberId: str) -> str:
+        return f"{BASE_PATH}/members/{memberId}/claims/search"
 
     # ── Happy-path ────────────────────────────────────────────────────────────
 
@@ -344,14 +343,14 @@ class TestSearchClaimsForMember:
         await _seed(db_session, target_claim, other_claim)
         resp = await client.post(
             self._url("MBR-TARGET"),
-            json={"searchRequest": {"excludeTestClaims": True}},
+            json={"searchRequest": {"excludeTestClaims": False}},
             headers=_auth_header(),
         )
-        print(await _seed(db_session, target_claim, other_claim))
         print(f"Request: {resp.request.url}====================================")
         print(f"Request body: {resp.request.content}====================================")
         print(f"Request headers: {resp.request.headers}====================================")
         print(f"Response: {resp}====================================")
+
 
         assert resp.status_code == 200
         auth_nums = [r["authNum"] for r in resp.json()["data"]]
@@ -451,3 +450,94 @@ class TestSearchClaimsForMember:
         )
         assert resp.status_code in (400, 422)
 
+
+# ═════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/members/{memberId}/claims
+# ═════════════════════════════════════════════════════════════════════════════
+class TestGetClaimsForMember:
+    """Tests for GET /api/v1/members/{memberId}/claims"""
+
+    def _url(self, memberId: str) -> str:
+        return f"{BASE_PATH}/members/{memberId}/claims"
+
+    async def test_returns_claims_for_member(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        c1 = _make_claim(member_id="MBR-GET-LIST-01")
+        c2 = _make_claim(member_id="MBR-GET-LIST-01")
+        await _seed(db_session, c1, c2)
+
+        resp = await client.get(self._url("MBR-GET-LIST-01"), headers=_auth_header())
+
+        assert resp.status_code == 200
+        auth_nums = [r["authNum"] for r in resp.json()["data"]]
+        assert c1.auth_num in auth_nums
+        assert c2.auth_num in auth_nums
+
+    async def test_does_not_return_other_member_claims(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        my_claim = _make_claim(member_id="MBR-MINE")
+        other_claim = _make_claim(member_id="MBR-THEIRS")
+        await _seed(db_session, my_claim, other_claim)
+
+        resp = await client.get(self._url("MBR-MINE"), headers=_auth_header())
+
+        assert resp.status_code == 200
+        auth_nums = [r["authNum"] for r in resp.json()["data"]]
+        assert my_claim.auth_num in auth_nums
+        assert other_claim.auth_num not in auth_nums
+
+    async def test_pagination_page_size_respected(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        claims = [_make_claim(member_id="MBR-PAGE-01") for _ in range(5)]
+        await _seed(db_session, *claims)
+
+        resp = await client.get(
+            self._url("MBR-PAGE-01"),
+            params={"page": 1, "pageSize": 2},
+            headers=_auth_header(),
+        )
+
+        assert resp.status_code == 200
+        assert len(resp.json()["data"]) <= 2
+
+    async def test_pagination_invalid_page_returns_422(
+        self, client: AsyncClient
+    ):
+        resp = await client.get(
+            self._url("MBR-001"),
+            params={"page": 0},
+            headers=_auth_header(),
+        )
+        assert resp.status_code == 422
+
+    async def test_pagination_page_size_exceeds_max_returns_422(
+        self, client: AsyncClient
+    ):
+        resp = await client.get(
+            self._url("MBR-001"),
+            params={"pageSize": 200},
+            headers=_auth_header(),
+        )
+        assert resp.status_code == 422
+
+    async def test_returns_empty_list_for_unknown_member(
+        self, client: AsyncClient
+    ):
+        resp = await client.get(
+            self._url("MBR-NOBODY"), headers=_auth_header()
+        )
+        assert resp.status_code == 200
+        assert resp.json()["data"] == []
+
+    async def test_success_message_present(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        claim = _make_claim(member_id="MBR-MSG-01")
+        await _seed(db_session, claim)
+
+        resp = await client.get(self._url("MBR-MSG-01"), headers=_auth_header())
+
+        assert resp.json()["message"] == "Claims retrieved successfully."
