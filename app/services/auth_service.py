@@ -59,7 +59,7 @@ class AuthService:
 
     async def logout(self, access_token: str) -> None:
         claims = decode_access_token(access_token, verify_exp=False)
-        await self.repo.revoke_user_refresh_tokens(int(claims["sub"]))
+        await self.repo.revoke_user_refresh_tokens(UUID(claims["sub"]))
         await self.repo.revoke_access_token(
             token_hash(access_token), token_expires_at(access_token)
         )
