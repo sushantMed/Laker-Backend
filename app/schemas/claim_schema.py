@@ -2,7 +2,7 @@
 Claim module schemas (Pydantic v2).
 
 Naming convention: camelCase aliases for API surface, snake_case internally.
-All validation uses @model_validator(mode="after") — never __init__.
+All validation uses @model_validator(mode="after").
 """
 
 from __future__ import annotations
@@ -11,7 +11,8 @@ from datetime import date
 from typing import Optional
 from app.utils.pagination import SortRequest, PaginationRequest
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict          #type:ignore
+from pydantic.alias_generators import to_camel                              #type:ignore
 
 from app.schemas.common_schema import SearchRequest
 
@@ -132,7 +133,7 @@ class ClaimSearch(BaseModel):
             ]
         )
         if not has_any_criteria:
-            from core.exceptions import NoSearchCriteriaException
+            from app.core.exceptions import NoSearchCriteriaException
 
             raise NoSearchCriteriaException(
                 "At least one search criterion (memberId, authNum, "
@@ -142,7 +143,7 @@ class ClaimSearch(BaseModel):
         if not self.member_id and not (
             self.date_filled_start and self.date_filled_end
         ):
-            from core.exceptions import NoSearchCriteriaException
+            from app.core.exceptions import NoSearchCriteriaException
 
             raise NoSearchCriteriaException(
                 "A full dateFilled range (dateFilledStart and dateFilledEnd) "
@@ -154,7 +155,7 @@ class ClaimSearch(BaseModel):
     def validate_date_filled_range(self) -> "ClaimSearch":
         if self.date_filled_start and self.date_filled_end:
             if self.date_filled_end < self.date_filled_start:
-                from core.exceptions import InvalidDateRangeException
+                from app.core.exceptions import InvalidDateRangeException
 
                 raise InvalidDateRangeException(
                     f"dateFilledEnd ({self.date_filled_end}) must be >= "
@@ -163,7 +164,7 @@ class ClaimSearch(BaseModel):
 
             span_days = (self.date_filled_end - self.date_filled_start).days
             if span_days > _MAX_DATE_RANGE_DAYS:
-                from core.exceptions import InvalidDateRangeException
+                from app.core.exceptions import InvalidDateRangeException
 
                 raise InvalidDateRangeException(
                     "Date Filled range cannot exceed 12 months "
@@ -171,6 +172,80 @@ class ClaimSearch(BaseModel):
                     f"dateFilledEnd={self.date_filled_end})."
                 )
         return self
+
+
+class ClaimSearchByMemberPath(BaseModel):
+    """
+    Search criteria for /members/{memberId}/claims/search.
+    memberId comes from path — no validation needed in body.
+    Date range and other filters are all optional.
+    """
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        json_schema_extra={
+            "example": {
+                "authNum": None,
+                "dateFilledStart": None,
+                "dateFilledEnd": None,
+                "excludeTestClaims": True
+            }
+        }
+    )
+
+    # memberId intentionally excluded — comes from path param
+    auth_num: Optional[str] = None
+    date_filled_start: Optional[date] = None
+    date_filled_end: Optional[date] = None
+    exclude_test_claims: bool = True
+
+    @model_validator(mode="after")
+    def validate_date_filled_range(self) -> "ClaimSearchByMemberPath":
+        if self.date_filled_start and self.date_filled_end:
+            if self.date_filled_end < self.date_filled_start:
+                from app.core.exceptions import InvalidDateRangeException
+                raise InvalidDateRangeException(
+                    f"dateFilledEnd ({self.date_filled_end}) must be >= "
+                    f"dateFilledStart ({self.date_filled_start})."
+                )
+            span_days = (self.date_filled_end - self.date_filled_start).days
+            if span_days > _MAX_DATE_RANGE_DAYS:
+                from app.core.exceptions import InvalidDateRangeException
+                raise InvalidDateRangeException(
+                    "Date Filled range cannot exceed 12 months."
+                )
+        return self 
+
+
+class ClaimSearchRequestByMemberPath(SearchRequest[ClaimSearchByMemberPath]):
+    """
+    Full request envelope — /members/{memberId}/claims/search.
+    memberId is taken from path param, not from body.
+    """
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        json_schema_extra={
+            "example": {
+                "searchRequest": {
+                    "authNum": None,
+                    "dateFilledStart": None,
+                    "dateFilledEnd": None,
+                    "excludeTestClaims": True
+                },
+                "sort": {
+                    "sortBy": "id",
+                    "sortDir": "ASC"
+                },
+                "pagination": {
+                    "page": 1,
+                    "pageSize": 20
+                }
+            }
+        }
+    )
+
 
 
 class ClaimSearchRequest(SearchRequest[ClaimSearch]):
@@ -201,7 +276,7 @@ class ClaimsByEntityQuery(PaginationRequest):
     def validate_date_range(self) -> "ClaimsByEntityQuery":
         if self.start_date and self.end_date:
             if self.end_date < self.start_date:
-                from core.exceptions import InvalidDateRangeException
+                from app.core.exceptions import InvalidDateRangeException
 
                 raise InvalidDateRangeException(
                     f"endDate ({self.end_date}) must be >= "
@@ -209,7 +284,7 @@ class ClaimsByEntityQuery(PaginationRequest):
                 )
             span_days = (self.end_date - self.start_date).days
             if span_days > _MAX_DATE_RANGE_DAYS:
-                from core.exceptions import InvalidDateRangeException
+                from app.core.exceptions import InvalidDateRangeException
 
                 raise InvalidDateRangeException(
                     "Date range cannot exceed 12 months "

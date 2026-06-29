@@ -172,7 +172,7 @@ wsl --install
 # This will install Ubuntu by default. Restart your system if prompted.
 ```
 
-**Step B: Install Ubuntu 24.04 LTS from Microsoft Store (Recommended)**
+**Step B: Install Ubuntu 24.04 LTS from Microsoft Store**
 
 1. Open **Microsoft Store** (search in Windows Start menu)
 2. Search for **"Ubuntu 24.04 LTS"**
@@ -181,7 +181,7 @@ wsl --install
 5. On first launch, it will configure itself (may take 2-3 minutes)
 6. Create a Unix username and password when prompted
 
-**Alternative: Command-line installation**
+**Alternative: Command-line installation (Recommended)**
 ```powershell
 # List available distributions
 wsl --list --online
@@ -218,7 +218,7 @@ sudo apt-get update && sudo apt-get upgrade -y
 
 ---
 
-### 1. Enable WSL interop
+### 1. Enable WSL interop (To be followed only when wsl is not activating after following above commands)
 
 WSL interop must be enabled for Docker Desktop and VS Code to work correctly.
 
@@ -245,7 +245,7 @@ Then restart WSL from a Windows PowerShell window:
 wsl --shutdown
 ```
 
-### 2. Connect VS Code to WSL
+### 2. Connect VS Code to WSL (Optional)
 
 Do not use `code .` from the WSL terminal — it will fail with an `Exec format error` because it tries to run the Windows `.exe` directly.
 

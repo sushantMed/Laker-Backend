@@ -193,7 +193,12 @@ class ClaimService:
         """
         member = await self._member_repo.get_by_member_id(member_id)
         if not member:
-            raise MemberNotFoundException(f"Member '{member_id}' not found.")
+            return PagedResponse.of(
+                data=[],
+                page=request.page,
+                page_size=request.page_size,
+                total=0,
+            )
 
         items, total = await self._repo.get_claims_by_member_id(
             member_id,

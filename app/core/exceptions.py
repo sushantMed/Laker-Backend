@@ -106,6 +106,12 @@ class MissingSearchCriteriaException(AppException):
     ) -> None:
         super().__init__(message, status_code=400)
 
+
+class DrugNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)
+        self.code = "DRUG_NOT_FOUND"
+
 class ClaimNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
@@ -127,10 +133,12 @@ class NoSearchCriteriaException(AppException):
 class PharmacyNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
+        self.code = "PHARMACY_NOT_FOUND"
 
 
 class PrescriberNotFoundException(AppException):
     def __init__(self, message: str) -> None:
-        super().__init__(message, status_code=404)  
+        super().__init__(message, status_code=404)
+        self.code = "PRESCRIBER_NOT_FOUND"
 
 

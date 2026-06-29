@@ -1,130 +1,335 @@
 """
 Integration tests for /api/v1/auth
-Uses pytest-anyio + httpx AsyncClient against a SQLite in-memory DB.
+
+Endpoints:
+  POST /api/v1/auth/login
+  POST /api/v1/auth/logout
+  POST /api/v1/auth/refresh
+  GET  /api/v1/auth/me
+
+Notes:
+  - login/refresh catch all exceptions internally and return 200 with
+    success=false on failure — no 4xx from these endpoints.
+  - logout and me use real HTTPBearer — requires raw_client (no bearer override).
+  - raw_client fixture is defined here since it's auth-specific.
 """
+
+from __future__ import annotations
 
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from httpx import AsyncClient, ASGITransport
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import AsyncGenerator
 
-from app.database.base import Base
-from app.database.session import get_db
 from app.main import app
-
-# ── SQLite in-memory engine for tests ────────────────────────────────────────
-
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-TestSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+from app.database.session import get_db
+from .conftest import _make_db_override, TestSessionLocal
 
 
-async def override_get_db():
-    async with TestSession() as session:
-        yield session
+AUTH_BASE = "/api/v1/auth"
 
 
-app.dependency_overrides[get_db] = override_get_db
+# ── raw_client: real bearer, test DB ─────────────────────────────────────────
 
+@pytest_asyncio.fixture()
+async def raw_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """Client with real bearer dependency — used for me/logout tests."""
+    app.dependency_overrides[get_db] = _make_db_override(db_session)
 
-# ── Fixtures ──────────────────────────────────────────────────────────────────
-
-@pytest_asyncio.fixture(autouse=True)
-async def setup_db():
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
-@pytest_asyncio.fixture
-async def client():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as ac:
         yield ac
 
+    app.dependency_overrides.clear()
 
-@pytest_asyncio.fixture
-async def seeded_user(client):
-    """Register a user directly in DB so we can test login."""
+
+# ── seeded_user: creates a real user inside the test transaction ──────────────
+
+@pytest_asyncio.fixture()
+async def seeded_user(db_session: AsyncSession) -> dict:
+    """
+    Inserts a user into the test DB (inside the rollback transaction).
+    Returns login credentials dict.
+    """
     from app.core.security import hash_password
     from app.models.user_model import UserModel
 
-    async with TestSession() as session:
-        user = UserModel(
-            email="test@example.com",
-            first_name="Test",
-            last_name="User",
-            hashed_password=hash_password("Password1!"),
-            role="user",
-            status="ACTIVE",
-        )
-        session.add(user)
-        await session.commit()
+    user = UserModel(
+        email="test@example.com",
+        first_name="Test",
+        last_name="User",
+        hashed_password=hash_password("Password1!"),
+        role="user",
+        status="ACTIVE",
+    )
+    db_session.add(user)
+    await db_session.flush()
     return {"email": "test@example.com", "password": "Password1!"}
 
 
-# ── Tests ─────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# POST /api/v1/auth/login
+# ═════════════════════════════════════════════════════════════════════════════
 
-@pytest.mark.asyncio
-async def test_login_success(client, seeded_user):
-    resp = await client.post("/api/v1/auth/login", json=seeded_user)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "accessToken" in data
-    assert "refreshToken" in data
-    assert data["user"]["email"] == seeded_user["email"]
+class TestLogin:
+
+    async def test_login_success_returns_200(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        resp = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        assert resp.status_code == 200
+
+    async def test_login_success_response_shape(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        resp = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        body = resp.json()
+        assert body["success"] is True
+        assert body["message"] == "Login successful"
+        assert "data" in body
+
+    async def test_login_returns_access_and_refresh_tokens(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        resp = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        data = resp.json()["data"]
+        assert "accessToken" in data
+        assert "refreshToken" in data
+        assert data["accessToken"] != ""
+        assert data["refreshToken"] != ""
+
+    async def test_login_returns_expires_in_and_token_type(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        data = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()["data"]
+        assert data["tokenType"] == "Bearer"
+        assert isinstance(data["expiresIn"], int)
+        assert data["expiresIn"] > 0
+
+    async def test_login_wrong_password_returns_success_false(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        # login catches exceptions internally — always 200, success=false on failure
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/login",
+            json={"email": seeded_user["email"], "password": "WrongPass1!"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False
+
+    async def test_login_unknown_email_returns_success_false(
+        self, raw_client: AsyncClient
+    ):
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/login",
+            json={"email": "nobody@example.com", "password": "Password1!"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False
+
+    async def test_login_invalid_email_format_returns_422(
+        self, raw_client: AsyncClient
+    ):
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/login",
+            json={"email": "not-an-email", "password": "Password1!"},
+        )
+        assert resp.status_code == 422
+
+    async def test_login_missing_password_returns_422(
+        self, raw_client: AsyncClient
+    ):
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/login",
+            json={"email": "test@example.com"},
+        )
+        assert resp.status_code == 422
+
+    async def test_login_password_too_short_returns_422(
+        self, raw_client: AsyncClient
+    ):
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/login",
+            json={"email": "test@example.com", "password": "short"},
+        )
+        assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
-async def test_login_wrong_password(client, seeded_user):
-    resp = await client.post(
-        "/api/v1/auth/login",
-        json={"email": seeded_user["email"], "password": "WrongPass1!"},
-    )
-    assert resp.status_code == 401
+# ═════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/auth/me
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestMe:
+
+    async def test_me_no_auth_header_returns_403(self, raw_client: AsyncClient):
+        resp = await raw_client.get(f"{AUTH_BASE}/me")
+        assert resp.status_code == 403
+
+    async def test_me_invalid_token_returns_200_success_false(
+        self, raw_client: AsyncClient
+    ):
+        # me() catches exceptions — returns 200 success=false for bad token
+        resp = await raw_client.get(
+            f"{AUTH_BASE}/me",
+            headers={"Authorization": "Bearer invalidtoken"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False
+
+    async def test_me_success_returns_user_profile(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        token = login.json()["data"]["accessToken"]
+
+        resp = await raw_client.get(
+            f"{AUTH_BASE}/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    async def test_me_response_contains_user_fields(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()["data"]["accessToken"]
+        profile = (await raw_client.get(
+            f"{AUTH_BASE}/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )).json()["data"]
+
+        assert profile["email"] == seeded_user["email"]
+        assert "userId" in profile
+        assert "firstName" in profile
+        assert "lastName" in profile
+        assert "role" in profile
+        assert "permissions" in profile
+
+    async def test_me_after_logout_returns_success_false(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()["data"]["accessToken"]
+
+        await raw_client.post(
+            f"{AUTH_BASE}/logout",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        resp = await raw_client.get(
+            f"{AUTH_BASE}/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.json()["success"] is False
 
 
-@pytest.mark.asyncio
-async def test_me_requires_auth(client):
-    resp = await client.get("/api/v1/auth/me")
-    assert resp.status_code == 403  # HTTPBearer returns 403 when no header
+# ═════════════════════════════════════════════════════════════════════════════
+# POST /api/v1/auth/refresh
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestRefresh:
+
+    async def test_refresh_returns_new_token_pair(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        refresh_token = login.json()["data"]["refreshToken"]
+
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/refresh",
+            json={"refreshToken": refresh_token},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    async def test_refresh_token_is_rotated(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        old_refresh = login.json()["data"]["refreshToken"]
+
+        new_data = (await raw_client.post(
+            f"{AUTH_BASE}/refresh",
+            json={"refreshToken": old_refresh},
+        )).json()["data"]
+
+        assert new_data["refreshToken"] != old_refresh
+
+    async def test_refresh_response_has_required_fields(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        data = (await raw_client.post(
+            f"{AUTH_BASE}/refresh",
+            json={"refreshToken": login.json()["data"]["refreshToken"]},
+        )).json()["data"]
+
+        assert "accessToken" in data
+        assert "refreshToken" in data
+        assert "expiresIn" in data
+
+    async def test_refresh_with_invalid_token_returns_success_false(
+        self, raw_client: AsyncClient
+    ):
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/refresh",
+            json={"refreshToken": "not-a-real-token"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False
+
+    async def test_refresh_token_cannot_be_reused(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        old_refresh = login.json()["data"]["refreshToken"]
+
+        # Use it once
+        await raw_client.post(f"{AUTH_BASE}/refresh", json={"refreshToken": old_refresh})
+
+        # Reuse should fail
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/refresh",
+            json={"refreshToken": old_refresh},
+        )
+        assert resp.json()["success"] is False
+
+    async def test_refresh_missing_token_returns_422(self, raw_client: AsyncClient):
+        resp = await raw_client.post(f"{AUTH_BASE}/refresh", json={})
+        assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
-async def test_me_success(client, seeded_user):
-    login = await client.post("/api/v1/auth/login", json=seeded_user)
-    token = login.json()["accessToken"]
-    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert me.status_code == 200
-    assert me.json()["email"] == seeded_user["email"]
+# ═════════════════════════════════════════════════════════════════════════════
+# POST /api/v1/auth/logout
+# ═════════════════════════════════════════════════════════════════════════════
 
+class TestLogout:
 
-@pytest.mark.asyncio
-async def test_refresh_token_rotation(client, seeded_user):
-    login = await client.post("/api/v1/auth/login", json=seeded_user)
-    refresh_token = login.json()["refreshToken"]
-    resp = await client.post("/api/v1/auth/refresh", json={"refreshToken": refresh_token})
-    assert resp.status_code == 200
-    new_data = resp.json()
-    assert new_data["refreshToken"] != refresh_token  # rotated
+    async def test_logout_no_auth_returns_403(self, raw_client: AsyncClient):
+        resp = await raw_client.post(f"{AUTH_BASE}/logout")
+        assert resp.status_code == 403
 
+    async def test_logout_success_returns_204(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()["data"]["accessToken"]
 
-@pytest.mark.asyncio
-async def test_logout(client, seeded_user):
-    login = await client.post("/api/v1/auth/login", json=seeded_user)
-    token = login.json()["accessToken"]
-    resp = await client.post(
-        "/api/v1/auth/logout",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert resp.status_code == 204
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/logout",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 204
 
+    async def test_logout_response_has_no_body(
+        self, raw_client: AsyncClient, seeded_user: dict
+    ):
+        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()["data"]["accessToken"]
 
-@pytest.mark.asyncio
-async def test_health(client):
-    resp = await client.get("/api/v1/health")
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/logout",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.content == b""

@@ -3,17 +3,17 @@
 
 set -e
 
-echo "⏳ Waiting for PostgreSQL to be ready..."
+echo "Waiting for PostgreSQL to be ready..."
 while ! nc -z "$DB_HOST" "$DB_PORT" 2>/dev/null; do
     echo "  PostgreSQL not ready yet, retrying in 2 seconds..."
     sleep 2
 done
-echo "✅ PostgreSQL is ready!"
+echo "PostgreSQL is ready!"
 
 echo ""
-echo "🔄 Running database migrations..."
+echo "Running database migrations..."
 alembic upgrade head
-echo "✅ Migrations completed!"
+echo "Migrations completed!"
 
 echo ""
 echo "🚀 Starting Laker API..."
