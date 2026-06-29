@@ -9,7 +9,8 @@ import pytest_asyncio  #type: ignore
 from httpx import ASGITransport, AsyncClient  #type: ignore
 from sqlalchemy import event  #type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  #type: ignore
-
+from app.models.member_model import MemberModel
+from app.utils.enums import Gender, CoverageType
 from app.core.config import settings
 from app.database.base import Base
 from app.database.session import get_db
@@ -168,6 +169,29 @@ def _make_claim(
         total_paid=total_paid,
     )
 
+
+def _make_member(
+    *,
+    member_id: str,
+    first_name: str = "Test",
+    last_name: str = "User",
+    date_of_birth: date = date(1990, 1, 1),
+    person_code: str = "01",
+    rel_code: str = "01",
+    start_date: date = date(2020, 1, 1),
+    end_date: date = date(2099, 12, 31),
+) -> MemberModel:
+    return MemberModel(
+        id=uuid.uuid4(),
+        member_id=member_id,
+        first_name=first_name,
+        last_name=last_name,
+        date_of_birth=date_of_birth,
+        person_code=person_code,
+        rel_code=rel_code,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 async def _seed(session: AsyncSession, *claims: ClaimModel) -> list[ClaimModel]:
     session.add_all(claims)
