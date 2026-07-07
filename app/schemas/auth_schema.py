@@ -43,16 +43,26 @@ class RefreshResponse(BaseModel):
     refreshToken: str
     expiresIn: int
 
+
+class ErrorDetail(BaseModel):
+    status_code: int
+    message: str
+
 class ApiResponse(GenericModel, Generic[T]):
     success: bool
     message: str
     data: Optional[T] = None
-    errors: list[str] = []
+    error: Optional[ErrorDetail] = None
  
     @classmethod
     def ok(cls, data: T, message: str = "Success") -> "ApiResponse[T]":
         return cls(success=True, message=message, data=data)
  
     @classmethod
-    def fail(cls, message: str, errors: list[str] = []) -> "ApiResponse[None]":
-        return cls(success=False, message=message, data=None, errors=errors)
+    def fail(cls, message: str, status_code: int, exception_message: Optional[str] = None) -> "ApiResponse[None]":
+        return cls(
+            success=False,
+            message=message,
+            data=None,
+            error=ErrorDetail(status_code=status_code, message=exception_message or message),
+        )

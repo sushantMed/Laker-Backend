@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
+from app.core.exceptions import InvalidCredentialsError, UserNotFoundError,UserInactiveError, TooManyAttemptsError
+from app.core.exceptions import UserInactiveError
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +25,8 @@ from app.schemas.auth_schema import (
     RefreshResponse,
     UserProfile,
 )
+from redis.asyncio import Redis
+
 
 
 class AuthService:
@@ -30,25 +34,40 @@ class AuthService:
     refresh_token_invalid: str = "Invalid refresh token"
     refresh_token_expired: str = "Refresh token expired"
     unauthorized: str = "Unauthorized"
-    def __init__(self, session: AsyncSession) -> None:
+
+    MAX_ATTEMPTS = 5
+    WINDOW_SECONDS = 15 * 60  # 15 minutes
+    
+    def __init__(self, session: AsyncSession, redis: Redis) -> None:
         self.repo = AuthRepository(session)
+        self.redis = redis
+        self.session=session
 
     # ── Public methods ────────────────────────────────────────────────────────
 
     async def login(self, request: LoginRequest) -> LoginResponse:
         user = await self.repo.get_user_by_email(request.email)
-        if not user or not verify_password(request.password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.credentials_invalid
-            )
+        if not user:
+            raise UserNotFoundError()
+
+        print(f"User status: {user.status}, Expected status: ACTIVE")
+        print(user)
         if user.status != "ACTIVE":
-            raise HTTPException(status_code=423, detail="Account locked")
+            raise UserInactiveError()
+        if not verify_password(request.password, user.hashed_password):
+            await self._register_failed_attempt(request.email)
+            raise InvalidCredentialsError()
+        if await self._is_rate_limited(request.email):
+            raise TooManyAttemptsError()
+
+        await self._clear_attempts(request.email)
 
         access_token, _, expires_in = create_access_token(
             subject=str(user.id),
             email=user.email,
             role=user.role,
         )
+        
         refresh_token = await self._create_refresh_token(user)
         return LoginResponse(
             accessToken=access_token,
@@ -56,6 +75,21 @@ class AuthService:
             expiresIn=expires_in,
             user=self._profile(user),
         )
+    
+    async def _is_rate_limited(self, email: str) -> bool:
+        key = f"login_attempts:{email.lower()}"
+        attempts = await self.redis.get(key)
+        return attempts is not None and int(attempts) >= self.MAX_ATTEMPTS
+
+    async def _register_failed_attempt(self, email: str) -> None:
+        key = f"login_attempts:{email.lower()}"
+        async with self.redis.pipeline(transaction=True) as pipe:
+            pipe.incr(key)
+            pipe.expire(key, self.WINDOW_SECONDS, nx=True)
+            await pipe.execute()
+
+    async def _clear_attempts(self, email: str) -> None:
+        await self.redis.delete(f"login_attempts:{email.lower()}")
 
     async def logout(self, access_token: str) -> None:
         claims = decode_access_token(access_token, verify_exp=False)
