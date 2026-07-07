@@ -37,17 +37,18 @@ class ValidationError(AppError):
 
 # ── Global exception handlers ─────────────────────────────────────────────────
 
-async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
-        content={"code": exc.code, "message": exc.detail},
+        content={"error": {"code": exc.code, "message": exc.detail}},
     )
 
 
-async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
+def generic_error_handler(_request: Request, exc: Exception) -> JSONResponse:
+    msg = str(exc) if exc is not None else "An unexpected error occurred"
     return JSONResponse(
         status_code=500,
-        content={"code": "INTERNAL_SERVER_ERROR", "message": "An unexpected error occurred"},
+        content={"error": {"code": "INTERNAL_SERVER_ERROR", "message": msg}},
     )
 
 class AppException(Exception):
@@ -67,6 +68,27 @@ class ForbiddenException(AppException):
 class NotFoundException(AppException):
     def __init__(self, message: str = "Not found"):
         super().__init__(message, status_code=404)
+
+
+
+class UserNotFoundError(AppException):
+    def __init__(self, detail: str = "User not found"):
+        super().__init__(status_code=404, message=detail)
+
+
+class InvalidCredentialsError(AppException):
+    def __init__(self, detail: str = "Invalid email or password"):
+        super().__init__(status_code=401, message=detail)
+
+
+class UserInactiveError(AppException):
+    def __init__(self, detail: str = "Account is inactive"):
+        super().__init__(status_code=403, message=detail)
+
+
+class TooManyAttemptsError(AppException):
+    def __init__(self, detail: str = "Too many login attempts"):
+        super().__init__(status_code=429, message=detail)
         
 
 class MemberNotFoundException(AppException):
