@@ -39,12 +39,12 @@ def upgrade() -> None:
     sa.Column('dispensing_fee', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('copay', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('total_paid', sa.Numeric(precision=10, scale=2), nullable=True),
-    sa.Column('is_test_claim', sa.Boolean(), server_default='false', nullable=False),
+    sa.Column('is_test_claim', sa.Boolean(), server_default=sa.text('0'), nullable=False),
     sa.Column('plan_id', sa.String(length=20), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.ForeignKeyConstraint(['member_id'], ['members.member_id'], ondelete='RESTRICT'),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.ForeignKeyConstraint(['member_id'], ['members.member_id']),
     sa.ForeignKeyConstraint(['plan_id'], ['plans.plan_id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )

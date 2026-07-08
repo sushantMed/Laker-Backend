@@ -28,17 +28,17 @@ def upgrade() -> None:
     sa.Column('rx_pcn', sa.String(length=20), nullable=True),
     sa.Column('region', sa.String(length=50), nullable=True),
     sa.Column('location', sa.String(length=50), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     sa.Column('is_deleted', sa.Boolean(), nullable=False),
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('plan_id', name='uq_plans_plan_id')
     )
-    op.create_index(op.f('ix_plans_plan_id'), 'plans', ['plan_id'], unique=True)
     op.create_table('revoked_access_tokens',
     sa.Column('token_hash', sa.String(length=64), nullable=False),
     sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
     sa.PrimaryKeyConstraint('token_hash', 'id')
     )
     op.create_table('users',
@@ -48,7 +48,7 @@ def upgrade() -> None:
     sa.Column('hashed_password', sa.String(length=255), nullable=False),
     sa.Column('role', sa.String(length=20), nullable=False),
     sa.Column('status', sa.String(length=20), nullable=False),
-    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
@@ -74,25 +74,24 @@ def upgrade() -> None:
     sa.Column('start_date', sa.Date(), nullable=False),
     sa.Column('end_date', sa.Date(), nullable=False),
     sa.Column('plan_id', sa.String(length=20), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     sa.Column('is_deleted', sa.Boolean(), nullable=False),
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.ForeignKeyConstraint(['plan_id'], ['plans.plan_id'], ondelete='RESTRICT'),
-    sa.ForeignKeyConstraint(['subscriber_member_id'], ['members.member_id'], ondelete='RESTRICT'),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.ForeignKeyConstraint(['plan_id'], ['plans.plan_id']),
+    sa.ForeignKeyConstraint(['subscriber_member_id'], ['members.member_id']),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_members_member_id'), 'members', ['member_id'], unique=True)
     op.create_index(op.f('ix_members_plan_id'), 'members', ['plan_id'], unique=False)
     op.create_index(op.f('ix_members_subscriber_member_id'), 'members', ['subscriber_member_id'], unique=False)
     op.create_table('refresh_tokens',
     sa.Column('token', sa.String(length=120), nullable=False),
     sa.Column('family_id', sa.String(length=80), nullable=False),
-    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.Uuid(), nullable=False),
     sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('consumed', sa.Boolean(), nullable=False),
     sa.Column('revoked', sa.Boolean(), nullable=False),
-    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -105,10 +104,10 @@ def upgrade() -> None:
     sa.Column('city', sa.String(length=100), nullable=True),
     sa.Column('state', sa.String(length=2), nullable=True),
     sa.Column('zip', sa.String(length=10), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     sa.Column('is_deleted', sa.Boolean(), nullable=False),
-    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
     sa.ForeignKeyConstraint(['member_id'], ['members.member_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -125,11 +124,9 @@ def downgrade() -> None:
     op.drop_table('refresh_tokens')
     op.drop_index(op.f('ix_members_subscriber_member_id'), table_name='members')
     op.drop_index(op.f('ix_members_plan_id'), table_name='members')
-    op.drop_index(op.f('ix_members_member_id'), table_name='members')
     op.drop_table('members')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
     op.drop_table('revoked_access_tokens')
-    op.drop_index(op.f('ix_plans_plan_id'), table_name='plans')
     op.drop_table('plans')
     # ### end Alembic commands ###

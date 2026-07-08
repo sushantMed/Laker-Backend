@@ -21,7 +21,9 @@ import app.models.prescriber_model  # noqa: F401
 import app.models.claim_model  # noqa: F401
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Escape '%' so ConfigParser doesn't treat URL-encoded credentials
+# (e.g. '%23' from a '#' in the password) as interpolation syntax.
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
