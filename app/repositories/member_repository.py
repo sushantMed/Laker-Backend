@@ -65,7 +65,7 @@ class MemberRepository(BaseRepository[MemberModel]):
                     MemberModel.prev_card_id.ilike(f"%{criteria.member_id}%")
                 )
             else:
-                stmt = stmt.where(MemberModel.member_id.ilike(f"%{criteria.member_id}%"))
+                stmt = stmt.where(MemberModel.member_id.ilike(f"{criteria.member_id}%"))
 
         if criteria.first_name:
             stmt = stmt.where(MemberModel.first_name.ilike(f"%{criteria.first_name}%"))
