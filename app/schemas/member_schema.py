@@ -173,7 +173,7 @@ class MemberSearch(BaseModel):
             ]
         )
         if not has_criteria:
-            from core.exceptions import MissingSearchCriteriaException
+            from app.core.exceptions import MissingSearchCriteriaException
 
             raise MissingSearchCriteriaException(
                 "At least one search criterion (carrier, memberId, firstName, "
@@ -227,7 +227,7 @@ class AddFamilyMemberRequest(BaseModel):
     @model_validator(mode="after")
     def validate_eligibility_dates(self) -> "AddFamilyMemberRequest":
         if self.end_date < self.start_date:
-            from core.exceptions import InvalidEligibilityException
+            from app.core.exceptions import InvalidEligibilityException
 
             raise InvalidEligibilityException(
                 f"endDate ({self.end_date}) must be >= startDate ({self.start_date})."
@@ -237,7 +237,7 @@ class AddFamilyMemberRequest(BaseModel):
     @model_validator(mode="after")
     def validate_rel_code_not_cardholder(self) -> "AddFamilyMemberRequest":
         if self.rel_code == RelCode.CARDHOLDER.value:
-            from core.exceptions import InvalidFamilyRelationshipException
+            from app.core.exceptions import InvalidFamilyRelationshipException
 
             raise InvalidFamilyRelationshipException(
                 "Cannot add a Cardholder (relCode=01) as a family member. "
