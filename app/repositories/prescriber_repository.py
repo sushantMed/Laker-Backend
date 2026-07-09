@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import select, false
 
 from app.models.prescriber_model import PrescriberModel
 from app.repositories.base_repository import BaseRepository
@@ -13,7 +13,7 @@ class PrescriberRepository(BaseRepository[PrescriberModel]):
     async def get_by_npi(self, npi: str) -> PrescriberModel | None:
         stmt = select(PrescriberModel).where(
             PrescriberModel.npi == npi,
-            PrescriberModel.is_deleted.is_(False),
+            PrescriberModel.is_deleted == false(),
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -27,7 +27,7 @@ class PrescriberRepository(BaseRepository[PrescriberModel]):
         sort_by: str,
         sort_dir: str,
     ) -> tuple[list[PrescriberModel], int]:
-        stmt = select(PrescriberModel).where(PrescriberModel.is_deleted.is_(False))
+        stmt = select(PrescriberModel).where(PrescriberModel.is_deleted == false())
 
         if criteria.name:
             stmt = stmt.where(PrescriberModel.name.ilike(f"%{criteria.name}%"))

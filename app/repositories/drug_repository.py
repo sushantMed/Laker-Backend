@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import select, false
 
 from app.models.drug_model import DrugModel
 from app.repositories.base_repository import BaseRepository
@@ -13,7 +13,7 @@ class DrugRepository(BaseRepository[DrugModel]):
     async def get_by_ndc(self, ndc: str) -> DrugModel | None:
         stmt = select(DrugModel).where(
             DrugModel.ndc == ndc,
-            DrugModel.is_deleted.is_(False),
+            DrugModel.is_deleted == false(),
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -29,7 +29,7 @@ class DrugRepository(BaseRepository[DrugModel]):
     ) -> tuple[list[DrugModel], int]:
         stmt = select(DrugModel).where(
             DrugModel.gpi == gpi,
-            DrugModel.is_deleted.is_(False),
+            DrugModel.is_deleted == false(),
         )
         return await self.paginate(
             stmt,
@@ -48,7 +48,7 @@ class DrugRepository(BaseRepository[DrugModel]):
         sort_by: str,
         sort_dir: str,
     ) -> tuple[list[DrugModel], int]:
-        stmt = select(DrugModel).where(DrugModel.is_deleted.is_(False))
+        stmt = select(DrugModel).where(DrugModel.is_deleted == false())
 
         if criteria.name:
             stmt = stmt.where(DrugModel.drug_name.ilike(f"%{criteria.name}%"))

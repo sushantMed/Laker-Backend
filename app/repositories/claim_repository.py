@@ -12,7 +12,7 @@ import uuid
 from datetime import date
 from typing import Optional, Sequence
 
-from sqlalchemy import asc, desc, func, select
+from sqlalchemy import asc, desc, func, select, false
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -68,7 +68,7 @@ class ClaimRepository:
         if date_filled_end:
             stmt = stmt.where(ClaimModel.date_filled <= date_filled_end)
         if exclude_test_claims:
-            stmt = stmt.where(ClaimModel.is_test_claim.is_(False))
+            stmt = stmt.where(ClaimModel.is_test_claim == false())
 
         return await self._paginate(stmt, page, page_size, sort_by, sort_dir)
 
@@ -90,7 +90,7 @@ class ClaimRepository:
             .where(ClaimModel.member_id == member_id)
         )
         if exclude_test_claims:
-            stmt = stmt.where(ClaimModel.is_test_claim.is_(False))
+            stmt = stmt.where(ClaimModel.is_test_claim == false())
 
         return await self._paginate(stmt, page, page_size, sort_by, sort_dir)
 
