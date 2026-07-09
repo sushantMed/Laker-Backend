@@ -67,7 +67,7 @@ class ForbiddenException(AppException):
 class NotFoundException(AppException):
     def __init__(self, message: str = "Not found"):
         super().__init__(message, status_code=404)
-        
+
 
 class MemberNotFoundException(AppException):
     def __init__(self, message: str) -> None:
@@ -124,11 +124,11 @@ class DrugNotFoundException(AppException):
 
 class InvalidDateRangeException(AppException):
     def __init__(self, message: str) -> None:
-        super().__init__(message, status_code=422)  
+        super().__init__(message, status_code=422)
 
 class NoSearchCriteriaException(AppException):
     def __init__(self, message: str) -> None:
-        super().__init__(message, status_code=400)  
+        super().__init__(message, status_code=400)
 
 class PharmacyNotFoundException(AppException):
     def __init__(self, message: str) -> None:
@@ -140,5 +140,3 @@ class PrescriberNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
         self.code = "PRESCRIBER_NOT_FOUND"
-
-

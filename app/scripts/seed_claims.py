@@ -3,7 +3,7 @@ Seed the claims table from a JSON file.
 This script is intended to be run as a standalone program, not imported as a module.
 Usage:
     python app/scripts/seed_claims.py [--file PATH] [--skip-missing-members]
-Options:    
+Options:
     --file PATH: Path to the claims JSON file (default: app/seed_data/claims.json).
     --skip-missing-members: Skip (instead of aborting on) claims whose memberId doesn't exist.
 Assumptions:

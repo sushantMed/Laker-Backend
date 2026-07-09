@@ -48,11 +48,11 @@ class ApiResponse(GenericModel, Generic[T]):
     message: str
     data: Optional[T] = None
     errors: list[str] = []
- 
+
     @classmethod
     def ok(cls, data: T, message: str = "Success") -> "ApiResponse[T]":
         return cls(success=True, message=message, data=data)
- 
+
     @classmethod
     def fail(cls, message: str, errors: list[str] = []) -> "ApiResponse[None]":
         return cls(success=False, message=message, data=None, errors=errors)

@@ -74,7 +74,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(Exception, generic_error_handler)
-    
+
     # ── Custom middleware stack ───────────────────────────────────────────────
     # Added bottom-up: last registered = outermost at ASGI level.
     #

@@ -215,7 +215,7 @@ class ClaimSearchByMemberPath(BaseModel):
                 raise InvalidDateRangeException(
                     "Date Filled range cannot exceed 12 months."
                 )
-        return self 
+        return self
 
 
 class ClaimSearchRequestByMemberPath(SearchRequest[ClaimSearchByMemberPath]):

@@ -38,6 +38,8 @@ from app.schemas.claim_schema import (
     ClaimSearchRequest,
     ClaimsByEntityQuery,
     ClaimSummary,
+    PharmacySummary,
+    PrescriberSummary,
 )
 from app.utils.pagination import PagedResponse
 
@@ -71,10 +73,22 @@ def _to_claim_detail(c: ClaimModel) -> ClaimDetail:
         quantity=c.quantity,
         daysSupply=c.days_supply,
         refillsRemaining=c.refills_remaining,
-        pharmacyNpi=c.pharmacy_npi,
-        pharmacyName=c.pharmacy_name,
-        prescriberNpi=c.prescriber_npi,
-        prescriberName=c.prescriber_name,
+        pharmacy=(
+            PharmacySummary(
+                pharmacyNpi=c.pharmacy_npi,
+                pharmacyName=c.pharmacy_name,
+            )
+            if c.pharmacy_npi or c.pharmacy_name
+            else None
+        ),
+        prescriber=(
+            PrescriberSummary(
+                prescriberNpi=c.prescriber_npi,
+                prescriberName=c.prescriber_name,
+            )
+            if c.prescriber_npi or c.prescriber_name
+            else None
+        ),
         ingredientCost=c.ingredient_cost,
         dispensingFee=c.dispensing_fee,
         copay=c.copay,

@@ -136,13 +136,13 @@ class MemberService:
         cached = await self._cache.get(member_id, MemberDetail)
         if cached:
             return cached
-        
+
         member = await self._repo.get_by_member_id(member_id)
         if not member:
             raise MemberNotFoundException(f"Member '{member_id}' not found.")
-        
+
         detail = _to_member_detail(member)
-        await self._cache.set(member_id, detail)    
+        await self._cache.set(member_id, detail)
         return detail
 
     # ── Search ───────────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ class MemberService:
 
         # 5. Build and persist new member
         new_member_id = MemberRepository.generate_member_id()
-        
+
 
         # 6. Generate family_position
         max_fp = await self._repo.get_max_family_position(subscriber_member_id)

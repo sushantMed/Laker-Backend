@@ -20,12 +20,14 @@ MarkupSafe==3.0.3
 oracledb==2.5.1
 packaging==26.2
 pluggy==1.6.0
+pre-commit==4.6.0
 pydantic==2.10.3
 pydantic-settings==2.6.1
 pydantic_core==2.27.1
 Pygments==2.20.0
 pytest==9.0.3
 pytest-asyncio==1.4.0
+pytest-cov==7.1.0
 python-dotenv==1.0.1
 PyYAML==6.0.3
 redis==5.0.1

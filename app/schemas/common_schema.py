@@ -79,7 +79,7 @@ class SearchRequest(GenericModel, Generic[TSearch]):
     sort: SortRequest = Field(default_factory=SortRequest)
 
     pagination: PaginationRequest = Field(default_factory=PaginationRequest)
-   
+
 
 
 class ApiResponse(GenericModel, Generic[T]):

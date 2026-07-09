@@ -180,5 +180,3 @@ class MemberRepository(BaseRepository[MemberModel]):
         a sequence or domain-specific algorithm."""
         suffix = str(int(time.time() * 1000))[-3:]
         return f"MBR{suffix}"
-
-

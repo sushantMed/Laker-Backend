@@ -22,10 +22,10 @@ Test strategy
 
 from __future__ import annotations
 from datetime import date
- 
+
 from httpx import AsyncClient #type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession #type: ignore
- 
+
 from .conftest import BASE_PATH, _auth_header, _make_claim, _seed, _make_member
 
 
@@ -254,7 +254,7 @@ class TestGetClaim:
     ):
         db_session.add(_make_member(member_id="MBR001"))
         await db_session.flush()
-        
+
         claim = _make_claim(
             auth_num="AUTH-PHARM-01",
             pharmacy_npi="1111111111",
@@ -361,7 +361,7 @@ class TestSearchClaimsForMember:
     async def test_member_search_with_auth_num_filter(
         self, client: AsyncClient, db_session: AsyncSession
     ):
-        
+
         db_session.add(_make_member(member_id="MBR-AN-01"))
         await db_session.flush()
 
@@ -385,7 +385,7 @@ class TestSearchClaimsForMember:
     ):
         db_session.add(_make_member(member_id="MBR-DR-01"))
         await db_session.flush()
-        
+
         in_range = _make_claim(member_id="MBR-DR-01", date_filled=date(2024, 5, 15))
         out_range = _make_claim(member_id="MBR-DR-01", date_filled=date(2023, 1, 1))
         await _seed(db_session, in_range, out_range)
@@ -412,7 +412,7 @@ class TestSearchClaimsForMember:
     ):
         db_session.add(_make_member(member_id="MBR-EMPTY-01"))
         await db_session.flush()
-        
+
         """No body criteria — should return all claims for the member."""
         c1 = _make_claim(member_id="MBR-EMPTY-01")
         c2 = _make_claim(member_id="MBR-EMPTY-01")
@@ -476,7 +476,7 @@ class TestGetClaimsForMember:
     ):
         db_session.add(_make_member(member_id="MBR-GET-LIST-01"))
         await db_session.flush()
-        
+
         c1 = _make_claim(member_id="MBR-GET-LIST-01")
         c2 = _make_claim(member_id="MBR-GET-LIST-01")
         await _seed(db_session, c1, c2)
@@ -494,7 +494,7 @@ class TestGetClaimsForMember:
         db_session.add(_make_member(member_id="MBR-MINE"))
         db_session.add(_make_member(member_id="MBR-THEIRS"))
         await db_session.flush()
-        
+
         my_claim = _make_claim(member_id="MBR-MINE")
         other_claim = _make_claim(member_id="MBR-THEIRS")
         await _seed(db_session, my_claim, other_claim)
@@ -556,7 +556,7 @@ class TestGetClaimsForMember:
         print(f"Request headers: {resp.request.headers}====================================")
         print(f"Response: {resp}====================================")
         print(f"Response: {resp.json()}====================================")
-        
+
         assert resp.status_code == 200
         assert resp.json()["data"] == []
 

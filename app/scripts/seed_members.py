@@ -8,7 +8,7 @@ from datetime import date
 from pathlib import Path
 
 from app.database.session import AsyncSessionLocal
-from sqlalchemy import select 
+from sqlalchemy import select
 from app.models.plan_model import PlanModel
 from app.models.member_model import MemberModel
 from app.models.member_address_model import MemberAddressModel
