@@ -1,4 +1,4 @@
-from sqlalchemy import func, select, update, exists
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.auth_model import RefreshTokenModel, RevokedAccessTokenModel
@@ -49,11 +49,11 @@ class AuthRepository:
     async def revoke_access_token(self, t_hash: str, expires_at) -> None:
         if await self.is_access_token_revoked(t_hash):
             return
-        self.session.add(RevokedAccessTokenModel(token_hash=t_hash, expires_at=expires_at))
+        self.session.add(
+            RevokedAccessTokenModel(token_hash=t_hash, expires_at=expires_at)
+        )
         await self.session.commit()
 
     async def is_access_token_revoked(self, t_hash: str) -> bool:
-        stmt = select(
-            exists().where(RevokedAccessTokenModel.token_hash == t_hash)
-        )
+        stmt = select(exists().where(RevokedAccessTokenModel.token_hash == t_hash))
         return await self.session.scalar(stmt)

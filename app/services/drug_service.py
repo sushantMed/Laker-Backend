@@ -67,9 +67,7 @@ class DrugService:
             total=total,
         )
 
-    async def search_drugs(
-        self, request: DrugSearchRequest
-    ) -> PagedResponse[DrugInfo]:
+    async def search_drugs(self, request: DrugSearchRequest) -> PagedResponse[DrugInfo]:
         items, total = await self._repo.search(
             request.searchRequest,
             page=request.pagination.page,
@@ -78,9 +76,7 @@ class DrugService:
             sort_dir=request.sort.sort_dir,
         )
         if not items:
-            raise DrugNotFoundException(
-                "No drugs found matching the search criteria."
-            )
+            raise DrugNotFoundException("No drugs found matching the search criteria.")
         return PagedResponse.of(
             data=[_to_drug_info(d) for d in items],
             page=request.pagination.page,

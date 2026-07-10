@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.common_schema import SearchRequest
@@ -13,26 +11,26 @@ class PrescriberInfo(BaseModel):
     model_config = _CAMEL
 
     npi: str
-    dea: Optional[str] = None
+    dea: str | None = None
     name: str
-    specialty: Optional[str] = None
+    specialty: str | None = None
     address: str
-    phone: Optional[str] = None
-    fax: Optional[str] = None
+    phone: str | None = None
+    fax: str | None = None
 
 
 class PrescriberSearch(BaseModel):
     model_config = _CAMEL
 
-    name: Optional[str] = None
-    npi: Optional[str] = None
-    dea: Optional[str] = None
-    specialty: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = Field(None, max_length=2)
+    name: str | None = None
+    npi: str | None = None
+    dea: str | None = None
+    specialty: str | None = None
+    city: str | None = None
+    state: str | None = Field(None, max_length=2)
 
     @model_validator(mode="after")
-    def at_least_one_criterion(self) -> "PrescriberSearch":
+    def at_least_one_criterion(self) -> PrescriberSearch:
         has_criteria = any(
             [
                 self.name,

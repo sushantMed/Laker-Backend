@@ -36,7 +36,13 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             response: Response = await call_next(request)
         except Exception:
             elapsed_ms = (time.perf_counter() - start) * 1_000
-            logger.exception("!! %s %s  cid=%s  error  %.1fms", request.method, request.url.path, cid, elapsed_ms)
+            logger.exception(
+                "!! %s %s  cid=%s  error  %.1fms",
+                request.method,
+                request.url.path,
+                cid,
+                elapsed_ms,
+            )
             raise
 
         elapsed_ms = (time.perf_counter() - start) * 1_000

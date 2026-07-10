@@ -1,4 +1,5 @@
 import redis.asyncio as redis
+
 from app.core.config import settings
 
 # Connection pool — reused across requests, handles concurrency
@@ -13,6 +14,7 @@ redis_pool = redis.ConnectionPool(
 )
 Redis = redis.Redis
 redis_client = redis.Redis(connection_pool=redis_pool)
+
 
 def get_redis() -> Redis:
     """FastAPI dependency — returns the shared Redis client."""

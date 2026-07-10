@@ -1,27 +1,34 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import date
-from typing import AsyncGenerator
 
-import pytest  #type: ignore
-import pytest_asyncio  #type: ignore
-from httpx import ASGITransport, AsyncClient  #type: ignore
-from sqlalchemy import event  #type: ignore
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  #type: ignore
-from app.models.member_model import MemberModel
-from app.utils.enums import Gender, CoverageType
+import pytest  # type: ignore
+import pytest_asyncio  # type: ignore
+from fakeredis import aioredis as fakeredis  # type: ignore
+from httpx import ASGITransport, AsyncClient  # type: ignore
+from sqlalchemy import event  # type: ignore
+from sqlalchemy.ext.asyncio import (  # type: ignore
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+from app.api.v1.auth import bearer
+from app.cache.redis_client import get_redis
 from app.core.config import settings
 from app.database.base import Base
 from app.database.session import get_db
+from app.dependencies.auth import get_current_user
 from app.main import app
-from app.api.v1.auth import bearer
 from app.models.claim_model import ClaimModel
 from app.models.drug_model import DrugModel
+from app.models.member_model import MemberModel
 from app.models.pharmacy_model import PharmacyModel
 from app.models.prescriber_model import PrescriberModel
-from app.utils.enums import BrandGeneric, Maintenance
-
+from app.models.user_model import UserModel
+from app.utils.enums import BrandGeneric, CoverageType, Gender, Maintenance
 
 # ── Test database ─────────────────────────────────────────────────────────────
 
@@ -34,9 +41,11 @@ engine = create_async_engine(
     echo=False,
 )
 
+
 @event.listens_for(engine.sync_engine, "connect")
 def _set_sqlite_pragma(dbapi_conn, _):
     dbapi_conn.execute("PRAGMA foreign_keys=OFF")
+
 
 TestSessionLocal = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
@@ -68,9 +77,11 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 # ── Dependency overrides ──────────────────────────────────────────────────────
 
+
 def _make_db_override(session: AsyncSession):
     async def _override():
         yield session
+
     return _override
 
 
@@ -78,7 +89,42 @@ async def _noop_bearer():
     return None
 
 
+async def _fake_current_user() -> UserModel:
+    """Bypass real token/redis auth for non-auth endpoint tests.
+
+    Claim and member endpoints depend on app.dependencies.auth.get_current_user
+    (a different HTTPBearer than app.api.v1.auth.bearer, plus a Redis lookup).
+    Overriding that dependency short-circuits the whole auth chain.
+    """
+    return UserModel(
+        id=uuid.uuid4(),
+        email="tester@example.com",
+        first_name="Test",
+        last_name="User",
+        hashed_password="x",
+        role="admin",
+        status="ACTIVE",
+    )
+
+
+@pytest_asyncio.fixture()
+async def fake_redis() -> AsyncGenerator[fakeredis.FakeRedis, None]:
+    """A per-test in-memory Redis, bound to the current event loop.
+
+    The real client in app.cache.redis_client is a module-level singleton whose
+    connection binds to the first event loop that uses it. Since pytest-asyncio
+    gives each test a fresh loop, reusing that singleton raises
+    "RuntimeError: Event loop is closed" on every test after the first.
+    """
+    r = fakeredis.FakeRedis(decode_responses=True)
+    try:
+        yield r
+    finally:
+        await r.aclose()
+
+
 # ── Settings override ─────────────────────────────────────────────────────────
+
 
 @pytest.fixture(autouse=True)
 def disable_cache():
@@ -93,15 +139,20 @@ def disable_cache():
 BASE_PATH = "/api/v1"
 VALID_AUTH_TOKEN = "Bearer test-token"
 
+
 def _auth_header() -> dict[str, str]:
     return {"Authorization": VALID_AUTH_TOKEN}
 
 
 @pytest_asyncio.fixture()
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def client(
+    db_session: AsyncSession, fake_redis: fakeredis.FakeRedis
+) -> AsyncGenerator[AsyncClient, None]:
     """Bearer bypassed — for claim/member/pharmacy/drug tests."""
     app.dependency_overrides[get_db] = _make_db_override(db_session)
     app.dependency_overrides[bearer] = _noop_bearer
+    app.dependency_overrides[get_current_user] = _fake_current_user
+    app.dependency_overrides[get_redis] = lambda: fake_redis
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
@@ -112,9 +163,12 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
 
 @pytest_asyncio.fixture()
-async def raw_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def raw_client(
+    db_session: AsyncSession, fake_redis: fakeredis.FakeRedis
+) -> AsyncGenerator[AsyncClient, None]:
     """Real bearer — for auth endpoint tests."""
     app.dependency_overrides[get_db] = _make_db_override(db_session)
+    app.dependency_overrides[get_redis] = lambda: fake_redis
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
@@ -125,6 +179,7 @@ async def raw_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, No
 
 
 # ── Helpers / factories ───────────────────────────────────────────────────────
+
 
 def _make_claim(
     *,
@@ -193,6 +248,7 @@ def _make_member(
         end_date=end_date,
     )
 
+
 async def _seed(session: AsyncSession, *claims: ClaimModel) -> list[ClaimModel]:
     session.add_all(claims)
     await session.flush()
@@ -202,95 +258,97 @@ async def _seed(session: AsyncSession, *claims: ClaimModel) -> list[ClaimModel]:
 @pytest_asyncio.fixture()
 async def seeded_lookups(db_session: AsyncSession):
     """Seeds reference data (drugs, pharmacies, prescribers) into the test transaction."""
-    db_session.add_all([
-        DrugModel(
-            ndc="00093721410",
-            gpi="39400010100310",
-            drug_name="Atorvastatin Calcium",
-            brand_generic=BrandGeneric.GENERIC,
-            maintenance=Maintenance.YES,
-            tier=1,
-            formulary_status="PREFERRED",
-            repackage_ind=False,
-        ),
-        DrugModel(
-            ndc="00093721420",
-            gpi="39400010100310",
-            drug_name="Atorvastatin Calcium HD",
-            brand_generic=BrandGeneric.GENERIC,
-            maintenance=Maintenance.YES,
-            tier=2,
-            formulary_status="PREFERRED",
-            repackage_ind=False,
-        ),
-        DrugModel(
-            ndc="00074312811",
-            gpi="27250030100120",
-            drug_name="Humira",
-            brand_generic=BrandGeneric.BRAND,
-            maintenance=Maintenance.NO,
-            tier=4,
-            formulary_status="NON_PREFERRED",
-            repackage_ind=False,
-        ),
-        DrugModel(
-            ndc="00000000000",
-            gpi="00000000000000",
-            drug_name="Deleted Drug",
-            brand_generic=BrandGeneric.GENERIC,
-            maintenance=Maintenance.NO,
-            repackage_ind=False,
-            is_deleted=True,
-        ),
-        PharmacyModel(
-            nabp="1234567",
-            npi="1023456789",
-            pharmacy_name="Main Street Pharmacy",
-            address_line1="100 Main St",
-            city="Springfield",
-            state="IL",
-            zip="62704",
-            phone="2175551234",
-            fax="2175555678",
-            is_24_hour=True,
-            in_network=True,
-        ),
-        PharmacyModel(
-            nabp="7654321",
-            npi="1987654321",
-            pharmacy_name="Downtown Drugs",
-            address_line1="55 Center Ave",
-            city="Chicago",
-            state="IL",
-            zip="60601",
-            phone="3125559876",
-            fax=None,
-            is_24_hour=False,
-            in_network=False,
-        ),
-        PrescriberModel(
-            npi="1112223334",
-            dea="AB1234567",
-            name="Dr. Jane Smith",
-            specialty="Cardiology",
-            address_line1="200 Health Ave",
-            city="Chicago",
-            state="IL",
-            zip="60601",
-            phone="3125551234",
-            fax="3125555678",
-        ),
-        PrescriberModel(
-            npi="5556667778",
-            dea=None,
-            name="Dr. John Doe",
-            specialty="Dermatology",
-            address_line1="300 Wellness Blvd",
-            city="Peoria",
-            state="IL",
-            zip="61602",
-            phone=None,
-            fax=None,
-        ),
-    ])
+    db_session.add_all(
+        [
+            DrugModel(
+                ndc="00093721410",
+                gpi="39400010100310",
+                drug_name="Atorvastatin Calcium",
+                brand_generic=BrandGeneric.GENERIC,
+                maintenance=Maintenance.YES,
+                tier=1,
+                formulary_status="PREFERRED",
+                repackage_ind=False,
+            ),
+            DrugModel(
+                ndc="00093721420",
+                gpi="39400010100310",
+                drug_name="Atorvastatin Calcium HD",
+                brand_generic=BrandGeneric.GENERIC,
+                maintenance=Maintenance.YES,
+                tier=2,
+                formulary_status="PREFERRED",
+                repackage_ind=False,
+            ),
+            DrugModel(
+                ndc="00074312811",
+                gpi="27250030100120",
+                drug_name="Humira",
+                brand_generic=BrandGeneric.BRAND,
+                maintenance=Maintenance.NO,
+                tier=4,
+                formulary_status="NON_PREFERRED",
+                repackage_ind=False,
+            ),
+            DrugModel(
+                ndc="00000000000",
+                gpi="00000000000000",
+                drug_name="Deleted Drug",
+                brand_generic=BrandGeneric.GENERIC,
+                maintenance=Maintenance.NO,
+                repackage_ind=False,
+                is_deleted=True,
+            ),
+            PharmacyModel(
+                nabp="1234567",
+                npi="1023456789",
+                pharmacy_name="Main Street Pharmacy",
+                address_line1="100 Main St",
+                city="Springfield",
+                state="IL",
+                zip="62704",
+                phone="2175551234",
+                fax="2175555678",
+                is_24_hour=True,
+                in_network=True,
+            ),
+            PharmacyModel(
+                nabp="7654321",
+                npi="1987654321",
+                pharmacy_name="Downtown Drugs",
+                address_line1="55 Center Ave",
+                city="Chicago",
+                state="IL",
+                zip="60601",
+                phone="3125559876",
+                fax=None,
+                is_24_hour=False,
+                in_network=False,
+            ),
+            PrescriberModel(
+                npi="1112223334",
+                dea="AB1234567",
+                name="Dr. Jane Smith",
+                specialty="Cardiology",
+                address_line1="200 Health Ave",
+                city="Chicago",
+                state="IL",
+                zip="60601",
+                phone="3125551234",
+                fax="3125555678",
+            ),
+            PrescriberModel(
+                npi="5556667778",
+                dea=None,
+                name="Dr. John Doe",
+                specialty="Dermatology",
+                address_line1="300 Wellness Blvd",
+                city="Peoria",
+                state="IL",
+                zip="61602",
+                phone=None,
+                fax=None,
+            ),
+        ]
+    )
     await db_session.flush()

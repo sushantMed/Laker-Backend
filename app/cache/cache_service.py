@@ -38,10 +38,14 @@ class CacheService:
                 return None
             return schema.model_validate(json.loads(raw))
         except Exception:
-            logger.warning("Cache GET failed for %s", self._key(identifier), exc_info=True)
+            logger.warning(
+                "Cache GET failed for %s", self._key(identifier), exc_info=True
+            )
             return None  # degrade gracefully — treat as cache miss
 
-    async def set(self, identifier: str, value: BaseModel, ttl: int | None = None) -> None:
+    async def set(
+        self, identifier: str, value: BaseModel, ttl: int | None = None
+    ) -> None:
         if not settings.cache_enabled:
             return
         try:
@@ -51,7 +55,9 @@ class CacheService:
                 ex=ttl or settings.cache_default_ttl_seconds,
             )
         except Exception:
-            logger.warning("Cache SET failed for %s", self._key(identifier), exc_info=True)
+            logger.warning(
+                "Cache SET failed for %s", self._key(identifier), exc_info=True
+            )
             # don't raise — caching failure shouldn't break the request
 
     async def delete(self, identifier: str) -> None:
@@ -60,7 +66,9 @@ class CacheService:
         try:
             await redis_client.delete(self._key(identifier))
         except Exception:
-            logger.warning("Cache DELETE failed for %s", self._key(identifier), exc_info=True)
+            logger.warning(
+                "Cache DELETE failed for %s", self._key(identifier), exc_info=True
+            )
 
     async def delete_pattern(self, pattern: str) -> None:
         """For bulk invalidation, e.g. all search results for a member."""

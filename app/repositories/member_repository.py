@@ -9,9 +9,9 @@ so carrier filter can use the join directly.
 from __future__ import annotations
 
 import time
-
-from sqlalchemy import select, func
 from datetime import date as date_type
+
+from sqlalchemy import false, func, select
 
 from app.models.member_model import MemberModel
 from app.models.plan_model import PlanModel
@@ -28,7 +28,7 @@ class MemberRepository(BaseRepository[MemberModel]):
         """Fetch one member with address and plan eager-loaded."""
         stmt = select(MemberModel).where(
             MemberModel.member_id.ilike(member_id),
-            MemberModel.is_deleted.is_(False),
+            MemberModel.is_deleted == false(),
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -47,7 +47,7 @@ class MemberRepository(BaseRepository[MemberModel]):
         stmt = (
             select(MemberModel)
             .join(MemberModel.plan, isouter=True)
-            .where(MemberModel.is_deleted.is_(False))
+            .where(MemberModel.is_deleted == false())
         )
 
         # Include Termed Members checkbox
@@ -99,7 +99,7 @@ class MemberRepository(BaseRepository[MemberModel]):
             select(MemberModel)
             .join(MemberModel.plan, isouter=True)
             .where(
-                MemberModel.is_deleted.is_(False),
+                MemberModel.is_deleted == false(),
                 (
                     (MemberModel.subscriber_member_id == subscriber_member_id)
                     | (MemberModel.member_id == subscriber_member_id)
@@ -120,7 +120,7 @@ class MemberRepository(BaseRepository[MemberModel]):
         stmt = select(func.count()).where(
             MemberModel.subscriber_member_id == subscriber_member_id,
             MemberModel.rel_code == "02",
-            MemberModel.is_deleted.is_(False),
+            MemberModel.is_deleted == false(),
         )
         result = await self.session.execute(stmt)
         return result.scalar_one()
@@ -132,7 +132,7 @@ class MemberRepository(BaseRepository[MemberModel]):
         """
         # Include the subscriber themselves (who has no subscriber_member_id)
         stmt = select(func.max(MemberModel.person_code)).where(
-            MemberModel.is_deleted.is_(False),
+            MemberModel.is_deleted == false(),
             (
                 (MemberModel.subscriber_member_id == subscriber_member_id)
                 | (MemberModel.member_id == subscriber_member_id)
@@ -148,9 +148,8 @@ class MemberRepository(BaseRepository[MemberModel]):
             return 0
 
     async def get_max_family_position(self, subscriber_member_id: str) -> int:
-
         stmt = select(func.max(MemberModel.family_position)).where(
-            MemberModel.is_deleted.is_(False),
+            MemberModel.is_deleted == false(),
             (
                 (MemberModel.subscriber_member_id == subscriber_member_id)
                 | (MemberModel.member_id == subscriber_member_id)
@@ -160,11 +159,11 @@ class MemberRepository(BaseRepository[MemberModel]):
         result = await self.session.execute(stmt)
         raw = result.scalar_one_or_none()
         if raw is None:
-         return 0
+            return 0
         try:
-           return int(raw)
+            return int(raw)
         except (ValueError, TypeError):
-           return 0
+            return 0
 
     # ── Persistence ──────────────────────────────────────────────────────────
 
@@ -180,5 +179,3 @@ class MemberRepository(BaseRepository[MemberModel]):
         a sequence or domain-specific algorithm."""
         suffix = str(int(time.time() * 1000))[-3:]
         return f"MBR{suffix}"
-
-

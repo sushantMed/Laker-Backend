@@ -40,17 +40,17 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.Column("is_deleted", sa.Boolean(), nullable=False),
-        sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("id", sa.Uuid(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_drugs_ndc"), "drugs", ["ndc"], unique=True)
@@ -72,17 +72,17 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.Column("is_deleted", sa.Boolean(), nullable=False),
-        sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("id", sa.Uuid(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_pharmacies_nabp"), "pharmacies", ["nabp"], unique=True)
@@ -103,17 +103,17 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.Column("is_deleted", sa.Boolean(), nullable=False),
-        sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("id", sa.Uuid(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_prescribers_npi"), "prescribers", ["npi"], unique=True)

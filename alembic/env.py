@@ -5,23 +5,23 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import app.models.auth_model
+import app.models.claim_model
+import app.models.drug_model
+import app.models.member_address_model
+import app.models.member_model
+import app.models.pharmacy_model
+import app.models.plan_model
+import app.models.prescriber_model
+import app.models.user_model  # noqa: F401
 from alembic import context
-
 from app.core.config import settings
 from app.database.base import Base
 
-import app.models.user_model  # noqa: F401
-import app.models.auth_model  # noqa: F401
-import app.models.plan_model  # noqa: F401
-import app.models.member_model  # noqa: F401
-import app.models.member_address_model  # noqa: F401
-import app.models.drug_model  # noqa: F401
-import app.models.pharmacy_model  # noqa: F401
-import app.models.prescriber_model  # noqa: F401
-import app.models.claim_model  # noqa: F401
-
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Escape '%' so ConfigParser doesn't treat URL-encoded credentials
+# (e.g. '%23' from a '#' in the password) as interpolation syntax.
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

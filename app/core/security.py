@@ -4,7 +4,7 @@ import hmac
 import json
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -17,6 +17,7 @@ SECRET_KEY = settings.jwt_secret_key
 
 # ── Password ──────────────────────────────────────────────────────────────────
 
+
 def hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 120_000)
@@ -26,13 +27,16 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, stored_hash: str) -> bool:
     if stored_hash.startswith("pbkdf2_sha256$"):
         _, salt, expected = stored_hash.split("$", 2)
-        digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 120_000)
+        digest = hashlib.pbkdf2_hmac(
+            "sha256", password.encode(), salt.encode(), 120_000
+        )
         actual = base64.urlsafe_b64encode(digest).decode()
         return hmac.compare_digest(actual, expected)
     return hmac.compare_digest(password, stored_hash)
 
 
 # ── JWT ───────────────────────────────────────────────────────────────────────
+
 
 def create_access_token(*, subject: str, email: str, role: str) -> tuple[str, str, int]:
     now = int(time.time())
@@ -67,10 +71,11 @@ def decode_access_token(token: str, *, verify_exp: bool = True) -> dict[str, Any
 
 def token_expires_at(token: str) -> datetime:
     claims = decode_access_token(token, verify_exp=False)
-    return datetime.fromtimestamp(int(claims["exp"]), tz=timezone.utc)
+    return datetime.fromtimestamp(int(claims["exp"]), tz=UTC)
 
 
 # ── Opaque refresh tokens ─────────────────────────────────────────────────────
+
 
 def opaque_token() -> str:
     return secrets.token_urlsafe(48)
@@ -81,6 +86,7 @@ def token_hash(token: str) -> str:
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
+
 
 def _encode_jwt(payload: dict[str, Any]) -> str:
     header = {"alg": ALGORITHM, "typ": "JWT"}

@@ -3,7 +3,7 @@ Seed the claims table from a JSON file.
 This script is intended to be run as a standalone program, not imported as a module.
 Usage:
     python app/scripts/seed_claims.py [--file PATH] [--skip-missing-members]
-Options:    
+Options:
     --file PATH: Path to the claims JSON file (default: app/seed_data/claims.json).
     --skip-missing-members: Skip (instead of aborting on) claims whose memberId doesn't exist.
 Assumptions:
@@ -12,6 +12,7 @@ Assumptions:
 - The claims JSON file is structured as a list of claim records, each with camelCase keys
   matching the ClaimModel fields (e.g., claimId, authNum, memberId,
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,18 +23,15 @@ from datetime import date, datetime
 from pathlib import Path
 
 from sqlalchemy import select
-from app.database.session import AsyncSessionLocal
 
+from app.database.session import AsyncSessionLocal
 from app.models.claim_model import ClaimModel
 from app.models.member_model import MemberModel
-from app.models.plan_model import PlanModel
-from app.models.member_address_model import MemberAddressModel
 
-
-
-_DEFAULT_SEED_FILE = Path(__file__).resolve().parent.parent   / "scripts" / "claims.json"
+_DEFAULT_SEED_FILE = Path(__file__).resolve().parent.parent / "scripts" / "claims.json"
 
 print(_DEFAULT_SEED_FILE)
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:

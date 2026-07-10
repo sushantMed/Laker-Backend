@@ -54,16 +54,22 @@ async def test_login_uses_sshost_client(monkeypatch):
     monkeypatch.setattr(service, "_is_rate_limited", fake_is_rate_limited)
     monkeypatch.setattr(service, "_clear_attempts", fake_clear_attempts)
     monkeypatch.setattr(service, "_create_refresh_token", fake_create_refresh_token)
-    monkeypatch.setattr("app.services.auth_service.authenticate_user", fake_authenticate)
+    monkeypatch.setattr(
+        "app.services.auth_service.authenticate_user", fake_authenticate
+    )
 
-    response = await service.login(LoginRequest(email="user@example.com", password="secret123"))
+    response = await service.login(
+        LoginRequest(email="user@example.com", password="secret123")
+    )
 
     assert response.accessToken
     assert response.refreshToken == "refresh-token"
 
 
 @pytest.mark.asyncio
-async def test_login_falls_back_to_local_password_when_sshost_is_unreachable(monkeypatch):
+async def test_login_falls_back_to_local_password_when_sshost_is_unreachable(
+    monkeypatch,
+):
     service = AuthService(session=object(), redis=DummyRedis())
 
     user = SimpleNamespace(
@@ -96,10 +102,16 @@ async def test_login_falls_back_to_local_password_when_sshost_is_unreachable(mon
     monkeypatch.setattr(service, "_is_rate_limited", fake_is_rate_limited)
     monkeypatch.setattr(service, "_clear_attempts", fake_clear_attempts)
     monkeypatch.setattr(service, "_create_refresh_token", fake_create_refresh_token)
-    monkeypatch.setattr("app.services.auth_service.authenticate_user", fake_authenticate)
-    monkeypatch.setattr("app.services.auth_service.verify_password", lambda password, stored_hash: True)
+    monkeypatch.setattr(
+        "app.services.auth_service.authenticate_user", fake_authenticate
+    )
+    monkeypatch.setattr(
+        "app.services.auth_service.verify_password", lambda password, stored_hash: True
+    )
 
-    response = await service.login(LoginRequest(email="fallback@example.com", password="secret123"))
+    response = await service.login(
+        LoginRequest(email="fallback@example.com", password="secret123")
+    )
 
     assert response.accessToken
     assert response.refreshToken == "refresh-token"

@@ -1,6 +1,7 @@
-from sqlalchemy import String, Boolean, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
 
@@ -8,7 +9,9 @@ from app.database.base import Base
 class PrescriberModel(Base):
     __tablename__ = "prescribers"
 
-    npi: Mapped[str] = mapped_column(String(10), unique=True, index=True, nullable=False)
+    npi: Mapped[str] = mapped_column(
+        String(10), unique=True, index=True, nullable=False
+    )
     dea: Mapped[str | None] = mapped_column(String(9), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     specialty: Mapped[str | None] = mapped_column(String(100), nullable=True)

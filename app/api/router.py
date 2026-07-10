@@ -1,6 +1,15 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, health, users, members, drugs, pharmacies, prescribers,claims
+from app.api.v1 import (
+    auth,
+    claims,
+    drugs,
+    health,
+    members,
+    pharmacies,
+    prescribers,
+    users,
+)
 
 api_router = APIRouter(prefix="/api/v1")
 

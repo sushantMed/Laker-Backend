@@ -1,10 +1,10 @@
 from functools import lru_cache
+from urllib.parse import quote_plus
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -31,7 +31,9 @@ class Settings(BaseSettings):
     cache_default_ttl_seconds: int = 300
 
     # ── SSHost integration ────────────────────────────────────────
-    sshost_host: str = "<docker service name>"  #docker service name for dummy sshost server
+    sshost_host: str = (
+        "<docker service name>"  # docker service name for dummy sshost server
+    )
     sshost_port: int = 9000
 
     # ── Security ──────────────────────────────────────────────────
@@ -44,15 +46,21 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        user = quote_plus(self.db_user)
+        password = quote_plus(self.db_password)
+        if self.db_driver.startswith("oracle"):
+            return (
+                f"{self.db_driver}://{user}:{password}"
+                f"@{self.db_host}:{self.db_port}/?service_name={self.db_name}"
+            )
         return (
-            f"{self.db_driver}://{self.db_user}:{self.db_password}"
+            f"{self.db_driver}://{user}:{password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
-
 
 
 @lru_cache

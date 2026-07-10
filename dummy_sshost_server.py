@@ -17,7 +17,9 @@ pass a username containing "fail", e.g. "fail@example.com" -> returns FAILED.
 To test the "SSHost unreachable" fallback path, just don't run this script
 (or kill it) — your app's SSHostError / fallback-to-DB logic will fire.
 """
+
 import asyncio
+import contextlib
 import json
 import logging
 
@@ -56,10 +58,8 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         logger.warning("Bad request from %s: %s", peer, e)
     finally:
         writer.close()
-        try:
+        with contextlib.suppress(Exception):
             await writer.wait_closed()
-        except Exception:
-            pass
 
 
 async def main():

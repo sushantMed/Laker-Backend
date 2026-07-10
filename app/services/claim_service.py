@@ -13,11 +13,10 @@ a search and isn't listed as an error response for those routes.
 """
 
 from __future__ import annotations
-from app.cache.cache_service import CacheService
-from app.utils.pagination import PaginationRequest
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache.cache_service import CacheService
 from app.core.exceptions import (
     ClaimNotFoundException,
     DrugNotFoundException,
@@ -27,19 +26,19 @@ from app.core.exceptions import (
 )
 from app.models.claim_model import ClaimModel
 from app.repositories.claim_repository import ClaimRepository
+from app.repositories.drug_repository import DrugRepository
 from app.repositories.member_repository import MemberRepository
-
 from app.repositories.pharmacy_repository import PharmacyRepository
 from app.repositories.prescriber_repository import PrescriberRepository
-from app.repositories.drug_repository import DrugRepository
-
 from app.schemas.claim_schema import (
     ClaimDetail,
-    ClaimSearchRequest,
     ClaimsByEntityQuery,
+    ClaimSearchRequest,
     ClaimSummary,
+    PharmacySummary,
+    PrescriberSummary,
 )
-from app.utils.pagination import PagedResponse
+from app.utils.pagination import PagedResponse, PaginationRequest
 
 
 def _to_claim_summary(c: ClaimModel) -> ClaimSummary:
@@ -71,10 +70,22 @@ def _to_claim_detail(c: ClaimModel) -> ClaimDetail:
         quantity=c.quantity,
         daysSupply=c.days_supply,
         refillsRemaining=c.refills_remaining,
-        pharmacyNpi=c.pharmacy_npi,
-        pharmacyName=c.pharmacy_name,
-        prescriberNpi=c.prescriber_npi,
-        prescriberName=c.prescriber_name,
+        pharmacy=(
+            PharmacySummary(
+                pharmacyNpi=c.pharmacy_npi,
+                pharmacyName=c.pharmacy_name,
+            )
+            if c.pharmacy_npi or c.pharmacy_name
+            else None
+        ),
+        prescriber=(
+            PrescriberSummary(
+                prescriberNpi=c.prescriber_npi,
+                prescriberName=c.prescriber_name,
+            )
+            if c.prescriber_npi or c.prescriber_name
+            else None
+        ),
         ingredientCost=c.ingredient_cost,
         dispensingFee=c.dispensing_fee,
         copay=c.copay,
@@ -103,9 +114,7 @@ class ClaimService:
 
         claim = await self._repo.get_by_auth_num(auth_num)
         if not claim:
-            raise ClaimNotFoundException(
-                f"Claim with auth num '{auth_num}' not found."
-            )
+            raise ClaimNotFoundException(f"Claim with auth num '{auth_num}' not found.")
 
         detail = _to_claim_detail(claim)
         await self._cache.set(auth_num, detail)
@@ -145,7 +154,6 @@ class ClaimService:
             total=total,
         )
 
-
     async def search_claims_for_member(
         self, member_id: str, request: ClaimSearchRequest
     ) -> PagedResponse[ClaimSummary]:
@@ -178,7 +186,6 @@ class ClaimService:
             page_size=request.pagination.page_size,
             total=total,
         )
-
 
     async def get_claims_for_member(
         self,
@@ -213,7 +220,6 @@ class ClaimService:
             total=total,
         )
 
-
     async def get_claims_for_pharmacy(
         self, nabp: str, query: ClaimsByEntityQuery
     ) -> PagedResponse[ClaimSummary]:
@@ -235,7 +241,6 @@ class ClaimService:
             total=total,
         )
 
-
     async def get_claims_for_prescriber(
         self, npi: str, query: ClaimsByEntityQuery
     ) -> PagedResponse[ClaimSummary]:
@@ -256,7 +261,6 @@ class ClaimService:
             page_size=query.page_size,
             total=total,
         )
-
 
     async def get_claims_for_drug(
         self, ndc: str, query: ClaimsByEntityQuery

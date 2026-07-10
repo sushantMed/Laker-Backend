@@ -31,8 +31,8 @@ async def test_get_drug_soft_deleted_not_returned(client, seeded_lookups):
 
 
 @pytest.mark.asyncio
-async def test_get_drug_requires_auth(client, seeded_lookups):
-    resp = await client.get("/api/v1/drugs/00093721410")
+async def test_get_drug_requires_auth(raw_client, seeded_lookups):
+    resp = await raw_client.get("/api/v1/drugs/00093721410")
     assert resp.status_code == 403
 
 
