@@ -51,7 +51,7 @@ class BaseRepository(Generic[ModelType]):
         # pagination is always deterministic instead of silently unordered.
         column = getattr(self.model, _to_snake_case(sort_by), None)
         if not isinstance(getattr(column, "property", None), ColumnProperty):
-            column = getattr(self.model, "id")
+            column = self.model.id
 
         order_fn = desc if sort_dir.upper() == "DESC" else asc
         stmt = stmt.order_by(order_fn(column))

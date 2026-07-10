@@ -1,10 +1,10 @@
-
-from sqlalchemy import String, Boolean, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 
+from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.database.base import Base
-from app.models.member_model import MemberModel  # noqa: F401
+from app.models.member_model import MemberModel
 
 
 class PlanModel(Base):
@@ -39,6 +39,6 @@ class PlanModel(Base):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Relationship — back-ref from MemberModel
-    members: Mapped[list["MemberModel"]] = relationship(  # noqa: F821
+    members: Mapped[list["MemberModel"]] = relationship(
         "MemberModel", back_populates="plan", lazy="noload"
     )

@@ -1,26 +1,29 @@
+from datetime import date, datetime
 
 from sqlalchemy import (
-    String,
     Boolean,
-    DateTime,
     Date,
+    DateTime,
     ForeignKey,
+    String,
     func,
+)
+from sqlalchemy import (
     Enum as SQLEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import datetime, date
 
 from app.database.base import Base
-from app.utils.enums import Gender, CoverageType
+from app.utils.enums import CoverageType, Gender
 
 
 class MemberModel(Base):
     __tablename__ = "members"
 
-
     # ── Primary key ──────────────────────────────────────────────────────────
-    member_id: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
+    member_id: Mapped[str] = mapped_column(
+        String(20), unique=True, index=True, nullable=False
+    )
 
     # ── Family linkage ───────────────────────────────────────────────────────
     # NULL means this member IS the subscriber (cardholder).
@@ -30,8 +33,6 @@ class MemberModel(Base):
         nullable=True,
         index=True,
     )
-
-
 
     # ── Name ─────────────────────────────────────────────────────────────────
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)

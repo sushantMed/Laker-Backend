@@ -1,19 +1,18 @@
 from typing import Annotated
 
-from app.cache.redis_client import get_redis, Redis
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
+from app.cache.redis_client import Redis, get_redis
 from app.database.session import get_db
 from app.schemas.auth_schema import (
+    ApiResponse,
     LoginRequest,
     LoginResponse,
     RefreshRequest,
     RefreshResponse,
     UserProfile,
-    ApiResponse
 )
 from app.services.auth_service import AuthService
 
@@ -41,6 +40,7 @@ async def login(
 ) -> ApiResponse[LoginResponse]:
     data = await AuthService(session, redis).login(body)
     return ApiResponse.ok(data, message="Login successful")
+
 
 @router.post(
     "/logout",
@@ -85,4 +85,6 @@ async def me(
         print("User profile retrieved successfully:", data)
         return ApiResponse.ok(data, message="User profile retrieved successfully")
     except Exception as e:
-        return ApiResponse.fail(message="Failed to retrieve user profile", errors=[str(e)])
+        return ApiResponse.fail(
+            message="Failed to retrieve user profile", errors=[str(e)]
+        )

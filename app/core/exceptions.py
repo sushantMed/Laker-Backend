@@ -37,6 +37,7 @@ class ValidationError(AppError):
 
 # ── Global exception handlers ─────────────────────────────────────────────────
 
+
 def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
@@ -51,26 +52,32 @@ def generic_error_handler(_request: Request, exc: Exception) -> JSONResponse:
         content={"error": {"code": "INTERNAL_SERVER_ERROR", "message": msg}},
     )
 
+
 class AppException(Exception):
     def __init__(self, message: str, status_code: int = 400):
         self.message = message
         self.status_code = status_code
         super().__init__(message)
 
+
 class AuthException(AppException):
     def __init__(self, message: str = "Unauthorized"):
         super().__init__(message, status_code=401)
+
+
 class SSHostError(AppException):
     def __init__(self, message: str = "SSHost unreachable") -> None:
         super().__init__(message, status_code=503)
+
+
 class ForbiddenException(AppException):
     def __init__(self, message: str = "Forbidden"):
         super().__init__(message, status_code=403)
 
+
 class NotFoundException(AppException):
     def __init__(self, message: str = "Not found"):
         super().__init__(message, status_code=404)
-
 
 
 class UserNotFoundError(AppException):
@@ -91,7 +98,7 @@ class UserInactiveError(AppException):
 class TooManyAttemptsError(AppException):
     def __init__(self, detail: str = "Too many login attempts"):
         super().__init__(status_code=429, message=detail)
-        
+
 
 class MemberNotFoundException(AppException):
     def __init__(self, message: str) -> None:
@@ -136,23 +143,21 @@ class DrugNotFoundException(AppException):
         super().__init__(message, status_code=404)
         self.code = "DRUG_NOT_FOUND"
 
+
 class ClaimNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
 
 
-class DrugNotFoundException(AppException):
-    def __init__(self, ndc: str) -> None:
-        super().__init__(f"Drug with NDC '{ndc}' not found.", status_code=404)
-        self.ndc = ndc
-
 class InvalidDateRangeException(AppException):
     def __init__(self, message: str) -> None:
-        super().__init__(message, status_code=422)  
+        super().__init__(message, status_code=422)
+
 
 class NoSearchCriteriaException(AppException):
     def __init__(self, message: str) -> None:
-        super().__init__(message, status_code=400)  
+        super().__init__(message, status_code=400)
+
 
 class PharmacyNotFoundException(AppException):
     def __init__(self, message: str) -> None:
@@ -164,5 +169,3 @@ class PrescriberNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
         self.code = "PRESCRIBER_NOT_FOUND"
-
-

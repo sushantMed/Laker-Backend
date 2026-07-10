@@ -13,7 +13,9 @@ NOTE: The wire protocol below (length-prefixed JSON) is a placeholder.
 Once the real request/response format with the SSHost owner is confirmed we will
 update `_encode` / `_decode` accordingly.
 """
+
 import asyncio
+import contextlib
 import json
 import logging
 
@@ -58,7 +60,7 @@ async def authenticate_user(username: str, password: str) -> bool:
             asyncio.open_connection(settings.sshost_host, settings.sshost_port),
             timeout=CONNECT_TIMEOUT,
         )
-    except (OSError, asyncio.TimeoutError) as e:
+    except (TimeoutError, OSError) as e:
         logger.error("Could not connect to SSHost: %s", e)
         raise SSHostError("SSHost unreachable") from e
 
@@ -68,15 +70,13 @@ async def authenticate_user(username: str, password: str) -> bool:
 
         response = await asyncio.wait_for(_decode(reader), timeout=RESPONSE_TIMEOUT)
 
-    except (OSError, asyncio.TimeoutError, json.JSONDecodeError) as e:
+    except (TimeoutError, OSError, json.JSONDecodeError) as e:
         logger.error("SSHost communication error: %s", e)
         raise SSHostError("SSHost response error") from e
     finally:
         writer.close()
-        try:
+        with contextlib.suppress(Exception):
             await writer.wait_closed()
-        except Exception:
-            pass
 
     status = response.get("status")
     if status == "SUCCESS":

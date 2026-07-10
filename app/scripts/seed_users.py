@@ -6,23 +6,22 @@ Called automatically from app/main.py lifespan, or run standalone:
 """
 
 import json
-import logging
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
 from app.database.session import AsyncSessionLocal
 from app.models.user_model import UserModel
-#For mocking in the db
+
+# For mocking in the db
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 
 def load_users(json_file):
-    with open(json_file, "r", encoding="utf-8") as file:
+    with open(json_file, encoding="utf-8") as file:
         content = file.read()
 
     print("JSON FILE:", json_file)
@@ -39,7 +38,6 @@ async def seed_users():
     users = load_users(json_path)
 
     async with AsyncSessionLocal() as session:
-
         result = await session.execute(select(UserModel))
         existing_user = result.first()
 
@@ -48,7 +46,6 @@ async def seed_users():
             return
 
         for user_data in users:
-
             email = user_data["email"].lower()
 
             result = await session.execute(

@@ -25,14 +25,20 @@ Note: Starlette applies middleware in *reverse registration order*
 
 from contextlib import asynccontextmanager
 
-from app.schemas.common_schema import ApiResponse
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.exceptions import AppException
+from fastapi.responses import JSONResponse
+
 from app.api.router import api_router
+from app.cache.redis_client import close_redis
 from app.core.config import settings
-from app.core.exceptions import AppError, app_error_handler, generic_error_handler
+from app.core.exceptions import (
+    AppError,
+    AppException,
+    app_error_handler,
+    generic_error_handler,
+)
 from app.core.logging import setup_logging
 from app.middleware.correlation_id import CorrelationIdMiddleware
 from app.middleware.logging import LoggingMiddleware
@@ -40,12 +46,10 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.observability.monitoring import monitor_router
-from app.cache.redis_client import close_redis
-from fastapi.exceptions import RequestValidationError
-
-
+from app.schemas.common_schema import ApiResponse
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -57,9 +61,8 @@ async def lifespan(app: FastAPI):
         await engine.dispose()
 
 
-
-
 # ── App factory ───────────────────────────────────────────────────────────────
+
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -78,7 +81,6 @@ def create_app() -> FastAPI:
     app.add_exception_handler(Exception, generic_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
 
-    
     # ── Custom middleware stack ───────────────────────────────────────────────
     # Added bottom-up: last registered = outermost at ASGI level.
     #
@@ -87,7 +89,9 @@ def create_app() -> FastAPI:
     #
     # So we register in reverse:
 
-    app.add_middleware(SecurityHeadersMiddleware)   # innermost → applied last on response
+    app.add_middleware(
+        SecurityHeadersMiddleware
+    )  # innermost → applied last on response
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(RateLimitMiddleware)
@@ -104,8 +108,6 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
     app.include_router(monitor_router)
 
-
-
     return app
 
 
@@ -113,11 +115,10 @@ def app_exception_handler(request: Request, exc: AppException):
     return JSONResponse(
         status_code=exc.status_code,
         content=ApiResponse.fail(
-            message=exc.message,
-            status_code=exc.status_code,
-            exception_message=str(exc)
+            message=exc.message, status_code=exc.status_code, exception_message=str(exc)
         ).model_dump(),
     )
+
 
 def http_exception_handler(
     request: Request,
@@ -126,10 +127,10 @@ def http_exception_handler(
     return JSONResponse(
         status_code=exc.status_code,
         content=ApiResponse.fail(
-            message=str(exc.detail),
-            status_code=exc.status_code
-        ).model_dump()
+            message=str(exc.detail), status_code=exc.status_code
+        ).model_dump(),
     )
+
 
 def validation_error_handler(request: Request, exc: RequestValidationError):
     messages = []
@@ -147,5 +148,6 @@ def validation_error_handler(request: Request, exc: RequestValidationError):
             exception_message=combined,
         ).model_dump(),
     )
+
 
 app = create_app()

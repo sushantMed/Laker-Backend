@@ -13,7 +13,7 @@ from app.utils.enums import BrandGeneric, Maintenance
 def load_seed_data():
     json_path = Path(__file__).parent / "lookups_seed.json"
 
-    with open(json_path, "r", encoding="utf-8") as file:
+    with open(json_path, encoding="utf-8") as file:
         content = file.read()
 
     if not content.strip():

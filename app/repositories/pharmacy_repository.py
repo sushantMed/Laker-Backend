@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import false, select
 
 from app.models.pharmacy_model import PharmacyModel
 from app.repositories.base_repository import BaseRepository
@@ -13,7 +13,7 @@ class PharmacyRepository(BaseRepository[PharmacyModel]):
     async def get_by_nabp(self, nabp: str) -> PharmacyModel | None:
         stmt = select(PharmacyModel).where(
             PharmacyModel.nabp == nabp,
-            PharmacyModel.is_deleted.is_(False),
+            PharmacyModel.is_deleted == false(),
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -27,7 +27,7 @@ class PharmacyRepository(BaseRepository[PharmacyModel]):
         sort_by: str,
         sort_dir: str,
     ) -> tuple[list[PharmacyModel], int]:
-        stmt = select(PharmacyModel).where(PharmacyModel.is_deleted.is_(False))
+        stmt = select(PharmacyModel).where(PharmacyModel.is_deleted == false())
 
         if criteria.name:
             stmt = stmt.where(PharmacyModel.pharmacy_name.ilike(f"%{criteria.name}%"))

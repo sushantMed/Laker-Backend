@@ -22,8 +22,8 @@ async def test_get_pharmacy_by_nabp_not_found(client, seeded_lookups):
 
 
 @pytest.mark.asyncio
-async def test_get_pharmacy_requires_auth(client, seeded_lookups):
-    resp = await client.get("/api/v1/pharmacies/1234567")
+async def test_get_pharmacy_requires_auth(raw_client, seeded_lookups):
+    resp = await raw_client.get("/api/v1/pharmacies/1234567")
     assert resp.status_code == 403
 
 

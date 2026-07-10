@@ -1,0 +1,61 @@
+# Pre-commit hooks for the Laker Backend.
+# Install once with:  pre-commit install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push
+# Run manually with:  pre-commit run --all-files
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+
+repos:
+  # General hygiene checks (fast, run on every commit).
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: debug-statements
+      - id: detect-private-key
+
+  # Ruff: lint (with auto-fix) and format Python code.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.0
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  # Enforce Conventional Commits for good, consistent commit messages.
+  # e.g.  feat(api): add member search endpoint
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          - --strict
+          - feat
+          - fix
+          - docs
+          - style
+          - refactor
+          - perf
+          - test
+          - build
+          - ci
+          - chore
+          - revert
+
+  # Enforce test coverage before pushing. Runs the full suite with coverage
+  # and fails if total coverage drops below the threshold.
+  - repo: local
+    hooks:
+      - id: pytest-coverage
+        name: pytest with coverage (>= 80%)
+        entry: python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=80
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

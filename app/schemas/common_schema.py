@@ -1,17 +1,17 @@
-import math
-from typing import Generic, TypeVar, Optional
+from typing import Generic, TypeVar
+
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
 
-T = TypeVar("T")
-TSearch = TypeVar("TSearch")
-
 from app.utils.pagination import (
-    PaginationRequest,
-    SortRequest,
     PagedResponse,
     PaginationMeta,
+    PaginationRequest,
+    SortRequest,
 )
+
+T = TypeVar("T")
+TSearch = TypeVar("TSearch")
 
 
 class SearchRequest(GenericModel, Generic[TSearch]):
@@ -38,13 +38,13 @@ class ErrorDetail(BaseModel):
 class ApiResponse(GenericModel, Generic[T]):
     success: bool
     message: str
-    data: Optional[T] = None
-    error: Optional[ErrorDetail] = None
+    data: T | None = None
+    error: ErrorDetail | None = None
 
     @classmethod
     def ok(
         cls,
-        data: Optional[T] = None,
+        data: T | None = None,
         message: str = "Success",
     ) -> "ApiResponse[T]":
         return cls(
@@ -59,7 +59,7 @@ class ApiResponse(GenericModel, Generic[T]):
         cls,
         message: str,
         status_code: int = 400,
-        exception_message: Optional[str] = None,
+        exception_message: str | None = None,
     ) -> "ApiResponse[None]":
         return cls(
             success=False,
@@ -76,8 +76,8 @@ class PagedApiResponse(GenericModel, Generic[T]):
     success: bool
     message: str
     data: list[T]  # flat list, no nesting
-    pagination: Optional[PaginationMeta] = None
-    error: Optional[ErrorDetail] = None
+    pagination: PaginationMeta | None = None
+    error: ErrorDetail | None = None
 
     @classmethod
     def ok(
@@ -98,7 +98,7 @@ class PagedApiResponse(GenericModel, Generic[T]):
         cls,
         message: str,
         status_code: int = 400,
-        errors: Optional[list[str]] = None,
+        errors: list[str] | None = None,
     ) -> "PagedApiResponse[None]":
         return cls(
             success=False,

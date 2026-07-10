@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import ( # type: ignore
+from sqlalchemy import (  # type: ignore
     Boolean,
     Date,
     DateTime,
@@ -18,7 +18,7 @@ from sqlalchemy import ( # type: ignore
     String,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship #type: ignore
+from sqlalchemy.orm import Mapped, mapped_column, relationship  # type: ignore
 
 from app.database.base import Base
 

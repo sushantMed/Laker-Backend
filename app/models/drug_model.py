@@ -1,13 +1,16 @@
+from datetime import datetime
+
 from sqlalchemy import (
-    String,
-    Integer,
     Boolean,
     DateTime,
+    Integer,
+    String,
     func,
+)
+from sqlalchemy import (
     Enum as SQLEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime
 
 from app.database.base import Base
 from app.utils.enums import BrandGeneric, Maintenance
@@ -16,7 +19,9 @@ from app.utils.enums import BrandGeneric, Maintenance
 class DrugModel(Base):
     __tablename__ = "drugs"
 
-    ndc: Mapped[str] = mapped_column(String(11), unique=True, index=True, nullable=False)
+    ndc: Mapped[str] = mapped_column(
+        String(11), unique=True, index=True, nullable=False
+    )
     gpi: Mapped[str] = mapped_column(String(14), index=True, nullable=False)
     drug_name: Mapped[str] = mapped_column(String(255), nullable=False)
 

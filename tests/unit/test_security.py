@@ -21,7 +21,9 @@ def test_password_round_trip():
 
 
 def test_jwt_round_trip():
-    token, jti, expires_in = create_access_token(subject="1", email="a@b.com", role="user")
+    token, jti, expires_in = create_access_token(
+        subject="1", email="a@b.com", role="user"
+    )
     claims = decode_access_token(token)
     assert claims["sub"] == "1"
     assert claims["email"] == "a@b.com"

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.dependencies.auth import get_current_user, require_admin
 from app.models.user_model import UserModel
-from app.schemas.auth_schema import UserProfile, ApiResponse
+from app.schemas.auth_schema import ApiResponse, UserProfile
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/users", tags=["Users"])

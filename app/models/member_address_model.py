@@ -1,15 +1,14 @@
-import string
-from typing import TYPE_CHECKING
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from app.database.base import Base
 
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database.base import Base
 from app.models.member_model import MemberModel
+
 
 class MemberAddressModel(Base):
     __tablename__ = "member_addresses"
-
 
     member_id: Mapped[str | None] = mapped_column(
         String(20),
@@ -36,6 +35,6 @@ class MemberAddressModel(Base):
     )
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    member: Mapped["MemberModel"] = relationship(  # noqa: F821
+    member: Mapped["MemberModel"] = relationship(
         "MemberModel", back_populates="address"
     )

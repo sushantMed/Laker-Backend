@@ -14,23 +14,23 @@ services:
         retries: 5
       restart: unless-stopped
 
-  postgres:
-    image: postgres:16-alpine
-    container_name: laker-postgres
+  oracle-db:
+    image: container-registry.oracle.com/database/free:latest
+    container_name: oracle-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      ORACLE_PWD: Bot#2023
+      APP_USER: bot
+      APP_USER_PASSWORD: Bot#2023
     ports:
-      - "${DB_PORT}:5432"
+      - "1521:1521"
     volumes:
-      - laker_postgres_data:/var/lib/postgresql/data
+      - laker_oracle_data:/opt/oracle/oradata
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
 
   # sshost-dummy:
   #   build:
@@ -40,7 +40,7 @@ services:
   #   restart: unless-stopped
   #   ports:
   #     - "9000:9000"
-  
+
 
   api:
     build: .
@@ -56,7 +56,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      postgres:
+      oracle-db:
         condition: service_healthy
       # sshost-dummy:
       #   condition: service_started
@@ -65,5 +65,5 @@ services:
 
 
 volumes:
-  laker_postgres_data:
+  laker_oracle_data:
   redis-data:

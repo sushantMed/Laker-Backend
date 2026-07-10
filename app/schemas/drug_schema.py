@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.common_schema import SearchRequest
@@ -19,24 +17,24 @@ class DrugInfo(BaseModel):
     drug_name: str = Field(alias="drugName")
     brand_generic: BrandGeneric = Field(alias="brandGeneric")
     maintenance: Maintenance
-    desi: Optional[str] = None
-    tier: Optional[int] = None
-    formulary_status: Optional[str] = Field(None, alias="formularyStatus")
+    desi: str | None = None
+    tier: int | None = None
+    formulary_status: str | None = Field(None, alias="formularyStatus")
     repackage_ind: bool = Field(alias="repackageInd")
 
 
 class DrugSearch(BaseModel):
     model_config = _CAMEL
 
-    name: Optional[str] = None
-    ndc: Optional[str] = None
-    gpi: Optional[str] = None
-    brand_generic: Optional[BrandGeneric] = Field(None, alias="brandGeneric")
-    maintenance: Optional[Maintenance] = None
-    tier: Optional[int] = Field(None, ge=1, le=5)
+    name: str | None = None
+    ndc: str | None = None
+    gpi: str | None = None
+    brand_generic: BrandGeneric | None = Field(None, alias="brandGeneric")
+    maintenance: Maintenance | None = None
+    tier: int | None = Field(None, ge=1, le=5)
 
     @model_validator(mode="after")
-    def at_least_one_criterion(self) -> "DrugSearch":
+    def at_least_one_criterion(self) -> DrugSearch:
         has_criteria = any(
             [
                 self.name,

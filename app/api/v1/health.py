@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends
 from typing import Annotated
+
+from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache.redis_client import check_redis_health
 from app.core.config import settings
 from app.database.session import get_db
-from app.cache.redis_client import check_redis_health
 
 router = APIRouter(prefix="/health", tags=["Health"])
 

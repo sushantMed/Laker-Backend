@@ -22,8 +22,8 @@ async def test_get_prescriber_by_npi_not_found(client, seeded_lookups):
 
 
 @pytest.mark.asyncio
-async def test_get_prescriber_requires_auth(client, seeded_lookups):
-    resp = await client.get("/api/v1/prescribers/1112223334")
+async def test_get_prescriber_requires_auth(raw_client, seeded_lookups):
+    resp = await raw_client.get("/api/v1/prescribers/1112223334")
     assert resp.status_code == 403
 
 

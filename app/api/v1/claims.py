@@ -11,25 +11,22 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Query, status  # type: ignore
+from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
+
+from app.database.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user_model import UserModel
-from fastapi import APIRouter, Depends, Query  #type: ignore
-from fastapi.security import HTTPAuthorizationCredentials  #type: ignore
-from sqlalchemy.ext.asyncio import AsyncSession  #type: ignore
-
-from app.api.v1.auth import bearer
-from app.database.session import get_db
 from app.schemas.claim_schema import (
     ClaimDetail,
+    ClaimsByEntityQuery,
     ClaimSearchRequest,
     ClaimSearchRequestByMemberPath,
-    ClaimsByEntityQuery,
     ClaimSummary,
 )
 from app.schemas.common_schema import PagedApiResponse
 from app.services.claim_service import ClaimService
 from app.utils.pagination import PaginationRequest
-from fastapi import status
 
 router = APIRouter(tags=["Claims"])
 
@@ -43,12 +40,10 @@ async def search_claims(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
-    pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10
+    pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
 ) -> PagedApiResponse[ClaimSummary]:
     data = await ClaimService(session).search_claims(request)
     return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)
-
-
 
 
 @router.get("/claims/{authNum}", status_code=status.HTTP_200_OK)
@@ -60,8 +55,6 @@ async def get_claim(
     return await ClaimService(session).get_claim_by_auth_num(authNum)
 
 
-
-
 @router.post("/members/{memberId}/claims/search")
 async def search_claims_for_member(
     memberId: str,
@@ -69,12 +62,10 @@ async def search_claims_for_member(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
-    pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10
+    pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
 ) -> PagedApiResponse[ClaimSummary]:
     data = await ClaimService(session).search_claims_for_member(memberId, request)
     return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)
-
-
 
 
 @router.get("/members/{memberId}/claims", status_code=status.HTTP_200_OK)
@@ -90,8 +81,6 @@ async def get_claims_for_member(
     return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)
 
 
-
-
 @router.get("/pharmacies/{nabp}/claims", status_code=status.HTTP_200_OK)
 async def get_claims_for_pharmacy(
     nabp: str,
@@ -99,16 +88,14 @@ async def get_claims_for_pharmacy(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
-    startDate: Annotated[str | None, Query(alias="startDate")]=None,
-    endDate: Annotated[str | None, Query(alias="endDate")]=None,
+    startDate: Annotated[str | None, Query(alias="startDate")] = None,
+    endDate: Annotated[str | None, Query(alias="endDate")] = None,
 ) -> PagedApiResponse[ClaimSummary]:
     query = ClaimsByEntityQuery(
         page=page, pageSize=pageSize, startDate=startDate, endDate=endDate
     )
     data = await ClaimService(session).get_claims_for_pharmacy(nabp, query)
     return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)
-
-
 
 
 @router.get("/prescribers/{npi}/claims", status_code=status.HTTP_200_OK)
@@ -118,16 +105,14 @@ async def get_claims_for_prescriber(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
-    startDate: Annotated[str | None, Query(alias="startDate")]=None,
-    endDate: Annotated[str | None, Query(alias="endDate")]=None,
+    startDate: Annotated[str | None, Query(alias="startDate")] = None,
+    endDate: Annotated[str | None, Query(alias="endDate")] = None,
 ) -> PagedApiResponse[ClaimSummary]:
     query = ClaimsByEntityQuery(
         page=page, pageSize=pageSize, startDate=startDate, endDate=endDate
     )
     data = await ClaimService(session).get_claims_for_prescriber(npi, query)
     return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)
-
-
 
 
 @router.get("/drugs/{ndc}/claims", status_code=status.HTTP_200_OK)
@@ -137,8 +122,8 @@ async def get_claims_for_drug(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
-    startDate: Annotated[str | None, Query(alias="startDate")]=None,
-    endDate: Annotated[str | None, Query(alias="endDate")]=None,
+    startDate: Annotated[str | None, Query(alias="startDate")] = None,
+    endDate: Annotated[str | None, Query(alias="endDate")] = None,
 ) -> PagedApiResponse[ClaimSummary]:
     query = ClaimsByEntityQuery(
         page=page, pageSize=pageSize, startDate=startDate, endDate=endDate

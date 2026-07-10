@@ -16,26 +16,32 @@ Notes:
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import AsyncGenerator
 
-from app.main import app
+from app.cache.redis_client import get_redis
 from app.database.session import get_db
-from .conftest import _make_db_override, TestSessionLocal
+from app.main import app
 
+from .conftest import TestSessionLocal, _make_db_override
 
 AUTH_BASE = "/api/v1/auth"
 
 
 # ── raw_client: real bearer, test DB ─────────────────────────────────────────
 
+
 @pytest_asyncio.fixture()
-async def raw_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def raw_client(
+    db_session: AsyncSession, fake_redis
+) -> AsyncGenerator[AsyncClient, None]:
     """Client with real bearer dependency — used for me/logout tests."""
     app.dependency_overrides[get_db] = _make_db_override(db_session)
+    app.dependency_overrides[get_redis] = lambda: fake_redis
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
@@ -46,6 +52,7 @@ async def raw_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, No
 
 
 # ── seeded_user: creates a real user inside the test transaction ──────────────
+
 
 @pytest_asyncio.fixture()
 async def seeded_user(db_session: AsyncSession) -> dict:
@@ -73,8 +80,8 @@ async def seeded_user(db_session: AsyncSession) -> dict:
 # POST /api/v1/auth/login
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestLogin:
 
+class TestLogin:
     async def test_login_success_returns_200(
         self, raw_client: AsyncClient, seeded_user: dict
     ):
@@ -103,30 +110,30 @@ class TestLogin:
     async def test_login_returns_expires_in_and_token_type(
         self, raw_client: AsyncClient, seeded_user: dict
     ):
-        data = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()["data"]
+        data = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
+            "data"
+        ]
         assert data["tokenType"] == "Bearer"
         assert isinstance(data["expiresIn"], int)
         assert data["expiresIn"] > 0
 
-    async def test_login_wrong_password_returns_success_false(
+    async def test_login_wrong_password_returns_401(
         self, raw_client: AsyncClient, seeded_user: dict
     ):
-        # login catches exceptions internally — always 200, success=false on failure
+        # invalid credentials → 401 with success=false envelope
         resp = await raw_client.post(
             f"{AUTH_BASE}/login",
             json={"email": seeded_user["email"], "password": "WrongPass1!"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
 
-    async def test_login_unknown_email_returns_success_false(
-        self, raw_client: AsyncClient
-    ):
+    async def test_login_unknown_email_returns_404(self, raw_client: AsyncClient):
         resp = await raw_client.post(
             f"{AUTH_BASE}/login",
             json={"email": "nobody@example.com", "password": "Password1!"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         assert resp.json()["success"] is False
 
     async def test_login_invalid_email_format_returns_422(
@@ -138,18 +145,14 @@ class TestLogin:
         )
         assert resp.status_code == 422
 
-    async def test_login_missing_password_returns_422(
-        self, raw_client: AsyncClient
-    ):
+    async def test_login_missing_password_returns_422(self, raw_client: AsyncClient):
         resp = await raw_client.post(
             f"{AUTH_BASE}/login",
             json={"email": "test@example.com"},
         )
         assert resp.status_code == 422
 
-    async def test_login_password_too_short_returns_422(
-        self, raw_client: AsyncClient
-    ):
+    async def test_login_password_too_short_returns_422(self, raw_client: AsyncClient):
         resp = await raw_client.post(
             f"{AUTH_BASE}/login",
             json={"email": "test@example.com", "password": "short"},
@@ -161,8 +164,8 @@ class TestLogin:
 # GET /api/v1/auth/me
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestMe:
 
+class TestMe:
     async def test_me_no_auth_header_returns_403(self, raw_client: AsyncClient):
         resp = await raw_client.get(f"{AUTH_BASE}/me")
         assert resp.status_code == 403
@@ -195,11 +198,15 @@ class TestMe:
     async def test_me_response_contains_user_fields(
         self, raw_client: AsyncClient, seeded_user: dict
     ):
-        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()["data"]["accessToken"]
-        profile = (await raw_client.get(
-            f"{AUTH_BASE}/me",
-            headers={"Authorization": f"Bearer {token}"},
-        )).json()["data"]
+        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
+            "data"
+        ]["accessToken"]
+        profile = (
+            await raw_client.get(
+                f"{AUTH_BASE}/me",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        ).json()["data"]
 
         assert profile["email"] == seeded_user["email"]
         assert "userId" in profile
@@ -211,7 +218,9 @@ class TestMe:
     async def test_me_after_logout_returns_success_false(
         self, raw_client: AsyncClient, seeded_user: dict
     ):
-        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()["data"]["accessToken"]
+        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
+            "data"
+        ]["accessToken"]
 
         await raw_client.post(
             f"{AUTH_BASE}/logout",
@@ -222,6 +231,7 @@ class TestMe:
             f"{AUTH_BASE}/me",
             headers={"Authorization": f"Bearer {token}"},
         )
+        assert resp.status_code == 200
         assert resp.json()["success"] is False
 
 
@@ -229,8 +239,8 @@ class TestMe:
 # POST /api/v1/auth/refresh
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestRefresh:
 
+class TestRefresh:
     async def test_refresh_returns_new_token_pair(
         self, raw_client: AsyncClient, seeded_user: dict
     ):
@@ -251,10 +261,12 @@ class TestRefresh:
         login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
         old_refresh = login.json()["data"]["refreshToken"]
 
-        new_data = (await raw_client.post(
-            f"{AUTH_BASE}/refresh",
-            json={"refreshToken": old_refresh},
-        )).json()["data"]
+        new_data = (
+            await raw_client.post(
+                f"{AUTH_BASE}/refresh",
+                json={"refreshToken": old_refresh},
+            )
+        ).json()["data"]
 
         assert new_data["refreshToken"] != old_refresh
 
@@ -262,10 +274,12 @@ class TestRefresh:
         self, raw_client: AsyncClient, seeded_user: dict
     ):
         login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
-        data = (await raw_client.post(
-            f"{AUTH_BASE}/refresh",
-            json={"refreshToken": login.json()["data"]["refreshToken"]},
-        )).json()["data"]
+        data = (
+            await raw_client.post(
+                f"{AUTH_BASE}/refresh",
+                json={"refreshToken": login.json()["data"]["refreshToken"]},
+            )
+        ).json()["data"]
 
         assert "accessToken" in data
         assert "refreshToken" in data
@@ -288,13 +302,16 @@ class TestRefresh:
         old_refresh = login.json()["data"]["refreshToken"]
 
         # Use it once
-        await raw_client.post(f"{AUTH_BASE}/refresh", json={"refreshToken": old_refresh})
+        await raw_client.post(
+            f"{AUTH_BASE}/refresh", json={"refreshToken": old_refresh}
+        )
 
         # Reuse should fail
         resp = await raw_client.post(
             f"{AUTH_BASE}/refresh",
             json={"refreshToken": old_refresh},
         )
+        assert resp.status_code == 200
         assert resp.json()["success"] is False
 
     async def test_refresh_missing_token_returns_422(self, raw_client: AsyncClient):
@@ -306,8 +323,8 @@ class TestRefresh:
 # POST /api/v1/auth/logout
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestLogout:
 
+class TestLogout:
     async def test_logout_no_auth_returns_403(self, raw_client: AsyncClient):
         resp = await raw_client.post(f"{AUTH_BASE}/logout")
         assert resp.status_code == 403
@@ -315,7 +332,9 @@ class TestLogout:
     async def test_logout_success_returns_204(
         self, raw_client: AsyncClient, seeded_user: dict
     ):
-        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()["data"]["accessToken"]
+        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
+            "data"
+        ]["accessToken"]
 
         resp = await raw_client.post(
             f"{AUTH_BASE}/logout",
@@ -326,7 +345,9 @@ class TestLogout:
     async def test_logout_response_has_no_body(
         self, raw_client: AsyncClient, seeded_user: dict
     ):
-        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()["data"]["accessToken"]
+        token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
+            "data"
+        ]["accessToken"]
 
         resp = await raw_client.post(
             f"{AUTH_BASE}/logout",
