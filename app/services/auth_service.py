@@ -1,8 +1,13 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
-from app.core.exceptions import InvalidCredentialsError, UserNotFoundError,UserInactiveError, TooManyAttemptsError
-from app.core.exceptions import UserInactiveError
+from app.core.exceptions import (
+    InvalidCredentialsError,
+    UserNotFoundError,
+    UserInactiveError,
+    TooManyAttemptsError,
+)
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +19,7 @@ from app.core.security import (
     token_hash,
     verify_password,
 )
+from app.services.sshost_client import authenticate_user, SSHostError
 from app.core.constants import REFRESH_TOKEN_REMEMBER_ME_DAYS
 from app.models.auth_model import RefreshTokenModel
 from app.models.user_model import UserModel
@@ -27,6 +33,7 @@ from app.schemas.auth_schema import (
 )
 from redis.asyncio import Redis
 
+logger = logging.getLogger("auth_service")
 
 
 class AuthService:
@@ -37,28 +44,26 @@ class AuthService:
 
     MAX_ATTEMPTS = 5
     WINDOW_SECONDS = 15 * 60  # 15 minutes
-    
+
     def __init__(self, session: AsyncSession, redis: Redis) -> None:
         self.repo = AuthRepository(session)
         self.redis = redis
-        self.session=session
-
-    # ── Public methods ────────────────────────────────────────────────────────
+        self.session = session
 
     async def login(self, request: LoginRequest) -> LoginResponse:
+        if await self._is_rate_limited(request.email):
+            raise TooManyAttemptsError()
+
         user = await self.repo.get_user_by_email(request.email)
         if not user:
             raise UserNotFoundError()
 
-        print(f"User status: {user.status}, Expected status: ACTIVE")
-        print(user)
         if user.status != "ACTIVE":
             raise UserInactiveError()
-        if not verify_password(request.password, user.hashed_password):
+
+        if not await self._verify_credentials(request.email, request.password, user):
             await self._register_failed_attempt(request.email)
             raise InvalidCredentialsError()
-        if await self._is_rate_limited(request.email):
-            raise TooManyAttemptsError()
 
         await self._clear_attempts(request.email)
 
@@ -67,15 +72,32 @@ class AuthService:
             email=user.email,
             role=user.role,
         )
-        
         refresh_token = await self._create_refresh_token(user)
+
         return LoginResponse(
             accessToken=access_token,
             refreshToken=refresh_token.token,
             expiresIn=expires_in,
-            user=self._profile(user),
         )
-    
+
+    async def _verify_credentials(
+        self, email: str, password: str, user: UserModel) -> bool:
+        try:
+            sshost_ok = await authenticate_user(email, password)
+            print(f"SSHost authentication result for {email}: {sshost_ok}")
+        except SSHostError as exc:
+            logger.warning(
+                "SSHost unavailable (%s), falling back to local DB verification for %s",
+                exc,
+                email,
+            )
+            return verify_password(password, user.hashed_password)
+
+        if sshost_ok is False:
+            return False
+
+        return True
+
     async def _is_rate_limited(self, email: str) -> bool:
         key = f"login_attempts:{email.lower()}"
         attempts = await self.redis.get(key)
