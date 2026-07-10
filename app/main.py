@@ -39,7 +39,6 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.observability.monitoring import monitor_router
-from app.schemas.auth_schema import ApiResponse
 from app.cache.redis_client import close_redis
 from fastapi.exceptions import RequestValidationError
 
@@ -112,12 +111,14 @@ def create_app() -> FastAPI:
 def app_exception_handler(request: Request, exc: AppException):
     return JSONResponse(
         status_code=exc.status_code,
-        content=ApiResponse.fail(
-            message=exc.message,
-            status_code=exc.status_code,
-            exception_message=str(exc)
-        ).model_dump(),
+        content={
+            "error": {
+                "code": getattr(exc, "code", "APP_ERROR"),
+                "message": exc.message,
+            }
+        },
     )
+
 
 def http_exception_handler(
     request: Request,
@@ -125,11 +126,14 @@ def http_exception_handler(
 ):
     return JSONResponse(
         status_code=exc.status_code,
-        content=ApiResponse.fail(
-            message=str(exc.detail),
-            status_code=exc.status_code
-        ).model_dump()
+        content={
+            "error": {
+                "code": f"HTTP_{exc.status_code}",
+                "message": str(exc.detail),
+            }
+        },
     )
+
 
 def validation_error_handler(request: Request, exc: RequestValidationError):
     messages = []
@@ -141,11 +145,12 @@ def validation_error_handler(request: Request, exc: RequestValidationError):
 
     return JSONResponse(
         status_code=422,
-        content=ApiResponse.fail(
-            message="Validation failed",
-            status_code=422,
-            exception_message=combined,
-        ).model_dump(),
+        content={
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": combined or "Validation failed",
+            }
+        },
     )
 
 app = create_app()

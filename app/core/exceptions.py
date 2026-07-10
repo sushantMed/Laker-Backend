@@ -60,7 +60,9 @@ class AppException(Exception):
 class AuthException(AppException):
     def __init__(self, message: str = "Unauthorized"):
         super().__init__(message, status_code=401)
-
+class SSHostError(AppException):
+    def __init__(self, message: str = "SSHost unreachable") -> None:
+        super().__init__(message, status_code=503)
 class ForbiddenException(AppException):
     def __init__(self, message: str = "Forbidden"):
         super().__init__(message, status_code=403)
