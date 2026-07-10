@@ -1,7 +1,7 @@
 # Pre-commit hooks for the Laker Backend.
 # Install once with:  pre-commit install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push
 # Run manually with:  pre-commit run --all-files
-default_install_hook_types: [pre-commit, commit-msg]
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
 
 repos:
   # General hygiene checks (fast, run on every commit).

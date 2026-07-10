@@ -23,6 +23,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache.redis_client import get_redis
 from app.database.session import get_db
 from app.main import app
 
@@ -35,9 +36,12 @@ AUTH_BASE = "/api/v1/auth"
 
 
 @pytest_asyncio.fixture()
-async def raw_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def raw_client(
+    db_session: AsyncSession, fake_redis
+) -> AsyncGenerator[AsyncClient, None]:
     """Client with real bearer dependency — used for me/logout tests."""
     app.dependency_overrides[get_db] = _make_db_override(db_session)
+    app.dependency_overrides[get_redis] = lambda: fake_redis
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
@@ -113,25 +117,23 @@ class TestLogin:
         assert isinstance(data["expiresIn"], int)
         assert data["expiresIn"] > 0
 
-    async def test_login_wrong_password_returns_success_false(
+    async def test_login_wrong_password_returns_401(
         self, raw_client: AsyncClient, seeded_user: dict
     ):
-        # login catches exceptions internally — always 200, success=false on failure
+        # invalid credentials → 401 with success=false envelope
         resp = await raw_client.post(
             f"{AUTH_BASE}/login",
             json={"email": seeded_user["email"], "password": "WrongPass1!"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
 
-    async def test_login_unknown_email_returns_success_false(
-        self, raw_client: AsyncClient
-    ):
+    async def test_login_unknown_email_returns_404(self, raw_client: AsyncClient):
         resp = await raw_client.post(
             f"{AUTH_BASE}/login",
             json={"email": "nobody@example.com", "password": "Password1!"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         assert resp.json()["success"] is False
 
     async def test_login_invalid_email_format_returns_422(
@@ -229,6 +231,7 @@ class TestMe:
             f"{AUTH_BASE}/me",
             headers={"Authorization": f"Bearer {token}"},
         )
+        assert resp.status_code == 200
         assert resp.json()["success"] is False
 
 
@@ -308,6 +311,7 @@ class TestRefresh:
             f"{AUTH_BASE}/refresh",
             json={"refreshToken": old_refresh},
         )
+        assert resp.status_code == 200
         assert resp.json()["success"] is False
 
     async def test_refresh_missing_token_returns_422(self, raw_client: AsyncClient):

@@ -6,6 +6,7 @@ from datetime import date
 
 import pytest  # type: ignore
 import pytest_asyncio  # type: ignore
+from fakeredis import aioredis as fakeredis  # type: ignore
 from httpx import ASGITransport, AsyncClient  # type: ignore
 from sqlalchemy import event  # type: ignore
 from sqlalchemy.ext.asyncio import (  # type: ignore
@@ -15,15 +16,18 @@ from sqlalchemy.ext.asyncio import (  # type: ignore
 )
 
 from app.api.v1.auth import bearer
+from app.cache.redis_client import get_redis
 from app.core.config import settings
 from app.database.base import Base
 from app.database.session import get_db
+from app.dependencies.auth import get_current_user
 from app.main import app
 from app.models.claim_model import ClaimModel
 from app.models.drug_model import DrugModel
 from app.models.member_model import MemberModel
 from app.models.pharmacy_model import PharmacyModel
 from app.models.prescriber_model import PrescriberModel
+from app.models.user_model import UserModel
 from app.utils.enums import BrandGeneric, CoverageType, Gender, Maintenance
 
 # ── Test database ─────────────────────────────────────────────────────────────
@@ -85,6 +89,40 @@ async def _noop_bearer():
     return None
 
 
+async def _fake_current_user() -> UserModel:
+    """Bypass real token/redis auth for non-auth endpoint tests.
+
+    Claim and member endpoints depend on app.dependencies.auth.get_current_user
+    (a different HTTPBearer than app.api.v1.auth.bearer, plus a Redis lookup).
+    Overriding that dependency short-circuits the whole auth chain.
+    """
+    return UserModel(
+        id=uuid.uuid4(),
+        email="tester@example.com",
+        first_name="Test",
+        last_name="User",
+        hashed_password="x",
+        role="admin",
+        status="ACTIVE",
+    )
+
+
+@pytest_asyncio.fixture()
+async def fake_redis() -> AsyncGenerator[fakeredis.FakeRedis, None]:
+    """A per-test in-memory Redis, bound to the current event loop.
+
+    The real client in app.cache.redis_client is a module-level singleton whose
+    connection binds to the first event loop that uses it. Since pytest-asyncio
+    gives each test a fresh loop, reusing that singleton raises
+    "RuntimeError: Event loop is closed" on every test after the first.
+    """
+    r = fakeredis.FakeRedis(decode_responses=True)
+    try:
+        yield r
+    finally:
+        await r.aclose()
+
+
 # ── Settings override ─────────────────────────────────────────────────────────
 
 
@@ -107,10 +145,14 @@ def _auth_header() -> dict[str, str]:
 
 
 @pytest_asyncio.fixture()
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def client(
+    db_session: AsyncSession, fake_redis: fakeredis.FakeRedis
+) -> AsyncGenerator[AsyncClient, None]:
     """Bearer bypassed — for claim/member/pharmacy/drug tests."""
     app.dependency_overrides[get_db] = _make_db_override(db_session)
     app.dependency_overrides[bearer] = _noop_bearer
+    app.dependency_overrides[get_current_user] = _fake_current_user
+    app.dependency_overrides[get_redis] = lambda: fake_redis
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
@@ -121,9 +163,12 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
 
 @pytest_asyncio.fixture()
-async def raw_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def raw_client(
+    db_session: AsyncSession, fake_redis: fakeredis.FakeRedis
+) -> AsyncGenerator[AsyncClient, None]:
     """Real bearer — for auth endpoint tests."""
     app.dependency_overrides[get_db] = _make_db_override(db_session)
+    app.dependency_overrides[get_redis] = lambda: fake_redis
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"

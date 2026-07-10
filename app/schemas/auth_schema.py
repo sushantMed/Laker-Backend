@@ -58,5 +58,6 @@ class ApiResponse(GenericModel, Generic[T]):
     def ok(cls, data: T, message: str = "Success") -> "ApiResponse[T]":
         return cls(success=True, message=message, data=data)
 
+    @classmethod
     def fail(cls, message: str, errors: list[str] | None = None) -> "ApiResponse[None]":
         return cls(success=False, message=message, data=None, errors=errors or [])
