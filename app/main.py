@@ -26,6 +26,7 @@ Note: Starlette applies middleware in *reverse registration order*
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -45,7 +46,7 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.observability.monitoring import monitor_router
-from app.schemas.auth_schema import ApiResponse
+from app.schemas.common_schema import ApiResponse
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(Exception, generic_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
 
     # ── Custom middleware stack ───────────────────────────────────────────────
     # Added bottom-up: last registered = outermost at ASGI level.
@@ -112,7 +114,9 @@ def create_app() -> FastAPI:
 def app_exception_handler(request: Request, exc: AppException):
     return JSONResponse(
         status_code=exc.status_code,
-        content=ApiResponse.fail(message=exc.message).model_dump(),
+        content=ApiResponse.fail(
+            message=exc.message, status_code=exc.status_code, exception_message=str(exc)
+        ).model_dump(),
     )
 
 
@@ -122,7 +126,27 @@ def http_exception_handler(
 ):
     return JSONResponse(
         status_code=exc.status_code,
-        content=ApiResponse.fail(message=str(exc.detail)).model_dump(),
+        content=ApiResponse.fail(
+            message=str(exc.detail), status_code=exc.status_code
+        ).model_dump(),
+    )
+
+
+def validation_error_handler(request: Request, exc: RequestValidationError):
+    messages = []
+    for err in exc.errors():
+        field = ".".join(str(loc) for loc in err["loc"] if loc != "body")
+        messages.append(f"{field}: {err['msg']}")
+
+    combined = "; ".join(messages)
+
+    return JSONResponse(
+        status_code=422,
+        content=ApiResponse.fail(
+            message="Validation failed",
+            status_code=422,
+            exception_message=combined,
+        ).model_dump(),
     )
 
 

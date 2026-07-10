@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     cache_enabled: bool = True
     cache_default_ttl_seconds: int = 300
 
+    # ── SSHost integration ────────────────────────────────────────
+    sshost_host: str = (
+        "<docker service name>"  # docker service name for dummy sshost server
+    )
+    sshost_port: int = 9000
+
     # ── Security ──────────────────────────────────────────────────
     jwt_secret_key: str
 

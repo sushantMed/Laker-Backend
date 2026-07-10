@@ -1,10 +1,18 @@
+import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import REFRESH_TOKEN_REMEMBER_ME_DAYS
+from app.core.exceptions import (
+    InvalidCredentialsError,
+    TooManyAttemptsError,
+    UserInactiveError,
+    UserNotFoundError,
+)
 from app.core.security import (
     create_access_token,
     decode_access_token,
@@ -23,6 +31,9 @@ from app.schemas.auth_schema import (
     RefreshResponse,
     UserProfile,
 )
+from app.services.sshost_client import SSHostError, authenticate_user
+
+logger = logging.getLogger("auth_service")
 
 
 class AuthService:
@@ -31,20 +42,30 @@ class AuthService:
     refresh_token_expired: str = "Refresh token expired"
     unauthorized: str = "Unauthorized"
 
-    def __init__(self, session: AsyncSession) -> None:
-        self.repo = AuthRepository(session)
+    MAX_ATTEMPTS = 5
+    WINDOW_SECONDS = 15 * 60  # 15 minutes
 
-    # ── Public methods ────────────────────────────────────────────────────────
+    def __init__(self, session: AsyncSession, redis: Redis) -> None:
+        self.repo = AuthRepository(session)
+        self.redis = redis
+        self.session = session
 
     async def login(self, request: LoginRequest) -> LoginResponse:
+        if await self._is_rate_limited(request.email):
+            raise TooManyAttemptsError()
+
         user = await self.repo.get_user_by_email(request.email)
-        if not user or not verify_password(request.password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=self.credentials_invalid,
-            )
+        if not user:
+            raise UserNotFoundError()
+
         if user.status != "ACTIVE":
-            raise HTTPException(status_code=423, detail="Account locked")
+            raise UserInactiveError()
+
+        if not await self._verify_credentials(request.email, request.password, user):
+            await self._register_failed_attempt(request.email)
+            raise InvalidCredentialsError()
+
+        await self._clear_attempts(request.email)
 
         access_token, _, expires_in = create_access_token(
             subject=str(user.id),
@@ -52,12 +73,43 @@ class AuthService:
             role=user.role,
         )
         refresh_token = await self._create_refresh_token(user)
+
         return LoginResponse(
             accessToken=access_token,
             refreshToken=refresh_token.token,
             expiresIn=expires_in,
-            user=self._profile(user),
         )
+
+    async def _verify_credentials(
+        self, email: str, password: str, user: UserModel
+    ) -> bool:
+        try:
+            sshost_ok = await authenticate_user(email, password)
+            print(f"SSHost authentication result for {email}: {sshost_ok}")
+        except SSHostError as exc:
+            logger.warning(
+                "SSHost unavailable (%s), falling back to local DB verification for %s",
+                exc,
+                email,
+            )
+            return verify_password(password, user.hashed_password)
+
+        return sshost_ok is not False
+
+    async def _is_rate_limited(self, email: str) -> bool:
+        key = f"login_attempts:{email.lower()}"
+        attempts = await self.redis.get(key)
+        return attempts is not None and int(attempts) >= self.MAX_ATTEMPTS
+
+    async def _register_failed_attempt(self, email: str) -> None:
+        key = f"login_attempts:{email.lower()}"
+        async with self.redis.pipeline(transaction=True) as pipe:
+            pipe.incr(key)
+            pipe.expire(key, self.WINDOW_SECONDS, nx=True)
+            await pipe.execute()
+
+    async def _clear_attempts(self, email: str) -> None:
+        await self.redis.delete(f"login_attempts:{email.lower()}")
 
     async def logout(self, access_token: str) -> None:
         claims = decode_access_token(access_token, verify_exp=False)

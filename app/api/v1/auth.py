@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache.redis_client import Redis, get_redis
 from app.database.session import get_db
 from app.schemas.auth_schema import (
     ApiResponse,
@@ -21,17 +22,24 @@ bearer = HTTPBearer()
 
 @router.post(
     "/login",
-    summary="Authenticate user and obtain tokens",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"model": ApiResponse[None], "description": "Invalid credentials"},
+        403: {"model": ApiResponse[None], "description": "Account inactive"},
+        404: {"model": ApiResponse[None], "description": "User not found"},
+        422: {"model": ApiResponse[None], "description": "Validation error"},
+        429: {"model": ApiResponse[None], "description": "Rate limited"},
+        500: {"model": ApiResponse[None], "description": "Internal server error"},
+    },
+    summary="Authenticate user and return access + refresh tokens",
 )
 async def login(
     body: LoginRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> ApiResponse[LoginResponse]:
-    try:
-        data = await AuthService(session).login(body)
-        return ApiResponse.ok(data, message="Login successful")
-    except Exception as e:
-        return ApiResponse.fail(message="Login failed", errors=[str(e)])
+    data = await AuthService(session, redis).login(body)
+    return ApiResponse.ok(data, message="Login successful")
 
 
 @router.post(
@@ -42,8 +50,9 @@ async def login(
 async def logout(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
     session: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> None:
-    await AuthService(session).logout(credentials.credentials)
+    await AuthService(session, redis).logout(credentials.credentials)
 
 
 @router.post(
@@ -53,9 +62,10 @@ async def logout(
 async def refresh(
     body: RefreshRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> ApiResponse[RefreshResponse]:
     try:
-        data = await AuthService(session).refresh(body)
+        data = await AuthService(session, redis).refresh(body)
         return ApiResponse.ok(data, message="Token refresh successful")
     except Exception as e:
         return ApiResponse.fail(message="Token refresh failed", errors=[str(e)])
@@ -68,9 +78,10 @@ async def refresh(
 async def me(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
     session: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> ApiResponse[UserProfile]:
     try:
-        data = await AuthService(session).me(credentials.credentials)
+        data = await AuthService(session, redis).me(credentials.credentials)
         print("User profile retrieved successfully:", data)
         return ApiResponse.ok(data, message="User profile retrieved successfully")
     except Exception as e:
