@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from app.dependencies.auth import get_current_user
+from app.models.user_model import UserModel
 from fastapi import APIRouter, Depends, Query  #type: ignore
 from fastapi.security import HTTPAuthorizationCredentials  #type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  #type: ignore
@@ -39,7 +41,7 @@ CLAIM_RETRIEVAL_SUCCESS_MESSAGE = "Claims retrieved successfully."
 async def search_claims(
     request: ClaimSearchRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10
 ) -> PagedApiResponse[ClaimSummary]:
@@ -53,7 +55,7 @@ async def search_claims(
 async def get_claim(
     authNum: str,
     session: Annotated[AsyncSession, Depends(get_db)],
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    current_user: Annotated[UserModel, Depends(get_current_user)],
 ) -> ClaimDetail:
     return await ClaimService(session).get_claim_by_auth_num(authNum)
 
@@ -65,7 +67,7 @@ async def search_claims_for_member(
     memberId: str,
     request: ClaimSearchRequestByMemberPath,
     session: Annotated[AsyncSession, Depends(get_db)],
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10
 ) -> PagedApiResponse[ClaimSummary]:
@@ -79,7 +81,7 @@ async def search_claims_for_member(
 async def get_claims_for_member(
     memberId: str,
     session: Annotated[AsyncSession, Depends(get_db)],
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
 ) -> PagedApiResponse[ClaimSummary]:
@@ -94,7 +96,7 @@ async def get_claims_for_member(
 async def get_claims_for_pharmacy(
     nabp: str,
     session: Annotated[AsyncSession, Depends(get_db)],
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
     startDate: Annotated[str | None, Query(alias="startDate")]=None,
@@ -113,7 +115,7 @@ async def get_claims_for_pharmacy(
 async def get_claims_for_prescriber(
     npi: str,
     session: Annotated[AsyncSession, Depends(get_db)],
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
     startDate: Annotated[str | None, Query(alias="startDate")]=None,
@@ -132,7 +134,7 @@ async def get_claims_for_prescriber(
 async def get_claims_for_drug(
     ndc: str,
     session: Annotated[AsyncSession, Depends(get_db)],
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
     startDate: Annotated[str | None, Query(alias="startDate")]=None,

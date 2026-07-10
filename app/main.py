@@ -25,6 +25,7 @@ Note: Starlette applies middleware in *reverse registration order*
 
 from contextlib import asynccontextmanager
 
+from app.schemas.common_schema import ApiResponse
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,7 +40,6 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.observability.monitoring import monitor_router
-from app.schemas.auth_schema import ApiResponse
 from app.cache.redis_client import close_redis
 from fastapi.exceptions import RequestValidationError
 
