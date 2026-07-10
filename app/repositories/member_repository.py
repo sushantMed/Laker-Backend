@@ -9,9 +9,9 @@ so carrier filter can use the join directly.
 from __future__ import annotations
 
 import time
-
-from sqlalchemy import select, func, false
 from datetime import date as date_type
+
+from sqlalchemy import false, func, select
 
 from app.models.member_model import MemberModel
 from app.models.plan_model import PlanModel
@@ -65,7 +65,9 @@ class MemberRepository(BaseRepository[MemberModel]):
                     MemberModel.prev_card_id.ilike(f"%{criteria.member_id}%")
                 )
             else:
-                stmt = stmt.where(MemberModel.member_id.ilike(f"%{criteria.member_id}%"))
+                stmt = stmt.where(
+                    MemberModel.member_id.ilike(f"%{criteria.member_id}%")
+                )
 
         if criteria.first_name:
             stmt = stmt.where(MemberModel.first_name.ilike(f"%{criteria.first_name}%"))
@@ -148,7 +150,6 @@ class MemberRepository(BaseRepository[MemberModel]):
             return 0
 
     async def get_max_family_position(self, subscriber_member_id: str) -> int:
-
         stmt = select(func.max(MemberModel.family_position)).where(
             MemberModel.is_deleted == false(),
             (
@@ -160,11 +161,11 @@ class MemberRepository(BaseRepository[MemberModel]):
         result = await self.session.execute(stmt)
         raw = result.scalar_one_or_none()
         if raw is None:
-         return 0
+            return 0
         try:
-           return int(raw)
+            return int(raw)
         except (ValueError, TypeError):
-           return 0
+            return 0
 
     # ── Persistence ──────────────────────────────────────────────────────────
 

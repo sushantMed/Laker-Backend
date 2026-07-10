@@ -1,18 +1,17 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 from app.database.session import get_db
 from app.schemas.auth_schema import (
+    ApiResponse,
     LoginRequest,
     LoginResponse,
     RefreshRequest,
     RefreshResponse,
     UserProfile,
-    ApiResponse
 )
 from app.services.auth_service import AuthService
 
@@ -33,6 +32,7 @@ async def login(
         return ApiResponse.ok(data, message="Login successful")
     except Exception as e:
         return ApiResponse.fail(message="Login failed", errors=[str(e)])
+
 
 @router.post(
     "/logout",
@@ -74,4 +74,6 @@ async def me(
         print("User profile retrieved successfully:", data)
         return ApiResponse.ok(data, message="User profile retrieved successfully")
     except Exception as e:
-        return ApiResponse.fail(message="Failed to retrieve user profile", errors=[str(e)])
+        return ApiResponse.fail(
+            message="Failed to retrieve user profile", errors=[str(e)]
+        )

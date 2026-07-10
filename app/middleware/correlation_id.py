@@ -22,7 +22,7 @@ def get_correlation_id() -> str:
     return _correlation_id_ctx.get()
 
 
-#we can use this in main
+# we can use this in main
 class CorrelationIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         cid = request.headers.get(CORRELATION_ID_HEADER) or str(uuid.uuid4())

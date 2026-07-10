@@ -1,4 +1,4 @@
-from sqlalchemy import select, false
+from sqlalchemy import false, select
 
 from app.models.plan_model import PlanModel
 from app.repositories.base_repository import BaseRepository

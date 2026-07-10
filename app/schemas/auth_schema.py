@@ -1,15 +1,19 @@
 from datetime import datetime
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
-from typing import Generic, TypeVar, Optional
 from pydantic.generics import GenericModel
 
+T = TypeVar("T")
 
-T = TypeVar('T')
 
 class LoginRequest(BaseModel):
-    email: str = Field(max_length=255, pattern=r"^[^\@\s]+@[^\@\s]+\.[^\@\s]+$" ,example="eample@example.com")
-    password: str = Field(min_length=8,example="password123")
+    email: str = Field(
+        max_length=255,
+        pattern=r"^[^\@\s]+@[^\@\s]+\.[^\@\s]+$",
+        example="eample@example.com",
+    )
+    password: str = Field(min_length=8, example="password123")
     # rememberMe: bool = False
 
 
@@ -43,10 +47,11 @@ class RefreshResponse(BaseModel):
     refreshToken: str
     expiresIn: int
 
+
 class ApiResponse(GenericModel, Generic[T]):
     success: bool
     message: str
-    data: Optional[T] = None
+    data: T | None = None
     errors: list[str] = []
 
     @classmethod
@@ -54,5 +59,5 @@ class ApiResponse(GenericModel, Generic[T]):
         return cls(success=True, message=message, data=data)
 
     @classmethod
-    def fail(cls, message: str, errors: list[str] = []) -> "ApiResponse[None]":
-        return cls(success=False, message=message, data=None, errors=errors)
+    def fail(cls, message: str, errors: list[str] | None = None) -> "ApiResponse[None]":
+        return cls(success=False, message=message, data=None, errors=errors or [])

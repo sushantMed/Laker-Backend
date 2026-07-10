@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select, false
+from sqlalchemy import false, select
 
 from app.models.prescriber_model import PrescriberModel
 from app.repositories.base_repository import BaseRepository
@@ -36,7 +36,9 @@ class PrescriberRepository(BaseRepository[PrescriberModel]):
         if criteria.dea:
             stmt = stmt.where(PrescriberModel.dea.ilike(f"%{criteria.dea}%"))
         if criteria.specialty:
-            stmt = stmt.where(PrescriberModel.specialty.ilike(f"%{criteria.specialty}%"))
+            stmt = stmt.where(
+                PrescriberModel.specialty.ilike(f"%{criteria.specialty}%")
+            )
         if criteria.city:
             stmt = stmt.where(PrescriberModel.city.ilike(f"%{criteria.city}%"))
         if criteria.state:

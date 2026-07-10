@@ -1,15 +1,17 @@
-import math
-from typing import Generic, TypeVar,Optional
-from pydantic import BaseModel, Field
+from typing import Generic, TypeVar
+
+from pydantic import Field
 from pydantic.generics import GenericModel
-T = TypeVar("T")
-TSearch = TypeVar("TSearch")
+
 from app.utils.pagination import (
-    PaginationRequest,
-    SortRequest,
     PagedResponse,
     PaginationMeta,
+    PaginationRequest,
+    SortRequest,
 )
+
+T = TypeVar("T")
+TSearch = TypeVar("TSearch")
 
 # class SortRequest(BaseModel):
 #     sort_by: str = Field(default="id", alias="sortBy")
@@ -61,8 +63,6 @@ from app.utils.pagination import (
 #         )
 
 
-
-
 class SearchRequest(GenericModel, Generic[TSearch]):
     """
     Generic search envelope used by all search endpoints.
@@ -81,11 +81,10 @@ class SearchRequest(GenericModel, Generic[TSearch]):
     pagination: PaginationRequest = Field(default_factory=PaginationRequest)
 
 
-
 class ApiResponse(GenericModel, Generic[T]):
     success: bool
     message: str
-    data: Optional[T] = None
+    data: T | None = None
     errors: list[str] = []
 
     @classmethod
@@ -93,8 +92,8 @@ class ApiResponse(GenericModel, Generic[T]):
         return cls(success=True, message=message, data=data)
 
     @classmethod
-    def fail(cls, message: str, errors: list[str] = []) -> "ApiResponse[None]":
-        return cls(success=False, message=message, data=None, errors=errors)
+    def fail(cls, message: str, errors: list[str] | None = None) -> "ApiResponse[None]":
+        return cls(success=False, message=message, data=None, errors=errors or [])
 
 
 class PagedApiResponse(GenericModel, Generic[T]):
@@ -122,7 +121,7 @@ class PagedApiResponse(GenericModel, Generic[T]):
     def fail(
         cls,
         message: str,
-        errors: list[str] = [],
+        errors: list[str] | None = None,
     ) -> "PagedApiResponse[None]":
         return cls(
             success=False,
@@ -136,5 +135,5 @@ class PagedApiResponse(GenericModel, Generic[T]):
                 hasNext=False,
                 hasPrev=False,
             ),
-            errors=errors,
+            errors=errors or [],
         )

@@ -25,13 +25,19 @@ Note: Starlette applies middleware in *reverse registration order*
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.exceptions import AppException
+from fastapi.responses import JSONResponse
+
 from app.api.router import api_router
+from app.cache.redis_client import close_redis
 from app.core.config import settings
-from app.core.exceptions import AppError, app_error_handler, generic_error_handler
+from app.core.exceptions import (
+    AppError,
+    AppException,
+    app_error_handler,
+    generic_error_handler,
+)
 from app.core.logging import setup_logging
 from app.middleware.correlation_id import CorrelationIdMiddleware
 from app.middleware.logging import LoggingMiddleware
@@ -40,10 +46,9 @@ from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.observability.monitoring import monitor_router
 from app.schemas.auth_schema import ApiResponse
-from app.cache.redis_client import close_redis
-
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,9 +60,8 @@ async def lifespan(app: FastAPI):
         await engine.dispose()
 
 
-
-
 # ── App factory ───────────────────────────────────────────────────────────────
+
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -83,7 +87,9 @@ def create_app() -> FastAPI:
     #
     # So we register in reverse:
 
-    app.add_middleware(SecurityHeadersMiddleware)   # innermost → applied last on response
+    app.add_middleware(
+        SecurityHeadersMiddleware
+    )  # innermost → applied last on response
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(RateLimitMiddleware)
@@ -100,16 +106,15 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
     app.include_router(monitor_router)
 
-
-
     return app
 
 
 def app_exception_handler(request: Request, exc: AppException):
     return JSONResponse(
         status_code=exc.status_code,
-        content=ApiResponse.fail(message=exc.message).model_dump()
+        content=ApiResponse.fail(message=exc.message).model_dump(),
     )
+
 
 def http_exception_handler(
     request: Request,
@@ -117,9 +122,8 @@ def http_exception_handler(
 ):
     return JSONResponse(
         status_code=exc.status_code,
-        content=ApiResponse.fail(
-            message=str(exc.detail)
-        ).model_dump()
+        content=ApiResponse.fail(message=str(exc.detail)).model_dump(),
     )
+
 
 app = create_app()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select, false
+from sqlalchemy import false, select
 
 from app.models.pharmacy_model import PharmacyModel
 from app.repositories.base_repository import BaseRepository

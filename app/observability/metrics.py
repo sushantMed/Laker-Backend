@@ -6,7 +6,6 @@ In production replace with prometheus-fastapi-instrumentator or
 opentelemetry-sdk.
 """
 
-import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 

@@ -8,14 +8,12 @@ All validation uses @model_validator(mode="after") — never __init__.
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional
-from app.utils.pagination import SortRequest, PaginationRequest
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.schemas.common_schema import SearchRequest
 from app.utils.enums import CoverageType, FamilyRole, Gender, MemberStatus, RelCode
-
+from app.utils.pagination import PaginationRequest, SortRequest
 
 # ── Shared config ────────────────────────────────────────────────────────────
 
@@ -36,11 +34,11 @@ def _calculate_age(date_of_birth: date) -> str:
 class MemberAddressSchema(BaseModel):
     model_config = _CAMEL
 
-    address1: Optional[str] = None
-    address2: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = Field(None, max_length=2)
-    zip: Optional[str] = Field(None, max_length=10)
+    address1: str | None = None
+    address2: str | None = None
+    city: str | None = None
+    state: str | None = Field(None, max_length=2)
+    zip: str | None = Field(None, max_length=10)
 
 
 # ── Plan summary (embedded in member responses) ──────────────────────────────
@@ -51,10 +49,10 @@ class PlanSummary(BaseModel):
 
     plan_id: str = Field(alias="planId")
     carrier: str
-    group_name: Optional[str] = Field(None, alias="groupName")
-    group_number: Optional[str] = Field(None, alias="groupNumber")
-    rx_bin: Optional[str] = Field(None, alias="rxBin")
-    rx_pcn: Optional[str] = Field(None, alias="rxPcn")
+    group_name: str | None = Field(None, alias="groupName")
+    group_number: str | None = Field(None, alias="groupNumber")
+    rx_bin: str | None = Field(None, alias="rxBin")
+    rx_pcn: str | None = Field(None, alias="rxPcn")
 
 
 # ── Member summary (search results list row) ─────────────────────────────────
@@ -66,25 +64,25 @@ class MemberSummary(BaseModel):
     model_config = _CAMEL
 
     member_id: str = Field(alias="memberId")
-    subscriber_member_id: Optional[str] = Field(None, alias="subscriberMemberId")
+    subscriber_member_id: str | None = Field(None, alias="subscriberMemberId")
     first_name: str = Field(alias="firstName")
     last_name: str = Field(alias="lastName")
-    mi: Optional[str] = None
+    mi: str | None = None
     date_of_birth: date = Field(alias="dateOfBirth")
     age: str = ""
-    gender: Optional[Gender] = None
+    gender: Gender | None = None
     status: MemberStatus
     person_code: str = Field(alias="personCode")
-    family_position: Optional[str] = Field(None, alias="familyPosition")
+    family_position: str | None = Field(None, alias="familyPosition")
     rel_code: str = Field(alias="relCode")
     role: FamilyRole = Field(alias="role")
-    cov_type: Optional[CoverageType] = Field(None, alias="covType")
-    insured_id: Optional[str] = Field(None, alias="insuredId")
+    cov_type: CoverageType | None = Field(None, alias="covType")
+    insured_id: str | None = Field(None, alias="insuredId")
     start_date: date = Field(alias="startDate")
     end_date: date = Field(alias="endDate")
-    plan_id: Optional[str] = Field(None, alias="planId")
+    plan_id: str | None = Field(None, alias="planId")
     # Carrier pulled from joined Plan — useful for list display
-    carrier: Optional[str] = None
+    carrier: str | None = None
 
 
 # ── Member detail (single member GET) ────────────────────────────────────────
@@ -96,35 +94,35 @@ class MemberDetail(BaseModel):
     model_config = _CAMEL
 
     member_id: str = Field(alias="memberId")
-    subscriber_member_id: Optional[str] = Field(None, alias="subscriberMemberId")
+    subscriber_member_id: str | None = Field(None, alias="subscriberMemberId")
 
     first_name: str = Field(alias="firstName")
     last_name: str = Field(alias="lastName")
-    mi: Optional[str] = None
+    mi: str | None = None
 
     date_of_birth: date = Field(alias="dateOfBirth")
     age: str = ""
-    gender: Optional[Gender] = None
-    ssn: Optional[str] = None
-    family_position: Optional[str] = Field(None, alias="familyPosition")
-    cov_type: Optional[CoverageType] = Field(None, alias="covType")
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    language_preference: Optional[str] = Field(None, alias="languagePreference")
+    gender: Gender | None = None
+    ssn: str | None = None
+    family_position: str | None = Field(None, alias="familyPosition")
+    cov_type: CoverageType | None = Field(None, alias="covType")
+    phone: str | None = None
+    email: str | None = None
+    language_preference: str | None = Field(None, alias="languagePreference")
 
-    insured_id: Optional[str] = Field(None, alias="insuredId")
+    insured_id: str | None = Field(None, alias="insuredId")
     person_code: str = Field(alias="personCode")
     rel_code: str = Field(alias="relCode")
     role: FamilyRole = Field(alias="role")
-    laker_pc: Optional[str] = Field(None, alias="lakerPc")
-    prev_card_id: Optional[str] = Field(None, alias="prevCardId")
+    laker_pc: str | None = Field(None, alias="lakerPc")
+    prev_card_id: str | None = Field(None, alias="prevCardId")
 
     start_date: date = Field(alias="startDate")
     end_date: date = Field(alias="endDate")
     status: MemberStatus
 
-    plan: Optional[PlanSummary] = None
-    address: Optional[MemberAddressSchema] = None
+    plan: PlanSummary | None = None
+    address: MemberAddressSchema | None = None
 
 
 # ── Eligibility response ──────────────────────────────────────────────────────
@@ -150,18 +148,18 @@ class MemberSearch(BaseModel):
 
     model_config = _CAMEL
 
-    carrier: Optional[str] = None
-    member_id: Optional[str] = Field(None, alias="memberId")
-    first_name: Optional[str] = Field(None, alias="firstName")
-    last_name: Optional[str] = Field(None, alias="lastName")
-    mi: Optional[str] = None
-    date_of_birth: Optional[date] = Field(None, alias="dateOfBirth")
+    carrier: str | None = None
+    member_id: str | None = Field(None, alias="memberId")
+    first_name: str | None = Field(None, alias="firstName")
+    last_name: str | None = Field(None, alias="lastName")
+    mi: str | None = None
+    date_of_birth: date | None = Field(None, alias="dateOfBirth")
 
     search_by_prev_card_id: bool = Field(False, alias="searchByPrevCardId")
     include_termed_members: bool = Field(False, alias="includeTermedMembers")
 
     @model_validator(mode="after")
-    def at_least_one_criterion(self) -> "MemberSearch":
+    def at_least_one_criterion(self) -> MemberSearch:
         has_criteria = any(
             [
                 self.carrier,
@@ -199,33 +197,33 @@ class AddFamilyMemberRequest(BaseModel):
 
     first_name: str = Field(alias="firstName", min_length=1, max_length=100)
     last_name: str = Field(alias="lastName", min_length=1, max_length=100)
-    mi: Optional[str] = Field(None, max_length=1)
+    mi: str | None = Field(None, max_length=1)
 
     date_of_birth: date = Field(alias="dateOfBirth")
-    gender: Optional[Gender] = None
-    ssn: Optional[str] = None
+    gender: Gender | None = None
+    ssn: str | None = None
 
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
-    language_preference: Optional[str] = Field(
+    phone: str | None = None
+    email: EmailStr | None = None
+    language_preference: str | None = Field(
         None, alias="languagePreference", max_length=10
     )
 
-    insured_id: Optional[str] = Field(None, alias="insuredId", max_length=50)
+    insured_id: str | None = Field(None, alias="insuredId", max_length=50)
     rel_code: str = Field(alias="relCode")
-    cov_type: Optional[CoverageType] = Field(None, alias="covType")
-    laker_pc: Optional[str] = Field(None, alias="lakerPc", max_length=20)
-    prev_card_id: Optional[str] = Field(None, alias="prevCardId", max_length=50)
+    cov_type: CoverageType | None = Field(None, alias="covType")
+    laker_pc: str | None = Field(None, alias="lakerPc", max_length=20)
+    prev_card_id: str | None = Field(None, alias="prevCardId", max_length=50)
 
     start_date: date = Field(alias="startDate")
     end_date: date = Field(alias="endDate")
 
-    plan_id: Optional[str] = Field(None, alias="planId")
+    plan_id: str | None = Field(None, alias="planId")
 
-    address: Optional[MemberAddressSchema] = None
+    address: MemberAddressSchema | None = None
 
     @model_validator(mode="after")
-    def validate_eligibility_dates(self) -> "AddFamilyMemberRequest":
+    def validate_eligibility_dates(self) -> AddFamilyMemberRequest:
         if self.end_date < self.start_date:
             from core.exceptions import InvalidEligibilityException
 
@@ -235,7 +233,7 @@ class AddFamilyMemberRequest(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_rel_code_not_cardholder(self) -> "AddFamilyMemberRequest":
+    def validate_rel_code_not_cardholder(self) -> AddFamilyMemberRequest:
         if self.rel_code == RelCode.CARDHOLDER.value:
             from core.exceptions import InvalidFamilyRelationshipException
 

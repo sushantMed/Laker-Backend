@@ -7,16 +7,13 @@ HTTP status mapping is the controller's responsibility.
 """
 
 from __future__ import annotations
+
 import hashlib
-from app.cache.cache_service import CacheService
-from app.utils.pagination import PaginationRequest
+from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.utils.enums import derive_status
-from datetime import date
-from app.utils.enums import FamilyRole, RelCode
-from app.utils.pagination import PagedResponse
 
+from app.cache.cache_service import CacheService
 from app.core.exceptions import (
     DuplicateSpouseException,
     InvalidFamilyRelationshipException,
@@ -36,6 +33,10 @@ from app.schemas.member_schema import (
     MemberSummary,
     PlanSummary,
 )
+from app.utils.enums import FamilyRole, RelCode, derive_status
+from app.utils.pagination import PagedResponse, PaginationRequest
+
+
 def _calculate_age(date_of_birth: date) -> str:
     today = date.today()
     age = today.year - date_of_birth.year
@@ -294,7 +295,6 @@ class MemberService:
 
         # 5. Build and persist new member
         new_member_id = MemberRepository.generate_member_id()
-
 
         # 6. Generate family_position
         max_fp = await self._repo.get_max_family_position(subscriber_member_id)

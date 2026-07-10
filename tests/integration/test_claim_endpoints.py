@@ -21,14 +21,13 @@ Test strategy
 """
 
 from __future__ import annotations
+
 from datetime import date
 
-from httpx import AsyncClient #type: ignore
-from sqlalchemy.ext.asyncio import AsyncSession #type: ignore
+from httpx import AsyncClient  # type: ignore
+from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
-from .conftest import BASE_PATH, _auth_header, _make_claim, _seed, _make_member
-
-
+from .conftest import BASE_PATH, _auth_header, _make_claim, _make_member, _seed
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -49,13 +48,17 @@ class TestSearchClaims:
 
         resp = await client.post(
             self.BASE_URL,
-            json={"searchRequest": {"memberId": "MBR-SEARCH-01", "excludeTestClaims": False}},
+            json={
+                "searchRequest": {
+                    "memberId": "MBR-SEARCH-01",
+                    "excludeTestClaims": False,
+                }
+            },
             headers=_auth_header(),
         )
 
         assert resp.status_code == 200, (
-            f"Expected 200 but got {resp.status_code}. "
-            f"Body: {resp.json()}"
+            f"Expected 200 but got {resp.status_code}. Body: {resp.json()}"
         )
         body = resp.json()
         assert body["data"] is not None
@@ -114,7 +117,9 @@ class TestSearchClaims:
 
         resp = await client.post(
             self.BASE_URL,
-            json={"searchRequest": {"memberId": "MBR-INCL", "excludeTestClaims": False}},
+            json={
+                "searchRequest": {"memberId": "MBR-INCL", "excludeTestClaims": False}
+            },
             headers=_auth_header(),
         )
 
@@ -150,7 +155,9 @@ class TestSearchClaims:
 
         resp = await client.post(
             self.BASE_URL,
-            json={"searchRequest": {"memberId": "MBR-KEYS", "excludeTestClaims": False}},
+            json={
+                "searchRequest": {"memberId": "MBR-KEYS", "excludeTestClaims": False}
+            },
             headers=_auth_header(),
         )
 
@@ -161,9 +168,7 @@ class TestSearchClaims:
 
     # ── Validation errors ─────────────────────────────────────────────────────
 
-    async def test_search_no_criteria_returns_error(
-        self, client: AsyncClient
-    ):
+    async def test_search_no_criteria_returns_error(self, client: AsyncClient):
         resp = await client.post(
             self.BASE_URL,
             json={"searchRequest": {}},
@@ -177,7 +182,12 @@ class TestSearchClaims:
     ):
         resp = await client.post(
             self.BASE_URL,
-            json={"searchRequest": {"dateFilledStart": "2024-01-01", "excludeTestClaims": False}},
+            json={
+                "searchRequest": {
+                    "dateFilledStart": "2024-01-01",
+                    "excludeTestClaims": False,
+                }
+            },
             headers=_auth_header(),
         )
         assert resp.status_code in (400, 422)
@@ -191,7 +201,7 @@ class TestSearchClaims:
                 "searchRequest": {
                     "memberId": "MBR-001",
                     "dateFilledStart": "2023-01-01",
-                    "dateFilledEnd": "2024-06-01",   # > 366 days
+                    "dateFilledEnd": "2024-06-01",  # > 366 days
                     "excludeTestClaims": False,
                 }
             },
@@ -216,15 +226,14 @@ class TestSearchClaims:
         )
         assert resp.status_code in (400, 422)
 
-    async def test_search_missing_auth_header_returns_401(
-        self, client: AsyncClient
-    ):
+    async def test_search_missing_auth_header_returns_401(self, client: AsyncClient):
         resp = await client.post(
             self.BASE_URL,
             json={"searchRequest": {"memberId": "MBR-001", "excludeTestClaims": False}},
         )
 
         assert resp.status_code in (200, 400, 401, 422)
+
 
 #  ═════════════════════════════════════════════════════════════════════════════
 # GET /api/v1/claims/{authNum}
@@ -318,9 +327,7 @@ class TestGetClaim:
 
     # ── Not found ─────────────────────────────────────────────────────────────
 
-    async def test_get_claim_unknown_auth_num_returns_404(
-        self, client: AsyncClient
-    ):
+    async def test_get_claim_unknown_auth_num_returns_404(self, client: AsyncClient):
         resp = await client.get(
             f"{BASE_PATH}/claims/DOES-NOT-EXIST", headers=_auth_header()
         )
@@ -335,7 +342,6 @@ class TestSearchClaimsForMember:
 
     def _url(self, memberId: str) -> str:
         return f"{BASE_PATH}/members/{memberId}/claims/search"
-
 
     async def test_search_returns_only_target_member_claims(
         self, client: AsyncClient, db_session: AsyncSession
@@ -361,7 +367,6 @@ class TestSearchClaimsForMember:
     async def test_member_search_with_auth_num_filter(
         self, client: AsyncClient, db_session: AsyncSession
     ):
-
         db_session.add(_make_member(member_id="MBR-AN-01"))
         await db_session.flush()
 
@@ -371,7 +376,12 @@ class TestSearchClaimsForMember:
 
         resp = await client.post(
             self._url("MBR-AN-01"),
-            json={"searchRequest": {"authNum": "AUTH-AN-FILTER", "excludeTestClaims": False}},
+            json={
+                "searchRequest": {
+                    "authNum": "AUTH-AN-FILTER",
+                    "excludeTestClaims": False,
+                }
+            },
             headers=_auth_header(),
         )
 
@@ -524,9 +534,7 @@ class TestGetClaimsForMember:
         assert resp.status_code == 200
         assert len(resp.json()["data"]) <= 2
 
-    async def test_pagination_invalid_page_returns_422(
-        self, client: AsyncClient
-    ):
+    async def test_pagination_invalid_page_returns_422(self, client: AsyncClient):
         resp = await client.get(
             self._url("MBR-001"),
             params={"page": 0},
@@ -544,16 +552,16 @@ class TestGetClaimsForMember:
         )
         assert resp.status_code == 422
 
-    async def test_returns_empty_list_for_unknown_member(
-        self, client: AsyncClient
-    ):
-        resp = await client.get(
-            self._url("MBR-NOBODY"), headers=_auth_header()
-        )
+    async def test_returns_empty_list_for_unknown_member(self, client: AsyncClient):
+        resp = await client.get(self._url("MBR-NOBODY"), headers=_auth_header())
 
         print(f"Request: {resp.request.url}====================================")
-        print(f"Request body: {resp.request.content}====================================")
-        print(f"Request headers: {resp.request.headers}====================================")
+        print(
+            f"Request body: {resp.request.content}===================================="
+        )
+        print(
+            f"Request headers: {resp.request.headers}===================================="
+        )
         print(f"Response: {resp}====================================")
         print(f"Response: {resp.json()}====================================")
 

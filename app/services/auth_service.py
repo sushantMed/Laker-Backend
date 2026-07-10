@@ -1,9 +1,10 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.constants import REFRESH_TOKEN_REMEMBER_ME_DAYS
 from app.core.security import (
     create_access_token,
     decode_access_token,
@@ -12,7 +13,6 @@ from app.core.security import (
     token_hash,
     verify_password,
 )
-from app.core.constants import REFRESH_TOKEN_REMEMBER_ME_DAYS
 from app.models.auth_model import RefreshTokenModel
 from app.models.user_model import UserModel
 from app.repositories.auth_repository import AuthRepository
@@ -30,6 +30,7 @@ class AuthService:
     refresh_token_invalid: str = "Invalid refresh token"
     refresh_token_expired: str = "Refresh token expired"
     unauthorized: str = "Unauthorized"
+
     def __init__(self, session: AsyncSession) -> None:
         self.repo = AuthRepository(session)
 
@@ -39,7 +40,8 @@ class AuthService:
         user = await self.repo.get_user_by_email(request.email)
         if not user or not verify_password(request.password, user.hashed_password):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.credentials_invalid
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=self.credentials_invalid,
             )
         if user.status != "ACTIVE":
             raise HTTPException(status_code=423, detail="Account locked")
@@ -68,30 +70,34 @@ class AuthService:
         current = await self.repo.get_refresh_token(request.refreshToken)
         if not current:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.refresh_token_invalid
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=self.refresh_token_invalid,
             )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expires_at = current.expires_at
         if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
+            expires_at = expires_at.replace(tzinfo=UTC)
 
         if current.revoked or current.consumed:
             # Token reuse detected — revoke entire family (rotation protection)
             await self.repo.revoke_refresh_family(current.family_id)
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.refresh_token_invalid
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=self.refresh_token_invalid,
             )
 
         if expires_at < now:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.refresh_token_expired
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=self.refresh_token_expired,
             )
 
         user = await self.repo.get_user_by_id(current.user_id)
         if not user:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.refresh_token_invalid
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=self.refresh_token_invalid,
             )
 
         current.consumed = True
@@ -113,18 +119,23 @@ class AuthService:
         user = await self.current_user(access_token)
         return self._profile(user)
 
-
     async def current_user(self, access_token: str) -> UserModel:
         claims = decode_access_token(access_token)
         if await self.repo.is_access_token_revoked(token_hash(access_token)):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+            )
         try:
             user_id = UUID(claims["sub"])
         except (KeyError, ValueError):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+            ) from None
         user = await self.repo.get_user_by_id(user_id)
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+            )
         return user
 
     # ── Private helpers ───────────────────────────────────────────────────────
@@ -140,7 +151,7 @@ class AuthService:
             token=opaque_token(),
             family_id=family_id or str(uuid4()),
             user_id=user.id,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=days),
+            expires_at=datetime.now(UTC) + timedelta(days=days),
         )
         return await self.repo.save_refresh_token(token)
 

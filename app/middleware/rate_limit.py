@@ -16,7 +16,7 @@ from threading import Lock
 from fastapi import status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response, JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from app.core.config import settings
 
@@ -43,7 +43,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             lambda: _Bucket(tokens=settings.rate_limit_requests)
         )
         self._capacity = settings.rate_limit_requests
-        self._rate = settings.rate_limit_requests / settings.rate_limit_window_seconds  # tokens/sec
+        self._rate = (
+            settings.rate_limit_requests / settings.rate_limit_window_seconds
+        )  # tokens/sec
 
     async def dispatch(self, request: Request, call_next) -> Response:
         if not settings.rate_limit_enabled:

@@ -1,6 +1,5 @@
 import logging
 import sys
-from typing import Any
 
 from app.core.config import settings
 

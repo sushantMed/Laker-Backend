@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,5 +32,5 @@ def require_roles(*roles: str):
 
 
 # Convenience shortcuts
-require_admin      = require_roles("admin", "superadmin")
+require_admin = require_roles("admin", "superadmin")
 require_superadmin = require_roles("superadmin")

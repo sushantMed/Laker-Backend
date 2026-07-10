@@ -9,10 +9,10 @@ or (items, total) tuples for paged queries.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import date
-from typing import Optional, Sequence
 
-from sqlalchemy import asc, desc, func, select, false
+from sqlalchemy import asc, desc, false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -35,7 +35,7 @@ class ClaimRepository:
 
     # ── Lookups ──────────────────────────────────────────────────────────────
 
-    async def get_by_auth_num(self, auth_num: str) -> Optional[ClaimModel]:
+    async def get_by_auth_num(self, auth_num: str) -> ClaimModel | None:
         stmt = (
             select(ClaimModel)
             .options(joinedload(ClaimModel.member))
@@ -48,14 +48,14 @@ class ClaimRepository:
 
     async def search(
         self,
-        member_id: Optional[str] = None,
-        auth_num: Optional[str] = None,
-        date_filled_start: Optional[date] = None,
-        date_filled_end: Optional[date] = None,
+        member_id: str | None = None,
+        auth_num: str | None = None,
+        date_filled_start: date | None = None,
+        date_filled_end: date | None = None,
         exclude_test_claims: bool = True,
         page: int = 1,
         page_size: int = 10,
-        sort_by: Optional[str] = None,
+        sort_by: str | None = None,
         sort_dir: str = "asc",
     ) -> tuple[Sequence[ClaimModel], int]:
         stmt = select(ClaimModel).options(joinedload(ClaimModel.member))
@@ -74,14 +74,13 @@ class ClaimRepository:
 
     # ── Claims for a member ──────────────────────────────────────────────────
 
-
     async def get_claims_by_member_id(
         self,
         member_id: str,
         exclude_test_claims: bool = True,
         page: int = 1,
         page_size: int = 10,
-        sort_by: Optional[str] = None,
+        sort_by: str | None = None,
         sort_dir: str = "asc",
     ) -> tuple[Sequence[ClaimModel], int]:
         stmt = (
@@ -99,8 +98,8 @@ class ClaimRepository:
     async def get_claims_by_pharmacy_nabp(
         self,
         nabp: str,
-        date_filled_start: Optional[date] = None,
-        date_filled_end: Optional[date] = None,
+        date_filled_start: date | None = None,
+        date_filled_end: date | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> tuple[Sequence[ClaimModel], int]:
@@ -115,8 +114,8 @@ class ClaimRepository:
     async def get_claims_by_prescriber_npi(
         self,
         npi: str,
-        date_filled_start: Optional[date] = None,
-        date_filled_end: Optional[date] = None,
+        date_filled_start: date | None = None,
+        date_filled_end: date | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> tuple[Sequence[ClaimModel], int]:
@@ -131,8 +130,8 @@ class ClaimRepository:
     async def get_claims_by_drug_ndc(
         self,
         ndc: str,
-        date_filled_start: Optional[date] = None,
-        date_filled_end: Optional[date] = None,
+        date_filled_start: date | None = None,
+        date_filled_end: date | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> tuple[Sequence[ClaimModel], int]:
@@ -160,8 +159,8 @@ class ClaimRepository:
     @staticmethod
     def _apply_date_range(
         stmt,
-        date_filled_start: Optional[date],
-        date_filled_end: Optional[date],
+        date_filled_start: date | None,
+        date_filled_end: date | None,
     ):
         if date_filled_start:
             stmt = stmt.where(ClaimModel.date_filled >= date_filled_start)
@@ -174,7 +173,7 @@ class ClaimRepository:
         stmt,
         page: int,
         page_size: int,
-        sort_by: Optional[str],
+        sort_by: str | None,
         sort_dir: str,
     ) -> tuple[Sequence[ClaimModel], int]:
         count_stmt = select(func.count()).select_from(stmt.subquery())

@@ -1,0 +1,47 @@
+# Ruff configuration for the Laker Backend.
+# Docs: https://docs.astral.sh/ruff/
+#
+# Usage:
+#   ruff check .          # lint
+#   ruff check . --fix    # lint and auto-fix
+#   ruff format .         # format
+
+target-version = "py312"
+line-length = 88
+
+# Directories that are generated or vendored — don't lint or format them.
+extend-exclude = [
+    "alembic/versions",
+    "venv",
+    "htmlcov",
+    ".pytest_cache",
+]
+
+[lint]
+# A pragmatic starter set:
+#   E, W  pycodestyle       F   pyflakes
+#   I     isort             UP  pyupgrade
+#   B     flake8-bugbear    C4  flake8-comprehensions
+#   SIM   flake8-simplify   RUF ruff-specific rules
+select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+    "E501",    # line length is enforced by the formatter, not the linter
+    "B008",    # FastAPI relies on function calls in argument defaults (Depends(), etc.)
+    "B039",    # ContextVar default {} is deliberate; it's replaced per request
+    "RUF002",  # en-dash used intentionally in docstring diagrams/prose
+    "UP046",   # PEP 695 generics don't play well with pydantic's GenericModel
+]
+
+[lint.per-file-ignores]
+# Tests may use assert freely, re-import fixtures, assert on broad exceptions,
+# and unpack tuples without using every element.
+"tests/**" = ["B011", "B017", "F811", "F401", "RUF059"]
+# Package inits commonly re-export names.
+"**/__init__.py" = ["F401"]
+
+[lint.isort]
+known-first-party = ["app"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
