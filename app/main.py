@@ -25,6 +25,7 @@ Note: Starlette applies middleware in *reverse registration order*
 
 from contextlib import asynccontextmanager
 
+from app.schemas.common_schema import ApiResponse
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -111,14 +112,12 @@ def create_app() -> FastAPI:
 def app_exception_handler(request: Request, exc: AppException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={
-            "error": {
-                "code": getattr(exc, "code", "APP_ERROR"),
-                "message": exc.message,
-            }
-        },
+        content=ApiResponse.fail(
+            message=exc.message,
+            status_code=exc.status_code,
+            exception_message=str(exc)
+        ).model_dump(),
     )
-
 
 def http_exception_handler(
     request: Request,
@@ -126,14 +125,11 @@ def http_exception_handler(
 ):
     return JSONResponse(
         status_code=exc.status_code,
-        content={
-            "error": {
-                "code": f"HTTP_{exc.status_code}",
-                "message": str(exc.detail),
-            }
-        },
+        content=ApiResponse.fail(
+            message=str(exc.detail),
+            status_code=exc.status_code
+        ).model_dump()
     )
-
 
 def validation_error_handler(request: Request, exc: RequestValidationError):
     messages = []
@@ -145,12 +141,11 @@ def validation_error_handler(request: Request, exc: RequestValidationError):
 
     return JSONResponse(
         status_code=422,
-        content={
-            "error": {
-                "code": "VALIDATION_ERROR",
-                "message": combined or "Validation failed",
-            }
-        },
+        content=ApiResponse.fail(
+            message="Validation failed",
+            status_code=422,
+            exception_message=combined,
+        ).model_dump(),
     )
 
 app = create_app()
