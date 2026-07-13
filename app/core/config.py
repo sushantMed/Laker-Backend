@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     db_host: str
     db_port: int
     db_name: str
+    db_user_password: str  # Password for the database user (used in Oracle connection)
 
     # ── Redis / Cache ─────────────────────────────────────────────
     redis_host: str = "redis"
