@@ -18,16 +18,20 @@ services:
     image: container-registry.oracle.com/database/free:latest
     container_name: oracle-db
     restart: unless-stopped
+
     environment:
-      ORACLE_PWD: Bot#2023
-      APP_USER: bot
-      APP_USER_PASSWORD: Bot#2023
+      ORACLE_PWD: ${DB_PASSWORD}
+      APP_USER: ${DB_USER}
+      APP_USER_PASSWORD: ${DB_USER_PASSWORD}
+
     ports:
-      - "1521:1521"
+      - "${DB_PORT}:1521"
+
     volumes:
       - laker_oracle_data:/opt/oracle/oradata
+
     healthcheck:
-      test: ["CMD", "healthcheck.sh"]
+      test: ["CMD", "lsnrctl", "status"]
       interval: 30s
       timeout: 10s
       retries: 10
