@@ -24,6 +24,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+import app.models  # noqa: F401 (registers every ORM mapper for relationship resolution)
 from app.database.session import AsyncSessionLocal
 from app.models.claim_model import ClaimModel
 from app.models.member_model import MemberModel
