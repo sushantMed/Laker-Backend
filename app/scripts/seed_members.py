@@ -29,104 +29,78 @@ def load_seed_data():
 
 
 async def seed_members():
-    """
-    Seed plans, members and addresses.
-
-    Safe to run multiple times.
-    If members already exist, seeding is skipped.
-    """
-
     data = load_seed_data()
 
     async with AsyncSessionLocal() as session:
-        # Skip if data already exists
-        result = await session.execute(select(MemberModel))
-
-        if result.first():
-            print("Members already exist. Skipping seed.")
-            return
-
         # --------------------------------------------------
-        # Plans
+        # Plans (upsert by plan_id)
         # --------------------------------------------------
-
-        print("Seeding plans...")
-
-        for plan_data in data.get("plans", []):
+        existing_plan_ids = set(
+            (await session.execute(select(PlanModel.plan_id))).scalars().all()
+        )
+        new_plans = [
+            p for p in data.get("plans", []) if p["plan_id"] not in existing_plan_ids
+        ]
+        for plan_data in new_plans:
             session.add(PlanModel(**plan_data))
-
         await session.flush()
-
-        print(f"✓ {len(data.get('plans', []))} plans inserted")
+        print(f"{len(new_plans)} new plans inserted")
 
         # --------------------------------------------------
-        # Members
+        # Members (upsert by member_id)
         # --------------------------------------------------
+        existing_member_ids = set(
+            (await session.execute(select(MemberModel.member_id))).scalars().all()
+        )
 
-        print("Seeding members...")
-
-        cardholders = []
-        dependents = []
+        cardholders, dependents = [], []
 
         for member_data in data.get("members", []):
-            # Avoid mutating original JSON dict
-            member_data = member_data.copy()
+            if member_data["member_id"] in existing_member_ids:
+                continue  # already seeded, skip
 
-            # Date conversion
+            member_data = member_data.copy()
             member_data["date_of_birth"] = date.fromisoformat(
                 member_data["date_of_birth"]
             )
-
             member_data["start_date"] = date.fromisoformat(member_data["start_date"])
-
             member_data["end_date"] = date.fromisoformat(member_data["end_date"])
 
-            # Enum conversion
             if member_data.get("gender"):
                 member_data["gender"] = Gender(member_data["gender"])
-
             if member_data.get("cov_type"):
                 member_data["cov_type"] = CoverageType(member_data["cov_type"])
 
             member = MemberModel(**member_data)
+            (dependents if member.subscriber_member_id else cardholders).append(member)
 
-            if member.subscriber_member_id:
-                dependents.append(member)
-            else:
-                cardholders.append(member)
-
-        # Insert cardholders first
         session.add_all(cardholders)
         await session.flush()
-
-        # Insert dependents second
         session.add_all(dependents)
         await session.flush()
-
-        print(f"✓ {len(cardholders)} cardholders inserted")
-
-        print(f"✓ {len(dependents)} dependents inserted")
+        print(f"{len(cardholders)} new cardholders inserted")
+        print(f"{len(dependents)} new dependents inserted")
 
         # --------------------------------------------------
-        # Addresses
+        # Addresses (upsert by member_id)
         # --------------------------------------------------
-
-        print("Seeding addresses...")
-
-        for address_data in data.get("addresses", []):
+        existing_addr_member_ids = set(
+            (await session.execute(select(MemberAddressModel.member_id)))
+            .scalars()
+            .all()
+        )
+        new_addresses = [
+            a
+            for a in data.get("addresses", [])
+            if a["member_id"] not in existing_addr_member_ids
+        ]
+        for address_data in new_addresses:
             session.add(MemberAddressModel(**address_data))
-
         await session.flush()
-
-        print(f"✓ {len(data.get('addresses', []))} addresses inserted")
-
-        # --------------------------------------------------
-        # Commit
-        # --------------------------------------------------
+        print(f"{len(new_addresses)} new addresses inserted")
 
         await session.commit()
-
-        print("✓ Members seeded successfully")
+        print("Seed completed successfully")
 
 
 if __name__ == "__main__":

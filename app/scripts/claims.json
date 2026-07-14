@@ -251,5 +251,28 @@
     "totalPaid": 18.90,
     "isTestClaim": true,
     "planId": null
+  },
+  {
+    "authNum": "CLM20240012",
+    "memberId": "MBR007",
+    "rxNumber": "77843012",
+    "drug": "Gabapentin 300mg",
+    "ndc": "00603542721",
+    "dateFilled": "2025-01-10",
+    "dateWritten": "2025-01-08",
+    "quantity": 90,
+    "daysSupply": 30,
+    "refillsRemaining": 2,
+    "pharmacyNpi": "1245319599",
+    "pharmacyNabp": "1234567",
+    "pharmacyName": "Laker Pharmacy - Main St",
+    "prescriberNpi": "1003827465",
+    "prescriberName": "Dr. Sarah Chen",
+    "ingredientCost": 16.90,
+    "dispensingFee": 2.00,
+    "copay": 10.00,
+    "totalPaid": 18.90,
+    "isTestClaim": true,
+    "planId": null
   }
 ]
