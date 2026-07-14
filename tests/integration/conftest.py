@@ -134,6 +134,14 @@ def disable_cache():
     settings.cache_enabled = original
 
 
+@pytest.fixture(autouse=True)
+def disable_rate_limit():
+    original_enabled = settings.rate_limit_enabled
+    settings.rate_limit_enabled = False
+    yield
+    settings.rate_limit_enabled = original_enabled
+
+
 # ── HTTP client fixtures ──────────────────────────────────────────────────────
 
 BASE_PATH = "/api/v1"
