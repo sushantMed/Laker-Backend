@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user_model import UserModel
-from app.schemas.common_schema import ApiResponse, PagedApiResponse
+from app.schemas.common_schema import PagedApiResponse
 from app.schemas.member_schema import (
     AddFamilyMemberRequest,
     EligibilityResponse,
@@ -27,9 +27,8 @@ async def get_member(
     member_id: str,
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> ApiResponse[MemberDetail]:
-    data = await MemberService(session).get_member_by_id(member_id)
-    return ApiResponse.ok(data=data, message="Member retrieved successfully.")
+) -> MemberDetail:
+    return await MemberService(session).get_member_by_id(member_id)
 
 
 @router.post("/search")
@@ -47,9 +46,8 @@ async def get_eligibility(
     member_id: str,
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
-) -> ApiResponse[EligibilityResponse]:
-    data = await MemberService(session).get_eligibility(member_id)
-    return ApiResponse.ok(data=data, message="Eligibility retrieved successfully.")
+) -> EligibilityResponse:
+    return await MemberService(session).get_eligibility(member_id)
 
 
 @router.get("/{member_id}/family")
@@ -74,6 +72,5 @@ async def add_family_member(
     request: AddFamilyMemberRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
-) -> ApiResponse[MemberDetail]:
-    data = await MemberService(session).add_family_member(member_id, request)
-    return ApiResponse.ok(data=data, message="Family member added successfully.")
+) -> MemberDetail:
+    return await MemberService(session).add_family_member(member_id, request)

@@ -86,7 +86,7 @@ class ClaimRepository:
         stmt = (
             select(ClaimModel)
             .options(joinedload(ClaimModel.member))
-            .where(ClaimModel.member_id == member_id)
+            .where(ClaimModel.member_id.ilike(member_id))
         )
         if exclude_test_claims:
             stmt = stmt.where(ClaimModel.is_test_claim == false())

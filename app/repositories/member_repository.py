@@ -101,8 +101,8 @@ class MemberRepository(BaseRepository[MemberModel]):
             .where(
                 MemberModel.is_deleted == false(),
                 (
-                    (MemberModel.subscriber_member_id == subscriber_member_id)
-                    | (MemberModel.member_id == subscriber_member_id)
+                    (MemberModel.subscriber_member_id.ilike(subscriber_member_id))
+                    | (MemberModel.member_id.ilike(subscriber_member_id))
                 ),
             )
         )

@@ -48,6 +48,23 @@ class RefreshResponse(BaseModel):
     expiresIn: int
 
 
+class LoginChallengeResponse(BaseModel):
+    """Returned after password check passes — no tokens yet."""
+
+    loginSessionId: str
+    otpRequired: bool = True
+    expiresIn: int  # seconds
+
+
+class VerifyOtpRequest(BaseModel):
+    loginSessionId: str
+    otp: str
+
+
+class ResendOtpRequest(BaseModel):
+    loginSessionId: str
+
+
 class ApiResponse(GenericModel, Generic[T]):
     success: bool
     message: str

@@ -83,6 +83,9 @@ class MemberSummary(BaseModel):
     plan_id: str | None = Field(None, alias="planId")
     # Carrier pulled from joined Plan — useful for list display
     carrier: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    prev_card_id: str | None = Field(None, alias="prevCardId")
 
 
 # ── Member detail (single member GET) ────────────────────────────────────────
