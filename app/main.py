@@ -135,8 +135,13 @@ def http_exception_handler(
 def validation_error_handler(request: Request, exc: RequestValidationError):
     messages = []
     for err in exc.errors():
+        msg = err["msg"]
+        # Custom validator messages are already self-describing, use them as-is.
+        if err["type"] == "value_error":
+            messages.append(msg.removeprefix("Value error, "))
+            continue
         field = ".".join(str(loc) for loc in err["loc"] if loc != "body")
-        messages.append(f"{field}: {err['msg']}")
+        messages.append(f"{field}: {msg}")
 
     combined = "; ".join(messages)
 
