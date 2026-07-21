@@ -75,10 +75,10 @@ class DrugService:
             sort_by=_resolve_sort(request.sort.sort_by),
             sort_dir=request.sort.sort_dir,
         )
-        if not items:
-            raise DrugNotFoundException("No drugs found matching the search criteria.")
+        # if not items:
+        #     raise DrugNotFoundException("No drugs found matching the search criteria.")
         return PagedResponse.of(
-            data=[_to_drug_info(d) for d in items],
+            data=[_to_drug_info(d) for d in items] if items else [],
             page=request.pagination.page,
             page_size=request.pagination.page_size,
             total=total,

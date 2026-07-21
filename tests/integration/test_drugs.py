@@ -143,7 +143,10 @@ async def test_search_drugs_no_match(client, seeded_lookups):
         json={"searchRequest": {"name": "Nonexistent"}},
         headers=AUTH,
     )
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["data"] == []
+    assert body["pagination"]["total"] == 0
 
 
 @pytest.mark.asyncio

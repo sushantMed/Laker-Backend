@@ -1,20 +1,31 @@
+import re
 from datetime import datetime
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic.generics import GenericModel
 
 T = TypeVar("T")
 
 
 class LoginRequest(BaseModel):
-    email: str = Field(
-        max_length=255,
-        pattern=r"^[^\@\s]+@[^\@\s]+\.[^\@\s]+$",
-        example="eample@example.com",
-    )
-    password: str = Field(min_length=8, example="password123")
+    email: str = Field(max_length=255, example="example@example.com")
+    password: str = Field(example="password123")
     # rememberMe: bool = False
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        if not re.match(r"^[^\@\s]+@[^\@\s]+\.[^\@\s]+$", value):
+            raise ValueError("Email should match the pattern example@example.com")
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError("Password should contain at least 8 characters")
+        return value
 
 
 class UserProfile(BaseModel):

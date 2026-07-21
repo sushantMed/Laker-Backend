@@ -156,12 +156,14 @@ async def test_search_drugs_returns_paged_response(service: DrugService):
     service._repo.search.assert_awaited_once()
 
 
-async def test_search_drugs_raises_when_empty(service: DrugService):
+async def test_search_drugs_returns_empty_when_no_match(service: DrugService):
     service._repo.search.return_value = ([], 0)
     request = DrugSearchRequest(searchRequest=DrugSearch(gpi="39400010100310"))
 
-    with pytest.raises(DrugNotFoundException):
-        await service.search_drugs(request)
+    result = await service.search_drugs(request)
+
+    assert result.data == []
+    assert result.pagination.total == 0
 
 
 def test_service_uses_drug_namespace(monkeypatch):
