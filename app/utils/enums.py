@@ -54,17 +54,15 @@ class FamilyRole(str, Enum):
 
 
 class CoverageType(str, Enum):
-    """Plan coverage type."""
-
-    CARDHOLDER = "CARDHOLDER"  # Cardholder Only
-    FAMILY = "FAMILY"
-    SPOUSE = "SPOUSE"
-    DEPENDENT = "DEPENDENT"
+    CARDHOLDER = "Cardholder Only"  # Cardholder Only
+    FAMILY = "Family"
+    SPOUSE = "Spouse"
+    DEPENDENT = "Dependent"
 
 
 class BrandGeneric(str, Enum):
-    BRAND = "BRAND"
-    GENERIC = "GENERIC"
+    BRAND = "Brand Name"
+    GENERIC = "Generic Name"
     ALL = "ALL"  # Represents both BRAND and GENERIC
 
 
