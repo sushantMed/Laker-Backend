@@ -274,7 +274,7 @@ class TestAddFamilyMember:
             "lastName": "Doe",
             "dateOfBirth": "1985-06-01",
             "relCode": "02",
-            "covType": "Spouse",
+            "covType": "SPOUSE",
             "startDate": "2020-01-01",
             "endDate": "2030-01-01",
         }
@@ -288,7 +288,7 @@ class TestAddFamilyMember:
 
         resp = await client.post(
             self._url("MBR040"),
-            json=self._body(relCode="03", covType="Dependent"),
+            json=self._body(relCode="03", covType="DEPENDENT"),
             headers=_auth_header(),
         )
         print(resp)
@@ -300,7 +300,7 @@ class TestAddFamilyMember:
     async def test_add_family_member_subscriber_not_found(self, client: AsyncClient):
         resp = await client.post(
             self._url("MISSING"),
-            json=self._body(relCode="03", covType="Dependent"),
+            json=self._body(relCode="03", covType="DEPENDENT"),
             headers=_auth_header(),
         )
         assert resp.status_code == 404
@@ -317,7 +317,7 @@ class TestAddFamilyMember:
 
         resp = await client.post(
             self._url("MBR041"),
-            json=self._body(relCode="03", covType="Dependent"),
+            json=self._body(relCode="03", covType="DEPENDENT"),
             headers=_auth_header(),
         )
         assert resp.status_code == 422
@@ -338,7 +338,7 @@ class TestAddFamilyMember:
 
         resp = await client.post(
             self._url("MBR042"),
-            json=self._body(relCode="02", covType="Spouse"),
+            json=self._body(relCode="02", covType="SPOUSE"),
             headers=_auth_header(),
         )
         assert resp.status_code == 409
@@ -350,7 +350,7 @@ class TestAddFamilyMember:
 
         resp = await client.post(
             self._url("MBR044"),
-            json=self._body(relCode="03", covType="Dependent", planId="NO-PLAN"),
+            json=self._body(relCode="03", covType="DEPENDENT", planId="NO-PLAN"),
             headers=_auth_header(),
         )
         assert resp.status_code == 404
@@ -360,7 +360,7 @@ class TestAddFamilyMember:
     ):
         await _seed(db_session, _make_member(member_id="MBR045", rel_code="01"))
 
-        body = self._body(relCode="03", covType="Dependent")
+        body = self._body(relCode="03", covType="DEPENDENT")
         del body["firstName"]
 
         resp = await client.post(
