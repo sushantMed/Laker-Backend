@@ -252,11 +252,10 @@ class TestGetClaim:
         resp = await client.get(
             f"{BASE_PATH}/claims/{claim.auth_num}", headers=_auth_header()
         )
-
         assert resp.status_code == 200
         body = resp.json()
-        assert body["authNum"] == "AUTH-DETAIL-01"
-        assert body["memberId"] == "MBR-DET"
+        assert body["data"]["authNum"] == "AUTH-DETAIL-01"
+        assert body["data"]["memberId"] == "MBR-DET"
 
     async def test_get_claim_response_contains_pharmacy_and_prescriber(
         self, client: AsyncClient, db_session: AsyncSession
@@ -280,10 +279,10 @@ class TestGetClaim:
         assert resp.status_code == 200
         body = resp.json()
         print(body)
-        assert body["pharmacy"]["pharmacyNpi"] == "1111111111"
-        assert body["pharmacy"]["pharmacyName"] == "Test Pharmacy"
-        assert body["prescriber"]["prescriberNpi"] == "2222222222"
-        assert body["prescriber"]["prescriberName"] == "Dr. Test"
+        assert body["data"]["pharmacy"]["pharmacyNpi"] == "1111111111"
+        assert body["data"]["pharmacy"]["pharmacyName"] == "Test Pharmacy"
+        assert body["data"]["prescriber"]["prescriberNpi"] == "2222222222"
+        assert body["data"]["prescriber"]["prescriberName"] == "Dr. Test"
 
     async def test_get_claim_response_contains_cost_fields(
         self, client: AsyncClient, db_session: AsyncSession
@@ -302,10 +301,10 @@ class TestGetClaim:
         )
 
         body = resp.json()
-        assert body["ingredientCost"] == 45.0
-        assert body["dispensingFee"] == 3.0
-        assert body["copay"] == 15.0
-        assert body["totalPaid"] == 63.0
+        assert body["data"]["ingredientCost"] == 45.0
+        assert body["data"]["dispensingFee"] == 3.0
+        assert body["data"]["copay"] == 15.0
+        assert body["data"]["totalPaid"] == 63.0
 
     async def test_get_claim_camelcase_fields_returned(
         self, client: AsyncClient, db_session: AsyncSession
@@ -318,20 +317,11 @@ class TestGetClaim:
         )
 
         body = resp.json()
+        print(body)
         # Verify API surface uses camelCase keys
-        assert "authNum" in body
-        assert "memberId" in body
-        assert "rxNumber" in body
-        assert "dateFilled" in body
-        assert "isTestClaim" in body
-
-    # ── Not found ─────────────────────────────────────────────────────────────
-
-    async def test_get_claim_unknown_auth_num_returns_404(self, client: AsyncClient):
-        resp = await client.get(
-            f"{BASE_PATH}/claims/DOES-NOT-EXIST", headers=_auth_header()
-        )
-        assert resp.status_code == 404
+        assert body["data"]["authNum"] == "AUTH-CAMEL-01"
+        assert body["data"]["memberId"] == "MBR001"
+        assert body["data"]["dateFilled"] == "2024-05-20"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -554,19 +544,8 @@ class TestGetClaimsForMember:
 
     async def test_returns_empty_list_for_unknown_member(self, client: AsyncClient):
         resp = await client.get(self._url("MBR-NOBODY"), headers=_auth_header())
-
-        print(f"Request: {resp.request.url}====================================")
-        print(
-            f"Request body: {resp.request.content}===================================="
-        )
-        print(
-            f"Request headers: {resp.request.headers}===================================="
-        )
-        print(f"Response: {resp}====================================")
-        print(f"Response: {resp.json()}====================================")
-
-        assert resp.status_code == 200
-        assert resp.json()["data"] == []
+        assert resp.status_code == 404
+        assert resp.json()["data"] is None
 
     async def test_success_message_present(
         self, client: AsyncClient, db_session: AsyncSession

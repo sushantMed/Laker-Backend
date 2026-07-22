@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +31,25 @@ class AuthRepository:
             select(RefreshTokenModel).where(RefreshTokenModel.token == token)
         )
         return result.scalar_one_or_none()
+
+    async def consume_refresh_token_atomic(
+        self, token: str
+    ) -> RefreshTokenModel | None:
+        """Atomically marks a refresh token as consumed, but only if it hasn't
+        been consumed already. Returns the row if this call was the one that
+        consumed it, or None if it was already consumed (signals reuse) or
+        doesn't exist."""
+        result = await self.session.execute(
+            update(RefreshTokenModel)
+            .where(
+                RefreshTokenModel.token == token,
+                RefreshTokenModel.consumed.is_(False),
+            )
+            .values(expires_at=datetime.now(UTC))
+            .returning(RefreshTokenModel)
+        )
+        row = result.first()
+        return row[0] if row else None
 
     async def revoke_refresh_family(self, family_id: str) -> None:
         await self.session.execute(

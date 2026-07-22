@@ -28,8 +28,8 @@ async def get_member(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[MemberDetail]:
-    data = await MemberService(session).get_member_by_id(member_id)
-    return ApiResponse.ok(data=data, message="Member retrieved successfully.")
+    detail = await MemberService(session).get_member_by_id(member_id)
+    return ApiResponse.ok(data=detail, message="Member retrieved successfully.")
 
 
 @router.post("/search")
@@ -48,8 +48,8 @@ async def get_eligibility(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
 ) -> ApiResponse[EligibilityResponse]:
-    data = await MemberService(session).get_eligibility(member_id)
-    return ApiResponse.ok(data=data, message="Eligibility retrieved successfully.")
+    detail = await MemberService(session).get_eligibility(member_id)
+    return ApiResponse.ok(data=detail, message="Eligibility retrieved successfully.")
 
 
 @router.get("/{member_id}/family")
@@ -75,5 +75,5 @@ async def add_family_member(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
 ) -> ApiResponse[MemberDetail]:
-    data = await MemberService(session).add_family_member(member_id, request)
-    return ApiResponse.ok(data=data, message="Family member added successfully.")
+    detail = await MemberService(session).add_family_member(member_id, request)
+    return ApiResponse.ok(data=detail, message="Member added successfully")

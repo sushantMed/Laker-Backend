@@ -100,9 +100,26 @@ class TooManyAttemptsError(AppException):
         super().__init__(status_code=429, message=detail)
 
 
+class InvalidOrExpiredOtpError(AppException):
+    """Used for both 'wrong OTP' and 'expired/not found' — don't leak which."""
+
+    def __init__(self, detail: str = "Invalid or expired OTP"):
+        super().__init__(status_code=401, message=detail)
+
+
+class OtpResendRateLimitedError(AppException):
+    def __init__(self, detail: str = "OTP resend rate limited"):
+        super().__init__(status_code=429, message=detail)
+
+
 class MemberNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
+
+
+class InvalidMemberDataException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=422)
 
 
 class PlanNotFoundException(AppException):

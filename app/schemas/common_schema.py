@@ -97,7 +97,7 @@ class PagedApiResponse(GenericModel, Generic[T]):
     def fail(
         cls,
         message: str,
-        status_code: int = 400,
+        status_code: int = 200,
         errors: list[str] | None = None,
     ) -> "PagedApiResponse[None]":
         return cls(

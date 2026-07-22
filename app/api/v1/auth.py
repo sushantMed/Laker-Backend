@@ -5,14 +5,20 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cache.redis_client import Redis, get_redis
+from app.core.config import settings
+from app.core.mailer import Mailer
 from app.database.session import get_db
+from app.dependencies.mailer import get_mailer
 from app.schemas.auth_schema import (
     ApiResponse,
+    LoginChallengeResponse,
     LoginRequest,
     LoginResponse,
     RefreshRequest,
     RefreshResponse,
+    ResendOtpRequest,
     UserProfile,
+    VerifyOtpRequest,
 )
 from app.services.auth_service import AuthService
 
@@ -37,8 +43,11 @@ async def login(
     body: LoginRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
-) -> ApiResponse[LoginResponse]:
-    data = await AuthService(session, redis).login(body)
+    mailer: Annotated[Mailer, Depends(get_mailer)],
+) -> ApiResponse[LoginResponse | LoginChallengeResponse]:
+    data = await AuthService(
+        session, redis, otp_secret=settings.otp_secret, mailer=mailer
+    ).login(body)
     return ApiResponse.ok(data, message="Login successful")
 
 
@@ -88,3 +97,49 @@ async def me(
         return ApiResponse.fail(
             message="Failed to retrieve user profile", errors=[str(e)]
         )
+
+
+@router.post(
+    "/verify-otp",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"model": ApiResponse[None], "description": "Invalid or expired OTP"},
+        403: {"model": ApiResponse[None], "description": "Account inactive"},
+        429: {"model": ApiResponse[None], "description": "Too many attempts"},
+        500: {"model": ApiResponse[None], "description": "Internal server error"},
+    },
+    summary="Verify OTP and return access + refresh tokens",
+)
+async def verify_otp(
+    body: VerifyOtpRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> ApiResponse[LoginResponse]:
+    try:
+        data = await AuthService(session, redis).verify_otp(body)
+        return ApiResponse.ok(data, message="OTP verified successfully")
+    except Exception as e:
+        return ApiResponse.fail(message="OTP verification failed", errors=[str(e)])
+
+
+@router.post(
+    "/resend-otp",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"model": ApiResponse[None], "description": "Invalid or expired session"},
+        403: {"model": ApiResponse[None], "description": "Account inactive"},
+        429: {"model": ApiResponse[None], "description": "Resend rate limited"},
+        500: {"model": ApiResponse[None], "description": "Internal server error"},
+    },
+    summary="Resend OTP to user email",
+)
+async def resend_otp(
+    body: ResendOtpRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> ApiResponse[LoginChallengeResponse]:
+    try:
+        data = await AuthService(session, redis).resend_otp(body.loginSessionId)
+        return ApiResponse.ok(data, message="OTP resent successfully")
+    except Exception as e:
+        return ApiResponse.fail(message="OTP resend failed", errors=[str(e)])
