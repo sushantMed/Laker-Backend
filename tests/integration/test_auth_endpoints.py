@@ -24,6 +24,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cache.redis_client import get_redis
+from app.core.config import settings
 from app.database.session import get_db
 from app.main import app
 
@@ -94,25 +95,40 @@ class TestLogin:
         resp = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
         body = resp.json()
         assert body["success"] is True
-        assert body["message"] == "Login successful"
+        assert body["message"] == "OTP send succssfully to your email"
         assert "data" in body
 
     async def test_login_returns_access_and_refresh_tokens(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
         resp = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
         data = resp.json()["data"]
+
+        assert resp.status_code == 200
         assert "accessToken" in data
         assert "refreshToken" in data
         assert data["accessToken"] != ""
         assert data["refreshToken"] != ""
 
-    async def test_login_returns_expires_in_and_token_type(
-        self, raw_client: AsyncClient, seeded_user: dict
+    async def test_login_returns_otp_challenge_when_otp_enabled(
+        self, raw_client: AsyncClient, seeded_user: dict, otp_enabled
     ):
-        data = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
-            "data"
-        ]
+        resp = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        data = resp.json()["data"]
+
+        assert resp.status_code == 200
+        assert data["otpRequired"] is True
+        assert "loginSessionId" in data
+        assert "accessToken" not in data
+        assert "refreshToken" not in data
+
+    async def test_login_returns_expires_in_and_token_type(
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
+    ):
+        resp = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        data = resp.json()["data"]
+
+        assert resp.status_code == 200
         assert data["tokenType"] == "Bearer"
         assert isinstance(data["expiresIn"], int)
         assert data["expiresIn"] > 0
@@ -182,9 +198,10 @@ class TestMe:
         assert resp.json()["success"] is False
 
     async def test_me_success_returns_user_profile(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
         login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
+        assert login.status_code == 200
         token = login.json()["data"]["accessToken"]
 
         resp = await raw_client.get(
@@ -196,7 +213,7 @@ class TestMe:
         assert resp.json()["success"] is True
 
     async def test_me_response_contains_user_fields(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
         token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
             "data"
@@ -216,7 +233,7 @@ class TestMe:
         assert "permissions" in profile
 
     async def test_me_after_logout_returns_success_false(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
         token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
             "data"
@@ -242,7 +259,7 @@ class TestMe:
 
 class TestRefresh:
     async def test_refresh_returns_new_token_pair(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
         login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
         refresh_token = login.json()["data"]["refreshToken"]
@@ -258,7 +275,7 @@ class TestRefresh:
         assert resp.json()["success"] is True
 
     async def test_refresh_token_is_rotated(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
         login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
         old_refresh = login.json()["data"]["refreshToken"]
@@ -273,7 +290,7 @@ class TestRefresh:
         assert new_data["refreshToken"] != old_refresh
 
     async def test_refresh_response_has_required_fields(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
         login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
         data = (
@@ -298,7 +315,7 @@ class TestRefresh:
         assert resp.json()["success"] is False
 
     async def test_refresh_token_cannot_be_reused(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
         login = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
         old_refresh = login.json()["data"]["refreshToken"]
@@ -332,7 +349,7 @@ class TestLogout:
         assert resp.status_code == 403
 
     async def test_logout_success_returns_204(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
         token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
             "data"
@@ -345,7 +362,7 @@ class TestLogout:
         assert resp.status_code == 204
 
     async def test_logout_response_has_no_body(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
         token = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
             "data"
