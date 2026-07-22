@@ -15,7 +15,7 @@ def test_drug_search_accepts_single_criterion():
 
 
 def test_drug_search_accepts_enum_criteria():
-    search = DrugSearch(brandGeneric="Generic Name", maintenance="YES")
+    search = DrugSearch(brandGeneric="GENERIC", maintenance="YES")
     assert search.brand_generic == BrandGeneric.GENERIC
     assert search.maintenance == Maintenance.YES
 
