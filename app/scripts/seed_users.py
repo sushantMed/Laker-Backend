@@ -43,7 +43,6 @@ async def seed_users():
 
         if existing_user:
             print("Users already exist. Skipping seed.")
-            return
 
         for user_data in users:
             email = user_data["email"].lower()

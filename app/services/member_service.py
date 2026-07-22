@@ -17,8 +17,10 @@ from app.cache.cache_service import CacheService
 from app.core.exceptions import (
     DuplicateSpouseException,
     InvalidFamilyRelationshipException,
+    InvalidMemberDataException,
     MemberNotFoundException,
     PlanNotFoundException,
+    ValidationError,
 )
 from app.models.member_address_model import MemberAddressModel
 from app.models.member_model import MemberModel
@@ -121,6 +123,9 @@ def _to_member_summary(m: MemberModel) -> MemberSummary:
         endDate=m.end_date,
         planId=m.plan_id,
         carrier=m.plan.carrier if m.plan else None,
+        email=m.email,
+        phone=m.phone,
+        prevCardId=m.prev_card_id,
     )
 
 
@@ -164,10 +169,6 @@ class MemberService:
             sort_dir=request.sort.sort_dir,
         )
 
-        if not items:
-            raise MemberNotFoundException(
-                "No members found matching the search criteria."
-            )
         result = PagedResponse.of(
             data=[_to_member_summary(m) for m in items],
             page=request.pagination.page,
@@ -185,10 +186,6 @@ class MemberService:
     # ── Eligibility ──────────────────────────────────────────────────────────
 
     async def get_eligibility(self, member_id: str) -> EligibilityResponse:
-        """
-        Eligibility lives inside Member — this endpoint is a dedicated
-        view over the same data for convenience.
-        """
         cache_key = f"eligibility:{member_id}"
         cached = await self._cache.get(cache_key, EligibilityResponse)
         if cached:
@@ -197,12 +194,22 @@ class MemberService:
         member = await self._repo.get_by_member_id(member_id)
         if not member:
             raise MemberNotFoundException(f"Member '{member_id}' not found.")
-        response = EligibilityResponse(
-            memberId=member.member_id,
-            status=derive_status(member.start_date, member.end_date),
-            startDate=member.start_date,
-            endDate=member.end_date,
-        )
+
+        if member.start_date is None or member.end_date is None:
+            raise InvalidMemberDataException(
+                f"Please provide start/end dates for member '{member_id}'."
+            )
+
+        try:
+            response = EligibilityResponse(
+                memberId=member.member_id,
+                status=derive_status(member.start_date, member.end_date),
+                startDate=member.start_date,
+                endDate=member.end_date,
+            )
+        except ValidationError as e:
+            raise InvalidMemberDataException(member_id, str(e)) from e
+
         await self._cache.set(cache_key, response)
         return response
 
@@ -236,7 +243,7 @@ class MemberService:
             return cached
 
         items, total = await self._repo.get_family_members(
-            member_id,
+            subscriber.member_id,
             page=request.page,
             page_size=request.page_size,
             sort_by=request.sort_by,

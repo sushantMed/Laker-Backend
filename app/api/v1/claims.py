@@ -24,7 +24,7 @@ from app.schemas.claim_schema import (
     ClaimSearchRequestByMemberPath,
     ClaimSummary,
 )
-from app.schemas.common_schema import PagedApiResponse
+from app.schemas.common_schema import ApiResponse, PagedApiResponse
 from app.services.claim_service import ClaimService
 from app.utils.pagination import PaginationRequest
 
@@ -51,8 +51,9 @@ async def get_claim(
     authNum: str,
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
-) -> ClaimDetail:
-    return await ClaimService(session).get_claim_by_auth_num(authNum)
+) -> ApiResponse[ClaimDetail]:
+    detail = await ClaimService(session).get_claim_by_auth_num(authNum)
+    return ApiResponse.ok(data=detail, message="Claim retrieved successfully.")
 
 
 @router.post("/members/{memberId}/claims/search")

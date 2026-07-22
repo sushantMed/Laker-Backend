@@ -12,5 +12,12 @@
     "last_name": "User",
     "password": "User@123",
     "role": "user"
+  },
+  {
+    "email": "sushant.sinha@businessonetech.com",
+    "first_name": "Sushant",
+    "last_name": "Sinha",
+    "password": "Sus@12345",
+    "role": "user"
   }
 ]

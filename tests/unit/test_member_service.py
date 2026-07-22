@@ -285,8 +285,9 @@ async def test_search_members_raises_when_empty(service: MemberService):
     service._repo.search.return_value = ([], 0)
     request = MemberSearchRequest(searchRequest=MemberSearch(last_name="Nobody"))
 
-    with pytest.raises(MemberNotFoundException):
-        await service.search_members(request)
+    result = await service.search_members(request)
+
+    assert result.data == []
 
 
 async def test_get_eligibility_returns_cached(service: MemberService):

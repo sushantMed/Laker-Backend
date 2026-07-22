@@ -45,6 +45,20 @@ class Settings(BaseSettings):
     rate_limit_requests: int = 100
     rate_limit_window_seconds: int = 60
 
+    otp_enabled: bool = False
+    otp_secret: str = "default-secret"
+
+    # ── Email / SMTP ─────────────────────────────────────────────
+
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+    smtp_from_email: str = "no-reply@yourapp.com"
+    smtp_from_name: str = "YourApp"
+
     @property
     def database_url(self) -> str:
         user = quote_plus(self.db_user)
