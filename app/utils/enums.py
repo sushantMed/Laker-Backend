@@ -63,8 +63,8 @@ class CoverageType(str, Enum):
 
 
 class BrandGeneric(str, Enum):
-    BRAND = "BRAND"
-    GENERIC = "GENERIC"
+    BRAND = "Brand Name"
+    GENERIC = "Generic Name"
     ALL = "ALL"  # Represents both BRAND and GENERIC
 
 
