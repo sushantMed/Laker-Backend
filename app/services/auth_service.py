@@ -169,10 +169,32 @@ def _generate_otp() -> str:
     return f"{secrets.randbelow(10**OTP_LENGTH):0{OTP_LENGTH}d}"
 
 
-def _hash_otp(otp: str, login_session_id: str, secret_key: str) -> str:
-    """HMAC the OTP so it's never stored in plaintext."""
-    msg = f"{login_session_id}:{otp}".encode()
-    return hmac.new(secret_key.encode(), msg, hashlib.sha256).hexdigest()
+def _derive_user_otp_key(secret_key: str, user_id) -> bytes:
+    """
+    Derive a per-user HMAC key from the master otp_secret.
+
+    Uses HKDF (RFC 5869): user_id is used as the info/context parameter,
+    not as a salt — the master secret is the entropy source, user_id just
+    domain-separates the output so each user gets an independent key.
+    """
+    ikm = secret_key.encode()  # Input Key Material
+    info = f"otp-key:v1:user:{user_id}".encode()
+    # HKDF-Extract: pull a pseudorandom key from the master secret.
+    # Using a fixed, static salt here (rather than none) per RFC 5869 guidance.
+    prk = hmac.new(
+        b"otp-hkdf-salt:v1", ikm, hashlib.sha256
+    ).digest()  # pseudorandom key
+    # HKDF-Expand: stretch into a key bound to this user.
+    return hmac.new(prk, info + b"\x01", hashlib.sha256).digest()
+
+
+def _hash_otp(otp: str, login_session_id: str, secret_key: str, user_id) -> str:
+    """HMAC the OTP under a key derived specifically for this user,
+    so it's never stored in plaintext and never verifiable cross-user."""
+    user_key = _derive_user_otp_key(secret_key, user_id)
+    msg = f"{login_session_id}:{user_id}:{otp}".encode()
+    print("Hashing OTP with user_key:", user_key.hex(), msg, otp)
+    return hmac.new(user_key, msg, hashlib.sha256).hexdigest()
 
 
 def _is_valid_otp_format(otp: str) -> bool:
@@ -257,6 +279,9 @@ class AuthService:
             raise InvalidOrExpiredOtpError()
 
         challenge = await self.otp_store.get(request.loginSessionId)
+        user = await self.repo.get_user_by_id(UUID(challenge.user_id))
+        if not user or user.status != "ACTIVE":
+            raise UserInactiveError()
 
         if not challenge:
             raise InvalidOrExpiredOtpError()
@@ -265,7 +290,9 @@ class AuthService:
             await self.otp_store.delete(request.loginSessionId)
             raise TooManyAttemptsError()
 
-        candidate_hash = _hash_otp(request.otp, request.loginSessionId, self.otp_secret)
+        candidate_hash = _hash_otp(
+            request.otp, request.loginSessionId, self.otp_secret, user.id
+        )
 
         if not hmac.compare_digest(candidate_hash, challenge.otp_hash):
             attempts = await self.otp_store.increment_attempts(request.loginSessionId)
@@ -276,11 +303,6 @@ class AuthService:
 
         # Success — consume the challenge immediately so it can't be replayed.
         await self.otp_store.delete(request.loginSessionId)
-
-        user = await self.repo.get_user_by_id(UUID(challenge.user_id))
-        if not user or user.status != "ACTIVE":
-            raise UserInactiveError()
-
         logger.info("OTP verified, tokens issued for user_id=%s", user.id)
         return await self._issue_tokens(user)
 
@@ -309,7 +331,7 @@ class AuthService:
         """
         login_session_id = str(uuid.uuid4())
         otp = _generate_otp()
-        otp_hash = _hash_otp(otp, login_session_id, self.otp_secret)
+        otp_hash = _hash_otp(otp, login_session_id, self.otp_secret, user.id)
 
         await self.otp_store.create(
             login_session_id=login_session_id,
@@ -317,7 +339,6 @@ class AuthService:
             email=user.email,
             otp_hash=otp_hash,
         )
-        await self.otp_store.set_resend_cooldown(str(user.id))
 
         if not self.mailer:
             logger.error(
@@ -330,11 +351,7 @@ class AuthService:
                 detail="Unable to send verification code. Please try again later.",
             )
 
-        print(f"Sending OTP email to {user.email} with code {otp}")
         try:
-            print(
-                f"DEBUG: OTP for user_id={user.id} is {otp} (expires in {OTP_TTL_SECONDS} seconds)"
-            )
             await self.mailer.send_email(
                 to=[user.email],
                 subject="Your login verification code",
@@ -348,6 +365,8 @@ class AuthService:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Unable to send verification code. Please try again later.",
             ) from e
+
+        await self.otp_store.set_resend_cooldown(str(user.id))
 
         return LoginChallengeResponse(
             loginSessionId=login_session_id,
