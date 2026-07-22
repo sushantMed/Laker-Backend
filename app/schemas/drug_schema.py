@@ -31,7 +31,7 @@ class DrugSearch(BaseModel):
     gpi: str | None = None
     brand_generic: BrandGeneric | None = Field(None, alias="brandGeneric")
     maintenance: Maintenance | None = None
-    tier: int | None = Field(None, ge=1, le=5)
+    tier: int | None = Field(None, ge=0, le=5)
 
     @model_validator(mode="after")
     def at_least_one_criterion(self) -> DrugSearch:
