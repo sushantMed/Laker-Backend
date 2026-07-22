@@ -58,7 +58,9 @@ class DrugRepository(BaseRepository[DrugModel]):
             stmt = stmt.where(DrugModel.gpi.ilike(f"%{criteria.gpi}%"))
         if criteria.brand_generic:
             if criteria.brand_generic == "ALL":
-                stmt = stmt.where(DrugModel.brand_generic.in_(["BRAND", "GENERIC"]))
+                stmt = stmt.where(
+                    DrugModel.brand_generic.in_(["Brand Name", "Generic Name"])
+                )
             else:
                 stmt = stmt.where(DrugModel.brand_generic == criteria.brand_generic)
         if criteria.maintenance:
