@@ -133,7 +133,7 @@ class TestLogin:
             f"{AUTH_BASE}/login",
             json={"email": "nobody@example.com", "password": "Password1!"},
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
 
     async def test_login_invalid_email_format_returns_422(
@@ -251,6 +251,8 @@ class TestRefresh:
             f"{AUTH_BASE}/refresh",
             json={"refreshToken": refresh_token},
         )
+
+        print(resp.json())
 
         assert resp.status_code == 200
         assert resp.json()["success"] is True

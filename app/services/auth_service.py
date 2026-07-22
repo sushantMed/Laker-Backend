@@ -366,7 +366,7 @@ class AuthService:
 
         return LoginResponse(
             accessToken=access_token,
-            refreshToken=refresh_token.token,
+            refreshToken=refresh_token,
             expiresIn=expires_in,
         )
 
@@ -434,11 +434,7 @@ class AuthService:
 
     async def refresh(self, request: RefreshRequest) -> RefreshResponse:
         presented_hash = token_hash(request.refreshToken)
-
-        # FIX: look up by hash, not plaintext — plaintext refresh tokens
-        # at rest are a standing liability if the DB is ever exposed
-        # (backups, replicas, read access via another vuln).
-        current = await self.repo.get_refresh_token_by_hash(presented_hash)
+        current = await self.repo.get_refresh_token(presented_hash)
         if not current:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -455,12 +451,6 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=self.refresh_token_expired,
             )
-
-        # FIX (race condition): atomically flip consumed=false -> true at
-        # the DB layer. If this returns None, either the token was never
-        # valid, or — more importantly — it was *already consumed*,
-        # meaning this is a reuse of a rotated-out token: revoke the
-        # whole family immediately.
         consumed = await self.repo.consume_refresh_token_atomic(presented_hash)
         if consumed is None:
             if current.family_id:
@@ -527,16 +517,16 @@ class AuthService:
         user: UserModel,
         family_id: str | None = None,
     ) -> str:
-        """Creates and persists a refresh token, returning the plaintext
-        value to hand back to the client. Only the hash is stored."""
         days = REFRESH_TOKEN_REMEMBER_ME_DAYS
+        raw_token = opaque_token()
         token = RefreshTokenModel(
-            token=opaque_token(),
+            token=token_hash(raw_token),
             family_id=family_id or str(uuid4()),
             user_id=user.id,
             expires_at=datetime.now(UTC) + timedelta(days=days),
         )
-        return await self.repo.save_refresh_token(token)
+        await self.repo.save_refresh_token(token)
+        return raw_token
 
     @staticmethod
     def _profile(user: UserModel) -> UserProfile:

@@ -39,7 +39,7 @@ class ClaimRepository:
         stmt = (
             select(ClaimModel)
             .options(joinedload(ClaimModel.member))
-            .where(ClaimModel.auth_num == auth_num)
+            .where(ClaimModel.auth_num.ilike(auth_num))
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
@@ -60,9 +60,9 @@ class ClaimRepository:
     ) -> tuple[Sequence[ClaimModel], int]:
         stmt = select(ClaimModel).options(joinedload(ClaimModel.member))
         if member_id:
-            stmt = stmt.where(ClaimModel.member_id == member_id)
+            stmt = stmt.where(ClaimModel.member_id.ilike(member_id))
         if auth_num:
-            stmt = stmt.where(ClaimModel.auth_num == auth_num)
+            stmt = stmt.where(ClaimModel.auth_num.ilike(auth_num))
         if date_filled_start:
             stmt = stmt.where(ClaimModel.date_filled >= date_filled_start)
         if date_filled_end:

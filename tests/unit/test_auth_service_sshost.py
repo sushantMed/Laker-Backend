@@ -30,20 +30,21 @@ async def test_login_uses_sshost_client(monkeypatch):
         role="user",
         first_name="Test",
         last_name="User",
+        client_ip=None,
     )
 
     async def fake_get_user_by_email(email):
         assert email == "user@example.com"
         return user
 
-    async def fake_is_rate_limited(email):
+    async def fake_is_rate_limited(email, client_ip):
         return False
 
-    async def fake_clear_attempts(email):
+    async def fake_clear_attempts(email, client_ip):
         return None
 
     async def fake_create_refresh_token(user_obj, family_id=None):
-        return SimpleNamespace(token="refresh-token")
+        return "refresh-token"
 
     async def fake_authenticate(username, password):
         assert username == "user@example.com"
@@ -80,6 +81,7 @@ async def test_login_falls_back_to_local_password_when_sshost_is_unreachable(
         role="user",
         first_name="Fallback",
         last_name="User",
+        client_ip=None,
     )
 
     async def fake_get_user_by_email(email):
@@ -89,14 +91,14 @@ async def test_login_falls_back_to_local_password_when_sshost_is_unreachable(
     async def fake_authenticate(username, password):
         raise SSHostError("SSHost unreachable")
 
-    async def fake_is_rate_limited(email):
+    async def fake_is_rate_limited(email, client_ip):
         return False
 
-    async def fake_clear_attempts(email):
+    async def fake_clear_attempts(email, client_ip):
         return None
 
     async def fake_create_refresh_token(user_obj, family_id=None):
-        return SimpleNamespace(token="refresh-token")
+        return "refresh-token"
 
     monkeypatch.setattr(service.repo, "get_user_by_email", fake_get_user_by_email)
     monkeypatch.setattr(service, "_is_rate_limited", fake_is_rate_limited)
