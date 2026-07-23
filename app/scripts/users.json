@@ -4,20 +4,27 @@
     "first_name": "Admin",
     "last_name": "User",
     "password": "Admin@123",
-    "role": "admin"
+    "roles": ["admin"]
   },
   {
     "email": "user@example.com",
     "first_name": "Test",
     "last_name": "User",
     "password": "User@123",
-    "role": "user"
+    "roles": ["members"]
   },
   {
     "email": "sushant.sinha@businessonetech.com",
     "first_name": "Sushant",
     "last_name": "Sinha",
     "password": "Sus@12345",
-    "role": "user"
+    "roles": ["readonly"]
+  },
+  {
+    "email": "dhanush@hotmail.com",
+    "first_name": "Dhanush",
+    "last_name": "User",
+    "password": "Dhanush#123",
+    "roles": ["readonly"]
   }
 ]

@@ -33,7 +33,8 @@ class UserProfile(BaseModel):
     firstName: str
     lastName: str
     email: str
-    role: str
+    roles: list[str]
+    roleLabels: list[str] = []
     initials: str
     status: str
     lastLogin: datetime | None = None

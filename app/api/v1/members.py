@@ -5,6 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import RequireUser
+from app.core.rbac import Perm
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user_model import UserModel
@@ -35,7 +37,7 @@ async def get_member(
 @router.post("/search")
 async def search_members(
     request: MemberSearchRequest,
-    current_user: Annotated[UserModel, Depends(get_current_user)],
+    current_user: RequireUser(Perm.MEMBER_SEARCH),
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PagedApiResponse[MemberSummary]:
     data = await MemberService(session).search_members(request)

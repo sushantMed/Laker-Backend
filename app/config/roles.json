@@ -1,0 +1,33 @@
+{
+  "admin": {
+    "description": "Administrator",
+    "superuser": true,
+    "permissions": []
+  },
+  "members": {
+    "description": "Member Servicing",
+    "permissions": [
+      "member:view",
+      "member:save",
+      "member:search",
+      "member:searchwithprevcardid",
+      "claim:view",
+      "groups:view",
+      "drug:view"
+    ]
+  },
+  "drugs": {
+    "description": "Drug Data",
+    "permissions": ["drug:view", "groups:view"]
+  },
+  "readonly": {
+    "description": "Read Only",
+    "permissions": [
+      "member:view",
+      "member:search",
+      "claim:view",
+      "groups:view",
+      "drug:view"
+    ]
+  }
+}

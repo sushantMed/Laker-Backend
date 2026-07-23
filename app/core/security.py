@@ -38,13 +38,15 @@ def verify_password(password: str, stored_hash: str) -> bool:
 # ── JWT ───────────────────────────────────────────────────────────────────────
 
 
-def create_access_token(*, subject: str, email: str, role: str) -> tuple[str, str, int]:
+def create_access_token(
+    *, subject: str, email: str, roles: list[str]
+) -> tuple[str, str, int]:
     now = int(time.time())
     jti = secrets.token_urlsafe(16)
     payload = {
         "sub": subject,
         "email": email,
-        "role": role,
+        "roles": roles,
         "jti": jti,
         "iat": now,
         "exp": now + ACCESS_TOKEN_EXPIRE_SECONDS,

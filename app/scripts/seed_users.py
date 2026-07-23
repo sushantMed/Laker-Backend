@@ -62,7 +62,7 @@ async def seed_users():
                 first_name=user_data["first_name"],
                 last_name=user_data["last_name"],
                 hashed_password=hash_password(user_data["password"]),
-                role=user_data.get("role", "user"),
+                roles=user_data.get("roles", ["readonly"]),
                 status="ACTIVE",
             )
 

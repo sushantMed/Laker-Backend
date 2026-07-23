@@ -21,6 +21,7 @@ from app.core.exceptions import (
     TooManyAttemptsError,
     UserInactiveError,
 )
+from app.core.rbac import load_roles, resolve_permissions
 from app.core.security import (
     create_access_token,
     decode_access_token,
@@ -379,7 +380,7 @@ class AuthService:
         access_token, _, expires_in = create_access_token(
             subject=str(user.id),
             email=user.email,
-            role=user.role,
+            roles=user.roles,
         )
         refresh_token = await self._create_refresh_token(user)
 
@@ -495,7 +496,7 @@ class AuthService:
         access_token, _, expires_in = create_access_token(
             subject=str(user.id),
             email=user.email,
-            role=user.role,
+            roles=user.roles,
         )
         return RefreshResponse(
             accessToken=access_token,
@@ -551,29 +552,15 @@ class AuthService:
     def _profile(user: UserModel) -> UserProfile:
         first = user.first_name[:1] if user.first_name else ""
         last = user.last_name[:1] if user.last_name else ""
+        defs = load_roles()
         return UserProfile(
             userId=str(user.id),
             firstName=user.first_name,
             lastName=user.last_name,
             email=user.email,
-            role=user.role,
+            roles=user.roles,
+            roleLabels=[defs[r].description for r in user.roles if r in defs],
             initials=f"{first}{last}".upper(),
             status=user.status,
-            permissions=AuthService._permissions(user.role),
+            permissions=sorted(resolve_permissions(user.roles)),
         )
-
-    @staticmethod
-    def _permissions(role: str) -> list[str]:
-        _map = {
-            "superadmin": [
-                "users:read",
-                "users:write",
-                "members:read",
-                "claims:read",
-                "auth:read",
-            ],
-            "admin": ["users:read", "members:read", "claims:read", "auth:read"],
-            "readonly": ["members:read", "claims:read"],
-            "user": ["members:read", "claims:read"],
-        }
-        return _map.get(role, ["members:read", "claims:read"])
