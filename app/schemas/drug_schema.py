@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.common_schema import SearchRequest
 from app.utils.enums import BrandGeneric, Maintenance
@@ -22,14 +22,6 @@ class DrugInfo(BaseModel):
     formulary_status: str | None = Field(None, alias="formularyStatus")
     repackage_ind: bool = Field(alias="repackageInd")
 
-    @field_validator("drug_name", "ndc", "gpi", "brand_generic", "tier", mode="before")
-    @classmethod
-    def strip_and_blank_to_none(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        v = v.strip()
-        return v or None
-
 
 class DrugSearch(BaseModel):
     model_config = _CAMEL
@@ -40,14 +32,6 @@ class DrugSearch(BaseModel):
     brand_generic: BrandGeneric | None = Field(None, alias="brandGeneric")
     maintenance: Maintenance | None = None
     tier: int | None = Field(None, ge=0, le=5)
-
-    @field_validator("name", "ndc", "gpi", "brand_generic", "tier", mode="before")
-    @classmethod
-    def strip_and_blank_to_none(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        v = v.strip()
-        return v or None
 
     @model_validator(mode="after")
     def at_least_one_criterion(self) -> DrugSearch:
