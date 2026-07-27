@@ -126,6 +126,16 @@ async def fake_redis() -> AsyncGenerator[fakeredis.FakeRedis, None]:
 # ── Settings override ─────────────────────────────────────────────────────────
 
 
+@pytest.fixture
+def otp_disabled(monkeypatch):
+    monkeypatch.setattr(settings, "otp_enabled", False)
+
+
+@pytest.fixture
+def otp_enabled(monkeypatch):
+    monkeypatch.setattr(settings, "otp_enabled", True)
+
+
 @pytest.fixture(autouse=True)
 def disable_cache():
     original = settings.cache_enabled

@@ -9,7 +9,13 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator  # type:ignore
+from pydantic import (  # type:ignore
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 from pydantic.alias_generators import to_camel  # type:ignore
 
 from app.schemas.common_schema import SearchRequest
@@ -119,6 +125,14 @@ class ClaimSearch(BaseModel):
 
     # Checked by default in the UI ("Exclude Test Claims")
     exclude_test_claims: bool = Field(True, alias="excludeTestClaims")
+
+    @field_validator("auth_num", "member_id", mode="before")
+    @classmethod
+    def strip_and_blank_to_none(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        return v or None
 
     @model_validator(mode="after")
     def validate_search_criteria(self) -> ClaimSearch:

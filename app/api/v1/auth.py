@@ -48,7 +48,13 @@ async def login(
     data = await AuthService(
         session, redis, otp_secret=settings.otp_secret, mailer=mailer
     ).login(body)
-    return ApiResponse.ok(data, message="Login successful")
+
+    if isinstance(data, LoginChallengeResponse):
+        message = "OTP sent successfully to your email"
+    else:
+        message = "Logged in successfully"
+
+    return ApiResponse.ok(data, message=message)
 
 
 @router.post(
@@ -117,7 +123,9 @@ async def verify_otp(
 ) -> ApiResponse[LoginResponse]:
     try:
         data = await AuthService(session, redis).verify_otp(body)
-        return ApiResponse.ok(data, message="OTP verified successfully")
+        return ApiResponse.ok(
+            data, message="OTP verified successfully. You are logged in."
+        )
     except Exception as e:
         return ApiResponse.fail(message="OTP verification failed", errors=[str(e)])
 

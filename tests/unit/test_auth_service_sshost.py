@@ -2,7 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.schemas.auth_schema import LoginRequest
+from app.core.config import settings
+from app.schemas.auth_schema import LoginRequest, LoginResponse
 from app.services.auth_service import AuthService
 from app.services.sshost_client import SSHostError
 
@@ -19,8 +20,13 @@ class DummyRedis:
 
 
 @pytest.mark.asyncio
-async def test_login_uses_sshost_client(monkeypatch):
-    service = AuthService(session=object(), redis=DummyRedis())
+async def test_login_returns_tokens_on_valid_credentials(monkeypatch):
+    monkeypatch.setattr(settings, "otp_enabled", False)
+    service = AuthService(
+        session=object(),
+        redis=DummyRedis(),
+        otp_secret="test-secret-not-a-sentinel",
+    )
 
     user = SimpleNamespace(
         id="user-1",
@@ -30,7 +36,6 @@ async def test_login_uses_sshost_client(monkeypatch):
         role="user",
         first_name="Test",
         last_name="User",
-        client_ip=None,
     )
 
     async def fake_get_user_by_email(email):
@@ -43,27 +48,30 @@ async def test_login_uses_sshost_client(monkeypatch):
     async def fake_clear_attempts(email, client_ip):
         return None
 
-    async def fake_create_refresh_token(user_obj, family_id=None):
-        return "refresh-token"
-
-    async def fake_authenticate(username, password):
-        assert username == "user@example.com"
+    async def fake_verify_credentials(email, password, user_obj):
+        assert email == "user@example.com"
         assert password == "secret123"
         return True
+
+    async def fake_issue_tokens(user_obj):
+        return LoginResponse(
+            accessToken="access-token",
+            refreshToken="refresh-token",
+            tokenType="Bearer",
+            expiresIn=3600,
+        )
 
     monkeypatch.setattr(service.repo, "get_user_by_email", fake_get_user_by_email)
     monkeypatch.setattr(service, "_is_rate_limited", fake_is_rate_limited)
     monkeypatch.setattr(service, "_clear_attempts", fake_clear_attempts)
-    monkeypatch.setattr(service, "_create_refresh_token", fake_create_refresh_token)
-    monkeypatch.setattr(
-        "app.services.auth_service.authenticate_user", fake_authenticate
-    )
+    monkeypatch.setattr(service, "_verify_credentials", fake_verify_credentials)
+    monkeypatch.setattr(service, "_issue_tokens", fake_issue_tokens)
 
     response = await service.login(
         LoginRequest(email="user@example.com", password="secret123")
     )
 
-    assert response.accessToken
+    assert response.accessToken == "access-token"
     assert response.refreshToken == "refresh-token"
 
 
@@ -71,6 +79,7 @@ async def test_login_uses_sshost_client(monkeypatch):
 async def test_login_falls_back_to_local_password_when_sshost_is_unreachable(
     monkeypatch,
 ):
+    monkeypatch.setattr(settings, "otp_enabled", False)
     service = AuthService(session=object(), redis=DummyRedis())
 
     user = SimpleNamespace(
