@@ -51,6 +51,15 @@ repos:
   # and fails if total coverage drops below the threshold.
   - repo: local
     hooks:
+      - id: pytest-quick
+        name: pytest  #(quick, no coverage gate)
+        entry: python -m pytest -x
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
       - id: pytest-coverage
         name: pytest with coverage (>= 80%)
         entry: python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=80
