@@ -48,7 +48,13 @@ async def login(
     data = await AuthService(
         session, redis, otp_secret=settings.otp_secret, mailer=mailer
     ).login(body)
-    return ApiResponse.ok(data, message="OTP send succssfully to your email")
+
+    if isinstance(data, LoginChallengeResponse):
+        message = "OTP sent successfully to your email"
+    else:
+        message = "Logged in successfully"
+
+    return ApiResponse.ok(data, message=message)
 
 
 @router.post(

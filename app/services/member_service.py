@@ -139,6 +139,7 @@ class MemberService:
     # ── Single member ────────────────────────────────────────────────────────
 
     async def get_member_by_id(self, member_id: str) -> MemberDetail:
+        member_id = member_id.strip()
         cached = await self._cache.get(member_id, MemberDetail)
         if cached:
             return cached
@@ -186,6 +187,7 @@ class MemberService:
     # ── Eligibility ──────────────────────────────────────────────────────────
 
     async def get_eligibility(self, member_id: str) -> EligibilityResponse:
+        member_id = member_id.strip()
         cache_key = f"eligibility:{member_id}"
         cached = await self._cache.get(cache_key, EligibilityResponse)
         if cached:
@@ -224,6 +226,7 @@ class MemberService:
         Return the full family unit for a subscriber.
         member_id must belong to a Cardholder (relCode=01).
         """
+        member_id = member_id.strip()
         subscriber = await self._repo.get_by_member_id(member_id)
         if not subscriber:
             raise MemberNotFoundException(f"Member '{member_id}' not found.")
@@ -273,6 +276,7 @@ class MemberService:
         4. Plan (if provided) must exist.
         """
         # 1. Validate subscriber
+        subscriber_member_id = subscriber_member_id.strip()
         subscriber = await self._repo.get_by_member_id(subscriber_member_id)
         if not subscriber:
             raise MemberNotFoundException(

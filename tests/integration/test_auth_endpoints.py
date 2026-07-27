@@ -95,7 +95,7 @@ class TestLogin:
         resp = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
         body = resp.json()
         assert body["success"] is True
-        assert body["message"] == "OTP send succssfully to your email"
+        assert body["message"] == "OTP sent successfully to your email"
         assert "data" in body
 
     async def test_login_returns_access_and_refresh_tokens(
