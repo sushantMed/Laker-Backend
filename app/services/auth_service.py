@@ -49,7 +49,7 @@ logger = logging.getLogger("auth_service")
 # OTP configuration
 # ---------------------------------------------------------------------------
 
-OTP_TTL_SECONDS = 300  # 5 minutes
+OTP_TTL_SECONDS = 1800  # 30 minutes
 OTP_MAX_ATTEMPTS = 5
 OTP_RESEND_COOLDOWN_SECONDS = 60
 OTP_LENGTH = 6
@@ -169,16 +169,16 @@ def _generate_otp() -> str:
     return f"{secrets.randbelow(10**OTP_LENGTH):0{OTP_LENGTH}d}"
 
 
-def _derive_user_otp_key(secret_key: str, user_id) -> bytes:
+def _derive_user_otp_key(secret_key: str, user_email) -> bytes:
     """
     Derive a per-user HMAC key from the master otp_secret.
 
-    Uses HKDF (RFC 5869): user_id is used as the info/context parameter,
-    not as a salt — the master secret is the entropy source, user_id just
+    Uses HKDF (RFC 5869): user_email is used as the info/context parameter,
+    not as a salt — the master secret is the entropy source, user_email just
     domain-separates the output so each user gets an independent key.
     """
     ikm = secret_key.encode()  # Input Key Material
-    info = f"otp-key:v1:user:{user_id}".encode()
+    info = f"otp-key:v1:user:{user_email}".encode()
     # HKDF-Extract: pull a pseudorandom key from the master secret.
     # Using a fixed, static salt here (rather than none) per RFC 5869 guidance.
     prk = hmac.new(
@@ -188,11 +188,11 @@ def _derive_user_otp_key(secret_key: str, user_id) -> bytes:
     return hmac.new(prk, info + b"\x01", hashlib.sha256).digest()
 
 
-def _hash_otp(otp: str, login_session_id: str, secret_key: str, user_id) -> str:
+def _hash_otp(otp: str, login_session_id: str, secret_key: str, user_email: str) -> str:
     """HMAC the OTP under a key derived specifically for this user,
     so it's never stored in plaintext and never verifiable cross-user."""
-    user_key = _derive_user_otp_key(secret_key, user_id)
-    msg = f"{login_session_id}:{user_id}:{otp}".encode()
+    user_key = _derive_user_otp_key(secret_key, user_email)
+    msg = f"{login_session_id}:{user_email}:{otp}".encode()
     print("Hashing OTP with user_key:", user_key.hex(), msg, otp)
     return hmac.new(user_key, msg, hashlib.sha256).hexdigest()
 
@@ -291,7 +291,7 @@ class AuthService:
             raise TooManyAttemptsError()
 
         candidate_hash = _hash_otp(
-            request.otp, request.loginSessionId, self.otp_secret, user.id
+            request.otp, request.loginSessionId, self.otp_secret, user.email
         )
 
         if not hmac.compare_digest(candidate_hash, challenge.otp_hash):
@@ -331,7 +331,7 @@ class AuthService:
         """
         login_session_id = str(uuid.uuid4())
         otp = _generate_otp()
-        otp_hash = _hash_otp(otp, login_session_id, self.otp_secret, user.id)
+        otp_hash = _hash_otp(otp, login_session_id, self.otp_secret, user.email)
 
         await self.otp_store.create(
             login_session_id=login_session_id,
