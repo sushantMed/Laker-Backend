@@ -193,7 +193,6 @@ def _hash_otp(otp: str, login_session_id: str, secret_key: str, user_email: str)
     so it's never stored in plaintext and never verifiable cross-user."""
     user_key = _derive_user_otp_key(secret_key, user_email)
     msg = f"{login_session_id}:{user_email}:{otp}".encode()
-    print("Hashing OTP with user_key:", user_key.hex(), msg, otp)
     return hmac.new(user_key, msg, hashlib.sha256).hexdigest()
 
 

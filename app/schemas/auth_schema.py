@@ -1,9 +1,8 @@
 import re
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel, Field, field_validator
-from pydantic.generics import GenericModel
 
 T = TypeVar("T")
 
@@ -74,18 +73,3 @@ class VerifyOtpRequest(BaseModel):
 
 class ResendOtpRequest(BaseModel):
     loginSessionId: str
-
-
-class ApiResponse(GenericModel, Generic[T]):
-    success: bool
-    message: str
-    data: T | None = None
-    errors: list[str] = []
-
-    @classmethod
-    def ok(cls, data: T, message: str = "Success") -> "ApiResponse[T]":
-        return cls(success=True, message=message, data=data)
-
-    @classmethod
-    def fail(cls, message: str, errors: list[str] | None = None) -> "ApiResponse[None]":
-        return cls(success=False, message=message, data=None, errors=errors or [])

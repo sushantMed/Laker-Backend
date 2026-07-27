@@ -186,7 +186,7 @@ class TestMe:
         resp = await raw_client.get(f"{AUTH_BASE}/me")
         assert resp.status_code == 403
 
-    async def test_me_invalid_token_returns_200_success_false(
+    async def test_me_invalid_token_returns_401_success_false(
         self, raw_client: AsyncClient
     ):
         # me() catches exceptions — returns 200 success=false for bad token
@@ -194,7 +194,8 @@ class TestMe:
             f"{AUTH_BASE}/me",
             headers={"Authorization": "Bearer invalidtoken"},
         )
-        assert resp.status_code == 200
+        print(resp.json())
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
 
     async def test_me_success_returns_user_profile(
@@ -248,7 +249,8 @@ class TestMe:
             f"{AUTH_BASE}/me",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert resp.status_code == 200
+        print(resp.json())
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
 
 
@@ -311,7 +313,7 @@ class TestRefresh:
             f"{AUTH_BASE}/refresh",
             json={"refreshToken": "not-a-real-token"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
 
     async def test_refresh_token_cannot_be_reused(
@@ -330,7 +332,7 @@ class TestRefresh:
             f"{AUTH_BASE}/refresh",
             json={"refreshToken": old_refresh},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
 
     async def test_refresh_missing_token_returns_422(self, raw_client: AsyncClient):
