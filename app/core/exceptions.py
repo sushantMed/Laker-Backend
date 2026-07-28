@@ -96,19 +96,31 @@ class UserInactiveError(AppException):
 
 
 class TooManyAttemptsError(AppException):
-    def __init__(self, detail: str = "Too many login attempts"):
+    def __init__(
+        self,
+        detail: str = "Maximum OTP attempts exceeded. Please login again to request a new OTP.",
+        attempts_remaining: int | None = None,
+    ):
         super().__init__(status_code=429, message=detail)
 
 
 class InvalidOrExpiredOtpError(AppException):
     """Used for both 'wrong OTP' and 'expired/not found' — don't leak which."""
 
-    def __init__(self, detail: str = "Invalid or expired OTP"):
+    def __init__(
+        self,
+        detail: str = "Invalid or expired OTP.",
+        attempts_remaining: int | None = None,
+    ):
+        self.attempts_remaining = attempts_remaining
         super().__init__(status_code=401, message=detail)
 
 
 class OtpResendRateLimitedError(AppException):
-    def __init__(self, detail: str = "OTP resend rate limited"):
+    def __init__(
+        self,
+        detail: str = "Maximum OTP resend rate exceeded. Please wait before trying again.",
+    ):
         super().__init__(status_code=429, message=detail)
 
 

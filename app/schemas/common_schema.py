@@ -33,6 +33,7 @@ class SearchRequest(GenericModel, Generic[TSearch]):
 class ErrorDetail(BaseModel):
     statusCode: int
     message: str
+    attemptsRemaining: int | None = None
 
 
 class ApiResponse(GenericModel, Generic[T]):
@@ -59,6 +60,7 @@ class ApiResponse(GenericModel, Generic[T]):
         cls,
         message: str,
         status_code: int = 400,
+        attempts_remaining: int | None = None,
         exception_message: str | None = None,
     ) -> "ApiResponse[None]":
         return cls(
@@ -68,6 +70,7 @@ class ApiResponse(GenericModel, Generic[T]):
             error=ErrorDetail(
                 statusCode=status_code,
                 message=exception_message or message,
+                attemptsRemaining=attempts_remaining,
             ),
         )
 

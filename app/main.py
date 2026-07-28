@@ -115,7 +115,10 @@ def app_exception_handler(request: Request, exc: AppException):
     return JSONResponse(
         status_code=exc.status_code,
         content=ApiResponse.fail(
-            message=exc.message, status_code=exc.status_code, exception_message=str(exc)
+            message=exc.message,
+            status_code=exc.status_code,
+            exception_message=str(exc),
+            attempts_remaining=getattr(exc, "attempts_remaining", 0),
         ).model_dump(),
     )
 
