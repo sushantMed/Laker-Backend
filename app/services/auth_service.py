@@ -51,7 +51,7 @@ logger = logging.getLogger("auth_service")
 
 OTP_TTL_SECONDS = 1800  # 30 minutes
 OTP_MAX_ATTEMPTS = 5
-OTP_RESEND_COOLDOWN_SECONDS = 60
+OTP_RESEND_COOLDOWN_SECONDS = 120
 OTP_LENGTH = 6
 
 OTP_KEY_PREFIX = "otp:challenge:"
@@ -106,7 +106,6 @@ class OtpStore:
             "created_at": str(time.time()),
         }
         key = self._key(login_session_id)
-        # SCALABILITY: hset + expire is two round trips; pipeline them so
         # OTP creation stays a single network round trip under load.
         async with self.redis.pipeline(transaction=True) as pipe:
             pipe.hset(key, mapping=payload)
@@ -153,7 +152,10 @@ class OtpStore:
 
     async def increment_attempts(self, login_session_id: str) -> int:
         key = self._key(login_session_id)
-        return await self.redis.hincrby(key, "attempts", 1)
+        logger.info("Incrementing attempts for %s", key)
+        attempts = await self.redis.hincrby(key, "attempts", 1)
+        logger.info("Attempts after increment: %s", attempts)
+        return attempts
 
     async def delete(self, login_session_id: str) -> None:
         await self.redis.delete(self._key(login_session_id))
@@ -278,12 +280,11 @@ class AuthService:
             raise InvalidOrExpiredOtpError()
 
         challenge = await self.otp_store.get(request.loginSessionId)
+        if not challenge:
+            raise InvalidOrExpiredOtpError()
         user = await self.repo.get_user_by_id(UUID(challenge.user_id))
         if not user or user.status != "ACTIVE":
             raise UserInactiveError()
-
-        if not challenge:
-            raise InvalidOrExpiredOtpError()
 
         if challenge.attempts >= OTP_MAX_ATTEMPTS:
             await self.otp_store.delete(request.loginSessionId)
@@ -295,10 +296,17 @@ class AuthService:
 
         if not hmac.compare_digest(candidate_hash, challenge.otp_hash):
             attempts = await self.otp_store.increment_attempts(request.loginSessionId)
+            remaining = max(OTP_MAX_ATTEMPTS - attempts, 0)
             if attempts >= OTP_MAX_ATTEMPTS:
                 await self.otp_store.delete(request.loginSessionId)
                 raise TooManyAttemptsError()
-            raise InvalidOrExpiredOtpError()
+            logger.info(
+                "OTP verification failed for session=%s, attempts_used=%s, remaining=%s",
+                request.loginSessionId,
+                attempts,
+                remaining,
+            )
+            raise InvalidOrExpiredOtpError(attempts_remaining=remaining)
 
         # Success — consume the challenge immediately so it can't be replayed.
         await self.otp_store.delete(request.loginSessionId)
