@@ -8,8 +8,8 @@ Endpoints:
   GET  /api/v1/auth/me
 
 Notes:
-  - login/refresh catch all exceptions internally and return 200 with
-    success=false on failure — no 4xx from these endpoints.
+  - Endpoints surface real HTTP status codes (401/403/404/…) via the global
+    exception handlers, matching statuscodeandmessages.xlsx.
   - logout and me use real HTTPBearer — requires raw_client (no bearer override).
   - raw_client fixture is defined here since it's auth-specific.
 """
@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.cache.redis_client import get_redis
 from app.core.config import settings
 from app.database.session import get_db
+from app.dependencies.mailer import get_mailer
 from app.main import app
 
 from .conftest import TestSessionLocal, _make_db_override
@@ -36,13 +37,43 @@ AUTH_BASE = "/api/v1/auth"
 # ── raw_client: real bearer, test DB ─────────────────────────────────────────
 
 
+class FakeMailer:
+    """Stand-in for app.core.mailer.Mailer that records instead of sending.
+
+    Without it the OTP path opens a real SMTP connection to settings.smtp_host,
+    which fails wherever the suite runs without live mail credentials — and the
+    service treats a send failure as fatal (503), so the test never sees the
+    challenge it is asserting on.
+    """
+
+    def __init__(self) -> None:
+        self.sent: list[dict] = []
+
+    async def send_email(
+        self,
+        *,
+        to: list[str],
+        subject: str,
+        html: str,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+    ) -> None:
+        self.sent.append({"to": to, "subject": subject, "html": html})
+
+
+@pytest.fixture()
+def fake_mailer() -> FakeMailer:
+    return FakeMailer()
+
+
 @pytest_asyncio.fixture()
 async def raw_client(
-    db_session: AsyncSession, fake_redis
+    db_session: AsyncSession, fake_redis, fake_mailer: FakeMailer
 ) -> AsyncGenerator[AsyncClient, None]:
     """Client with real bearer dependency — used for me/logout tests."""
     app.dependency_overrides[get_db] = _make_db_override(db_session)
     app.dependency_overrides[get_redis] = lambda: fake_redis
+    app.dependency_overrides[get_mailer] = lambda: fake_mailer
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
@@ -62,6 +93,7 @@ async def seeded_user(db_session: AsyncSession) -> dict:
     Returns login credentials dict.
     """
     from app.core.security import hash_password
+    from app.models.permission_model import UserPermissionModel
     from app.models.user_model import UserModel
 
     user = UserModel(
@@ -69,8 +101,13 @@ async def seeded_user(db_session: AsyncSession) -> dict:
         first_name="Test",
         last_name="User",
         hashed_password=hash_password("Password1!"),
-        role="user",
         status="ACTIVE",
+        grants=[
+            UserPermissionModel(pername="Memeber Screen", viewperm="Y", saveperm="N"),
+            UserPermissionModel(
+                pername="Paid claim lookup screen", viewperm="Y", saveperm="N"
+            ),
+        ],
     )
     db_session.add(user)
     await db_session.flush()
@@ -144,13 +181,15 @@ class TestLogin:
         assert resp.status_code == 401
         assert resp.json()["success"] is False
 
-    async def test_login_unknown_email_returns_404(self, raw_client: AsyncClient):
+    async def test_login_unknown_email_returns_401(self, raw_client: AsyncClient):
+        # Unknown username is not distinguished from a wrong password (spec: 401)
         resp = await raw_client.post(
             f"{AUTH_BASE}/login",
             json={"email": "nobody@example.com", "password": "Password1!"},
         )
         assert resp.status_code == 401
         assert resp.json()["success"] is False
+        assert resp.json()["message"] == "Invalid username or password."
 
     async def test_login_invalid_email_format_returns_422(
         self, raw_client: AsyncClient
@@ -182,20 +221,19 @@ class TestLogin:
 
 
 class TestMe:
-    async def test_me_no_auth_header_returns_403(self, raw_client: AsyncClient):
+    async def test_me_no_auth_header_returns_401(self, raw_client: AsyncClient):
         resp = await raw_client.get(f"{AUTH_BASE}/me")
-        assert resp.status_code == 403
+        assert resp.status_code == 401
+        assert resp.json()["message"] == "Authentication token is missing."
 
-    async def test_me_invalid_token_returns_200_success_false(
-        self, raw_client: AsyncClient
-    ):
-        # me() catches exceptions — returns 200 success=false for bad token
+    async def test_me_invalid_token_returns_401(self, raw_client: AsyncClient):
         resp = await raw_client.get(
             f"{AUTH_BASE}/me",
             headers={"Authorization": "Bearer invalidtoken"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
+        assert resp.json()["message"] == "Invalid authentication token."
 
     async def test_me_success_returns_user_profile(
         self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
@@ -229,8 +267,12 @@ class TestMe:
         assert "userId" in profile
         assert "firstName" in profile
         assert "lastName" in profile
-        assert "role" in profile
-        assert "permissions" in profile
+        # permissions mirrors the legacy userperm rows, keyed by pername with
+        # spaces joined by '-' so the client can use the key unquoted.
+        assert profile["permissions"] == {
+            "Memeber-Screen": ["viewperm"],
+            "Paid-claim-lookup-screen": ["viewperm"],
+        }
 
     async def test_me_after_logout_returns_success_false(
         self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
@@ -248,7 +290,7 @@ class TestMe:
             f"{AUTH_BASE}/me",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
 
 
@@ -304,15 +346,16 @@ class TestRefresh:
         assert "refreshToken" in data
         assert "expiresIn" in data
 
-    async def test_refresh_with_invalid_token_returns_success_false(
+    async def test_refresh_with_invalid_token_returns_401(
         self, raw_client: AsyncClient
     ):
         resp = await raw_client.post(
             f"{AUTH_BASE}/refresh",
             json={"refreshToken": "not-a-real-token"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
+        assert resp.json()["message"] == "Invalid refresh token."
 
     async def test_refresh_token_cannot_be_reused(
         self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
@@ -330,8 +373,12 @@ class TestRefresh:
             f"{AUTH_BASE}/refresh",
             json={"refreshToken": old_refresh},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 401
         assert resp.json()["success"] is False
+        assert (
+            resp.json()["message"]
+            == "Refresh token is no longer valid. Please log in again."
+        )
 
     async def test_refresh_missing_token_returns_422(self, raw_client: AsyncClient):
         resp = await raw_client.post(f"{AUTH_BASE}/refresh", json={})
@@ -344,9 +391,10 @@ class TestRefresh:
 
 
 class TestLogout:
-    async def test_logout_no_auth_returns_403(self, raw_client: AsyncClient):
+    async def test_logout_no_auth_returns_401(self, raw_client: AsyncClient):
         resp = await raw_client.post(f"{AUTH_BASE}/logout")
-        assert resp.status_code == 403
+        assert resp.status_code == 401
+        assert resp.json()["message"] == "Authentication token is missing."
 
     async def test_logout_success_returns_204(
         self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
@@ -359,7 +407,7 @@ class TestLogout:
             f"{AUTH_BASE}/logout",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert resp.status_code == 204
+        assert resp.status_code == 200
 
     async def test_logout_response_has_no_body(
         self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
@@ -372,4 +420,31 @@ class TestLogout:
             f"{AUTH_BASE}/logout",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert resp.content == b""
+        body = resp.json()
+        assert body["success"] is True
+        assert body["message"] == "Logout successful."
+
+    async def test_refresh_token_is_dead_after_logout(
+        self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
+    ):
+        """Logout revokes the user's refresh tokens, so the refresh token handed
+        out at login must not still buy a new pair.
+
+        Logout only ever set `revoked`; the consume query didn't look at it, so
+        the refresh survived its own revocation.
+        """
+        login = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
+            "data"
+        ]
+
+        await raw_client.post(
+            f"{AUTH_BASE}/logout",
+            headers={"Authorization": f"Bearer {login['accessToken']}"},
+        )
+
+        resp = await raw_client.post(
+            f"{AUTH_BASE}/refresh",
+            json={"refreshToken": login["refreshToken"]},
+        )
+        assert resp.status_code == 401
+        assert resp.json()["success"] is False

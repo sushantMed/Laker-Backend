@@ -33,13 +33,13 @@ class UserProfile(BaseModel):
     firstName: str
     lastName: str
     email: str
-    roles: list[str]
-    roleLabels: list[str] = []
     initials: str
     status: str
     lastLogin: datetime | None = None
     createdAt: datetime | None = None
-    permissions: list[str]
+    # {screen: [granted flags]}, e.g. {"Memeber-Screen": ["saveperm", "viewperm"]}
+    # Keys are pernames with spaces joined by '-' (see rbac.response_key).
+    permissions: dict[str, list[str]]
 
 
 class LoginResponse(BaseModel):

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,25 +21,6 @@ async def get_current_user(
     return await AuthService(session, redis).current_user(credentials.credentials)
 
 
-def require_roles(*roles: str):
-    """Factory — returns a dependency that enforces one of the given roles.
-
-    NOTE: prefer permission checks (``app.core.permissions.RequireUser``) over
-    role checks. This role-based shortcut is retained only for endpoints not yet
-    migrated to the permission model.
-    """
-
-    def _check(user: UserModel = Depends(get_current_user)) -> UserModel:
-        if not set(roles) & set(user.roles or []):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions",
-            )
-        return user
-
-    return _check
-
-
-# Convenience shortcuts
-require_admin = require_roles("admin")
-require_superadmin = require_roles("admin")
+# Roles are gone — every check is a grant check now. Use
+# ``app.core.permissions.require(...)`` / ``RequireUser(...)``; admin-only
+# endpoints gate on the "user admin" screen (Perm.USERADMIN_VIEW).

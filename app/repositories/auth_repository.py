@@ -1,5 +1,3 @@
-from datetime import UTC, datetime
-
 from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,18 +35,32 @@ class AuthRepository:
     ) -> RefreshTokenModel | None:
         """Atomically marks a refresh token as consumed, but only if it hasn't
         been consumed already. Returns the row if this call was the one that
-        consumed it, or None if it was already consumed (signals reuse) or
-        doesn't exist."""
+        consumed it, or None if it was already consumed (signals reuse), was
+        revoked, or doesn't exist.
+
+        The guard and the write have to agree on the same column: setting only
+        `expires_at` left `consumed` False forever, so the WHERE matched again
+        on every reuse and rotation never actually invalidated anything.
+        `revoked` is checked here too, otherwise logout and family revocation
+        set a flag that this query ignores.
+
+        `expires_at` is deliberately left alone. Back-dating it here made a
+        reused token trip the expiry check in AuthService.refresh() first, so
+        reuse reported itself as an expired token — and only once the clock had
+        moved on, which is why it reproduced in a full run but not in isolation.
+        """
         result = await self.session.execute(
             update(RefreshTokenModel)
             .where(
                 RefreshTokenModel.token == token,
                 RefreshTokenModel.consumed.is_(False),
+                RefreshTokenModel.revoked.is_(False),
             )
-            .values(expires_at=datetime.now(UTC))
+            .values(consumed=True)
             .returning(RefreshTokenModel)
         )
         row = result.first()
+        await self.session.commit()
         return row[0] if row else None
 
     async def revoke_refresh_family(self, family_id: str) -> None:

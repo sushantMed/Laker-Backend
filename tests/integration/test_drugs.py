@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import uuid
+
 import pytest
 
+from app.dependencies.auth import get_current_user
+from app.main import app
+from app.models.permission_model import UserPermissionModel
+from app.models.user_model import UserModel
 from app.utils.enums import BrandGeneric, Maintenance
-from tests.integration.conftest import AUTH
+from tests.integration.conftest import AUTH, _fake_current_user
 
 
 @pytest.mark.asyncio
@@ -119,6 +125,48 @@ async def test_search_drugs_by_gpi_maintenance_and_tier(client, seeded_lookups):
     body = resp.json()
     assert body["pagination"]["total"] == 1
     assert body["data"][0]["ndc"] == "00093721410"
+
+
+@pytest.mark.asyncio
+async def test_search_drugs_without_drug_grant_is_forbidden(client, seeded_lookups):
+    """The gate has to refuse someone, not just wave through the fixture user.
+
+    `client`'s double holds every screen, so every other test here would pass
+    with or without the dependency. This one swaps in a user granted a different
+    screen entirely — proving the refusal is about "drug lookup screen" and not
+    about being unauthenticated.
+    """
+
+    async def _user_without_drug_grant() -> UserModel:
+        return UserModel(
+            id=uuid.uuid4(),
+            email="nodrugs@example.com",
+            first_name="No",
+            last_name="Drugs",
+            hashed_password="x",
+            status="ACTIVE",
+            grants=[
+                UserPermissionModel(
+                    pername="Memeber Screen", viewperm="Y", saveperm="Y"
+                )
+            ],
+        )
+
+    app.dependency_overrides[get_current_user] = _user_without_drug_grant
+    try:
+        resp = await client.post(
+            "/api/v1/drugs/search",
+            json={"searchRequest": {"name": "Atorvastatin"}},
+            headers=AUTH,
+        )
+    finally:
+        app.dependency_overrides[get_current_user] = _fake_current_user
+
+    assert resp.status_code == 403
+    body = resp.json()
+    assert body["success"] is False
+    # Names the permission, so this can't pass on some unrelated 403.
+    assert body["message"] == "Missing permission: drug:view"
 
 
 @pytest.mark.asyncio

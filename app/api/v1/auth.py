@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +23,26 @@ from app.schemas.auth_schema import (
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+# Shared by other routers (prescribers/drugs/pharmacies) — keep auto_error so a
+# missing token is rejected before reaching the handler.
 bearer = HTTPBearer()
+# Auth endpoints below handle the missing-token case themselves to return a
+# 401 with a spec-defined message instead of the default 403.
+_optional_bearer = HTTPBearer(auto_error=False)
+
+
+def get_bearer_token(
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(_optional_bearer)
+    ],
+) -> str:
+    """Extract the bearer token, returning 401 when it is missing."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token is missing.",
+        )
+    return credentials.credentials
 
 
 @router.post(
@@ -53,15 +72,16 @@ async def login(
 
 @router.post(
     "/logout",
-    status_code=status.HTTP_204_NO_CONTENT,
+    status_code=status.HTTP_200_OK,
     summary="Revoke current access + refresh tokens",
 )
 async def logout(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    token: Annotated[str, Depends(get_bearer_token)],
     session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
-) -> None:
-    await AuthService(session, redis).logout(credentials.credentials)
+) -> ApiResponse[None]:
+    await AuthService(session, redis).logout(token)
+    return ApiResponse.ok(None, message="Logout successful.")
 
 
 @router.post(
@@ -73,11 +93,8 @@ async def refresh(
     session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> ApiResponse[RefreshResponse]:
-    try:
-        data = await AuthService(session, redis).refresh(body)
-        return ApiResponse.ok(data, message="Token refresh successful")
-    except Exception as e:
-        return ApiResponse.fail(message="Token refresh failed", errors=[str(e)])
+    data = await AuthService(session, redis).refresh(body)
+    return ApiResponse.ok(data, message="Token refreshed successfully.")
 
 
 @router.get(
@@ -85,18 +102,15 @@ async def refresh(
     summary="Return the profile of the authenticated user",
 )
 async def me(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    token: Annotated[str, Depends(get_bearer_token)],
     session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> ApiResponse[UserProfile]:
-    try:
-        data = await AuthService(session, redis).me(credentials.credentials)
-        print("User profile retrieved successfully:", data)
-        return ApiResponse.ok(data, message="User profile retrieved successfully")
-    except Exception as e:
-        return ApiResponse.fail(
-            message="Failed to retrieve user profile", errors=[str(e)]
-        )
+    # No try/except: the global handlers in main.py turn AuthService's 401/403/404
+    # into the right status code. Catching here would answer an expired token with
+    # a 200.
+    data = await AuthService(session, redis).me(token)
+    return ApiResponse.ok(data, message="User profile retrieved successfully")
 
 
 @router.post(

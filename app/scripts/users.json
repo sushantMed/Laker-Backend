@@ -4,27 +4,43 @@
     "first_name": "Admin",
     "last_name": "User",
     "password": "Admin@123",
-    "roles": ["admin"]
+    "_comment": "'*' grants every screen in PERNAME_RESOURCES with both flags.",
+    "permissions": "*"
   },
   {
     "email": "user@example.com",
     "first_name": "Test",
     "last_name": "User",
     "password": "User@123",
-    "roles": ["members"]
+    "permissions": {
+      "Memeber Screen": ["viewperm", "saveperm"],
+      "Paid claim lookup screen": ["viewperm"],
+      "groups screen": ["viewperm"],
+      "drug lookup screen": ["viewperm"]
+    }
   },
   {
     "email": "sushant.sinha@businessonetech.com",
     "first_name": "Sushant",
     "last_name": "Sinha",
     "password": "Sus@12345",
-    "roles": ["readonly"]
+    "permissions": {
+      "Memeber Screen": ["viewperm"],
+      "Paid claim lookup screen": ["viewperm"],
+      "groups screen": ["viewperm"],
+      "drug lookup screen": ["viewperm"]
+    }
   },
   {
     "email": "dhanush@hotmail.com",
     "first_name": "Dhanush",
     "last_name": "User",
     "password": "Dhanush#123",
-    "roles": ["readonly"]
+    "permissions": {
+      "Memeber Screen": ["viewperm"],
+      "Paid claim lookup screen": ["viewperm"],
+      "groups screen": ["viewperm"],
+      "drug lookup screen": ["viewperm"]
+    }
   }
 ]

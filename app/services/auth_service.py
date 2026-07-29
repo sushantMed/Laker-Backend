@@ -20,8 +20,8 @@ from app.core.exceptions import (
     OtpResendRateLimitedError,
     TooManyAttemptsError,
     UserInactiveError,
+    UserNotFoundError,
 )
-from app.core.rbac import load_roles, resolve_permissions
 from app.core.security import (
     create_access_token,
     decode_access_token,
@@ -203,10 +203,13 @@ def _is_valid_otp_format(otp: str) -> bool:
 
 
 class AuthService:
-    credentials_invalid: str = "Invalid credentials"
-    refresh_token_invalid: str = "Invalid refresh token"
-    refresh_token_expired: str = "Refresh token expired"
-    unauthorized: str = "Unauthorized"
+    credentials_invalid: str = "Invalid username or password."
+    refresh_token_invalid: str = "Invalid refresh token."
+    refresh_token_expired: str = "Refresh token has expired. Please log in again."
+    refresh_token_revoked: str = (
+        "Refresh token is no longer valid. Please log in again."
+    )
+    token_invalid: str = "Invalid authentication token."
 
     MAX_ATTEMPTS = 5
     WINDOW_SECONDS = 15 * 60  # 15 minutes
@@ -380,7 +383,6 @@ class AuthService:
         access_token, _, expires_in = create_access_token(
             subject=str(user.id),
             email=user.email,
-            roles=user.roles,
         )
         refresh_token = await self._create_refresh_token(user)
 
@@ -444,7 +446,7 @@ class AuthService:
             # FIX: don't let a malformed/tampered token throw a raw 500 —
             # logout is idempotent from the caller's point of view.
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.token_invalid
             ) from None
 
         await self.repo.revoke_user_refresh_tokens(user_id)
@@ -473,6 +475,9 @@ class AuthService:
             )
         consumed = await self.repo.consume_refresh_token_atomic(presented_hash)
         if consumed is None:
+            # The row exists and hasn't expired, so it was already spent or
+            # revoked — distinct from the unknown-token case above, and worth
+            # saying so: the client needs to log in again, not retry.
             if current.family_id:
                 await self.repo.revoke_refresh_family(current.family_id)
             logger.warning(
@@ -480,7 +485,7 @@ class AuthService:
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=self.refresh_token_invalid,
+                detail=self.refresh_token_revoked,
             )
 
         user = await self.repo.get_user_by_id(consumed.user_id)
@@ -496,7 +501,6 @@ class AuthService:
         access_token, _, expires_in = create_access_token(
             subject=str(user.id),
             email=user.email,
-            roles=user.roles,
         )
         return RefreshResponse(
             accessToken=access_token,
@@ -515,19 +519,18 @@ class AuthService:
         except Exception:
             # FIX: any decode/parse failure -> clean 401, not a 500.
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.token_invalid
             ) from None
 
         if await self.repo.is_access_token_revoked(token_hash(access_token)):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.token_invalid
             )
-
         user = await self.repo.get_user_by_id(user_id)
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
-            )
+            raise UserNotFoundError()
+        if user.status != "ACTIVE":
+            raise UserInactiveError("User account is inactive.")
         return user
 
     # ── Private helpers ─────────────────────────────────────────────────
@@ -552,15 +555,12 @@ class AuthService:
     def _profile(user: UserModel) -> UserProfile:
         first = user.first_name[:1] if user.first_name else ""
         last = user.last_name[:1] if user.last_name else ""
-        defs = load_roles()
         return UserProfile(
             userId=str(user.id),
             firstName=user.first_name,
             lastName=user.last_name,
             email=user.email,
-            roles=user.roles,
-            roleLabels=[defs[r].description for r in user.roles if r in defs],
             initials=f"{first}{last}".upper(),
             status=user.status,
-            permissions=sorted(resolve_permissions(user.roles)),
+            permissions=user.grant_map,
         )

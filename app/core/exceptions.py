@@ -81,22 +81,27 @@ class NotFoundException(AppException):
 
 
 class UserNotFoundError(AppException):
-    def __init__(self, detail: str = "User not found"):
+    def __init__(self, detail: str = "User not found."):
         super().__init__(status_code=404, message=detail)
 
 
 class InvalidCredentialsError(AppException):
-    def __init__(self, detail: str = "Invalid email or password"):
+    def __init__(self, detail: str = "Invalid username or password."):
         super().__init__(status_code=401, message=detail)
 
 
 class UserInactiveError(AppException):
-    def __init__(self, detail: str = "Account is inactive"):
+    def __init__(
+        self,
+        detail: str = "Your account is inactive. Please contact the administrator.",
+    ):
         super().__init__(status_code=403, message=detail)
 
 
 class TooManyAttemptsError(AppException):
-    def __init__(self, detail: str = "Too many login attempts"):
+    def __init__(
+        self, detail: str = "Too many failed login attempts. Please try again later."
+    ):
         super().__init__(status_code=429, message=detail)
 
 

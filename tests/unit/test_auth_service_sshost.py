@@ -33,7 +33,6 @@ async def test_login_returns_tokens_on_valid_credentials(monkeypatch):
         email="user@example.com",
         hashed_password="ignored",
         status="ACTIVE",
-        role="user",
         first_name="Test",
         last_name="User",
     )
@@ -87,7 +86,6 @@ async def test_login_falls_back_to_local_password_when_sshost_is_unreachable(
         email="fallback@example.com",
         hashed_password="local-hash",
         status="ACTIVE",
-        role="user",
         first_name="Fallback",
         last_name="User",
         client_ip=None,

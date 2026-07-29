@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import (  # type: ignore
 from app.api.v1.auth import bearer
 from app.cache.redis_client import get_redis
 from app.core.config import settings
+from app.core.rbac import PERNAME_RESOURCES
 from app.database.base import Base
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
@@ -25,6 +26,7 @@ from app.main import app
 from app.models.claim_model import ClaimModel
 from app.models.drug_model import DrugModel
 from app.models.member_model import MemberModel
+from app.models.permission_model import UserPermissionModel
 from app.models.pharmacy_model import PharmacyModel
 from app.models.prescriber_model import PrescriberModel
 from app.models.user_model import UserModel
@@ -102,8 +104,14 @@ async def _fake_current_user() -> UserModel:
         first_name="Test",
         last_name="User",
         hashed_password="x",
-        role="admin",
         status="ACTIVE",
+        # Authorization now comes from grants alone, so the test double needs
+        # them: every screen, both flags. Endpoint-level permission behaviour is
+        # covered in tests/unit/test_rbac.py, not here.
+        grants=[
+            UserPermissionModel(pername=pername, viewperm="Y", saveperm="Y")
+            for pername in PERNAME_RESOURCES
+        ],
     )
 
 

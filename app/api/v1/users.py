@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.dependencies.auth import get_current_user, require_admin
+from app.core.permissions import Perm, require
+from app.dependencies.auth import get_current_user
 from app.models.user_model import UserModel
 from app.schemas.auth_schema import ApiResponse, UserProfile
 from app.services.auth_service import AuthService
@@ -35,7 +36,7 @@ async def get_me(
     "/{user_id}",
     response_model=ApiResponse[UserProfile],
     summary="Get any user by ID (admin only)",
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require(Perm.USERADMIN_VIEW))],
 )
 async def get_user(
     user_id: int,
