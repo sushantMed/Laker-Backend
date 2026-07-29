@@ -90,7 +90,7 @@ class TestLogin:
         assert resp.status_code == 200
 
     async def test_login_success_response_shape(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_enabled
     ):
         resp = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
         body = resp.json()
