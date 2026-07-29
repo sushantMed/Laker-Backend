@@ -51,11 +51,11 @@ class DrugRepository(BaseRepository[DrugModel]):
         stmt = select(DrugModel).where(DrugModel.is_deleted == false())
 
         if criteria.name:
-            stmt = stmt.where(DrugModel.drug_name.ilike(f"%{criteria.name}%"))
+            stmt = stmt.where(DrugModel.drug_name.ilike(f"{criteria.name}%"))
         if criteria.ndc:
-            stmt = stmt.where(DrugModel.ndc.ilike(f"%{criteria.ndc}%"))
+            stmt = stmt.where(DrugModel.ndc.ilike(f"{criteria.ndc}%"))
         if criteria.gpi:
-            stmt = stmt.where(DrugModel.gpi.ilike(f"%{criteria.gpi}%"))
+            stmt = stmt.where(DrugModel.gpi.ilike(f"{criteria.gpi}%"))
         if criteria.brand_generic:
             if criteria.brand_generic == "ALL":
                 stmt = stmt.where(
