@@ -4,7 +4,7 @@
     "first_name": "Admin",
     "last_name": "User",
     "password": "Admin@123",
-    "_comment": "'*' grants every screen in PERNAME_RESOURCES with both flags.",
+    "_comment": "'*' grants every screen in PERNAME_RESOURCES with both actions.",
     "permissions": "*"
   },
   {
@@ -13,10 +13,10 @@
     "last_name": "User",
     "password": "User@123",
     "permissions": {
-      "Memeber Screen": ["viewperm", "saveperm"],
-      "Paid claim lookup screen": ["viewperm"],
-      "groups screen": ["viewperm"],
-      "drug lookup screen": ["viewperm"]
+      "Memeber Screen": ["view", "save"],
+      "Paid claim lookup screen": ["view"],
+      "groups screen": ["view"],
+      "drug lookup screen": ["view"]
     }
   },
   {
@@ -25,10 +25,10 @@
     "last_name": "Sinha",
     "password": "Sus@12345",
     "permissions": {
-      "Memeber Screen": ["viewperm"],
-      "Paid claim lookup screen": ["viewperm"],
-      "groups screen": ["viewperm"],
-      "drug lookup screen": ["viewperm"]
+      "Memeber Screen": ["view"],
+      "Paid claim lookup screen": ["view"],
+      "groups screen": ["view"],
+      "drug lookup screen": ["view"]
     }
   },
   {
@@ -37,10 +37,10 @@
     "last_name": "User",
     "password": "Dhanush#123",
     "permissions": {
-      "Memeber Screen": ["viewperm"],
-      "Paid claim lookup screen": ["viewperm"],
-      "groups screen": ["viewperm"],
-      "drug lookup screen": ["viewperm"]
+      "Memeber Screen": ["view"],
+      "Paid claim lookup screen": ["view"],
+      "groups screen": ["view"],
+      "drug lookup screen": ["view"]
     }
   }
 ]

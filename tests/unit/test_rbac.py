@@ -92,9 +92,9 @@ def test_grant_map_is_keyed_by_hyphenated_pername():
     assert grant_map(
         [("Memeber Screen", "Y", "Y"), ("pricing", "Y", "N"), ("web accum", "N", "Y")]
     ) == {
-        "Memeber-Screen": ["saveperm", "viewperm"],
-        "pricing": ["viewperm"],
-        "web-accum": ["saveperm"],
+        "Memeber-Screen": ["save", "view"],
+        "pricing": ["view"],
+        "web-accum": ["save"],
     }
 
 
@@ -106,13 +106,13 @@ def test_grant_map_keeps_pername_wording_including_unmapped():
     """The map is the user's grant data, not the subset we enforce — only the
     spaces change, so the client still recognizes the screen."""
     assert grant_map([("some brand new screen", "Y", "N")]) == {
-        "some-brand-new-screen": ["viewperm"]
+        "some-brand-new-screen": ["view"]
     }
 
 
 def test_grant_map_merges_duplicate_rows():
     assert grant_map([("pricing", "Y", "N"), ("pricing", "N", "Y")]) == {
-        "pricing": ["saveperm", "viewperm"]
+        "pricing": ["save", "view"]
     }
 
 
@@ -120,7 +120,7 @@ def test_grant_map_preserves_case_and_collapses_whitespace_runs():
     """Only whitespace is touched: casing survives, and a run of it yields one
     '-' rather than several."""
     assert grant_map([("  MEMEBER   SCREEN  ", "Y", "N")]) == {
-        "MEMEBER-SCREEN": ["viewperm"]
+        "MEMEBER-SCREEN": ["view"]
     }
 
 
@@ -128,7 +128,7 @@ def test_grant_map_unions_rows_that_collide_once_hyphenated():
     """A row already spelled with a hyphen lands on the same key as its spaced
     twin — flags merge, neither row is dropped."""
     assert grant_map([("mem subgroups", "Y", "N"), ("mem-subgroups", "N", "Y")]) == {
-        "mem-subgroups": ["saveperm", "viewperm"]
+        "mem-subgroups": ["save", "view"]
     }
 
 

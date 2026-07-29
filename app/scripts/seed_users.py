@@ -11,7 +11,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from app.core.rbac import PERNAME_RESOURCES, SAVEPERM, VIEWPERM
+from app.core.rbac import PERNAME_RESOURCES, SAVE, VIEW
 from app.core.security import hash_password
 from app.database.session import AsyncSessionLocal
 from app.models.permission_model import UserPermissionModel
@@ -37,18 +37,18 @@ def load_users(json_file):
 def _grants_for(spec) -> list[UserPermissionModel]:
     """Turn a users.json ``permissions`` block into user_permissions rows.
 
-    ``"*"`` means every known screen with both flags; otherwise the block is the
-    same ``{pername: [flags]}`` shape /auth/me returns, so what you seed reads
-    back identically.
+    ``"*"`` means every known screen with both actions; otherwise the block is
+    the same ``{pername: [actions]}`` shape /auth/me returns, so what you seed
+    reads back identically.
     """
     if spec == "*":
-        spec = {p: [VIEWPERM, SAVEPERM] for p in PERNAME_RESOURCES}
+        spec = {p: [VIEW, SAVE] for p in PERNAME_RESOURCES}
 
     return [
         UserPermissionModel(
             pername=pername,
-            viewperm="Y" if VIEWPERM in flags else "N",
-            saveperm="Y" if SAVEPERM in flags else "N",
+            viewperm="Y" if VIEW in flags else "N",
+            saveperm="Y" if SAVE in flags else "N",
         )
         for pername, flags in spec.items()
     ]

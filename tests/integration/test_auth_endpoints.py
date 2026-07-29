@@ -270,8 +270,8 @@ class TestMe:
         # permissions mirrors the legacy userperm rows, keyed by pername with
         # spaces joined by '-' so the client can use the key unquoted.
         assert profile["permissions"] == {
-            "Memeber-Screen": ["viewperm"],
-            "Paid-claim-lookup-screen": ["viewperm"],
+            "Memeber-Screen": ["view"],
+            "Paid-claim-lookup-screen": ["view"],
         }
 
     async def test_me_after_logout_returns_success_false(

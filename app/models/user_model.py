@@ -48,7 +48,7 @@ class UserModel(Base):
 
     @property
     def grant_map(self) -> dict[str, list[str]]:
-        """``{screen: [flags]}`` as returned by /auth/me, screens hyphenated."""
+        """``{screen: [actions]}`` as returned by /auth/me, screens hyphenated."""
         return grant_map(self._grant_rows)
 
     def can(self, perm: str) -> bool:

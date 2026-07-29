@@ -9,8 +9,11 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
-VIEWPERM = "viewperm"
-SAVEPERM = "saveperm"
+# The action names clients see. The DB columns are still `viewperm`/`saveperm`;
+# these are the response (and users.json) spelling, which drops the suffix so it
+# matches the action half of a permission code -- "member:view" -> "view".
+VIEW = "view"
+SAVE = "save"
 
 
 class Perm:
@@ -131,10 +134,10 @@ def _is_granted(flag: Any) -> bool:
 
 
 def grant_map(grants: Iterable[tuple[str, Any, Any]]) -> dict[str, list[str]]:
-    """The user's grants as ``{screen: [granted flag names]}`` — what /auth/me
+    """The user's grants as ``{screen: [granted actions]}`` — what /auth/me
     returns, and a direct projection of the legacy query's three columns:
 
-        {"Memeber-Screen": ["saveperm", "viewperm"], "pricing": ["viewperm"]}
+        {"Memeber-Screen": ["save", "view"], "pricing": ["view"]}
 
     Keys are the stored pername run through response_key(), so the screen name
     survives intact apart from its spaces becoming '-'. Screens holding neither
@@ -146,9 +149,9 @@ def grant_map(grants: Iterable[tuple[str, Any, Any]]) -> dict[str, list[str]]:
     for pername, viewperm, saveperm in grants:
         flags = []
         if _is_granted(saveperm):
-            flags.append(SAVEPERM)
+            flags.append(SAVE)
         if _is_granted(viewperm):
-            flags.append(VIEWPERM)
+            flags.append(VIEW)
         if flags:
             # Merge rather than overwrite: the legacy table can carry the same
             # screen twice under different casing, and hyphenating means a row
