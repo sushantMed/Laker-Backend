@@ -37,8 +37,7 @@ class UserProfile(BaseModel):
     status: str
     lastLogin: datetime | None = None
     createdAt: datetime | None = None
-    # {screen: [granted actions]}, e.g. {"Memeber-Screen": ["save", "view"]}
-    # Keys are pernames with spaces joined by '-' (see rbac.response_key).
+    # {screen: [actions]}, e.g. {"Memeber-Screen": ["save", "view"]}
     permissions: dict[str, list[str]]
 
 

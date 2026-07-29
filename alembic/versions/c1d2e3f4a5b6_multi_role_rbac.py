@@ -4,15 +4,9 @@ Revision ID: c1d2e3f4a5b6
 Revises: 88b907ae2b69
 Create Date: 2026-07-23
 
-Adapted for Oracle: roles are stored as a JSON column (Oracle has no native
-array type and no GIN index), not the Postgres ARRAY/GIN from the original spec.
-
-Backfill maps the old single `role` onto a one-element roles list. Any legacy
-value not in the known role set (e.g. the old default "user") falls back to
-["readonly"] — read-only — which is the fail-closed default.
-
-    Before running, confirm the spread of existing values:
-        SELECT role, COUNT(*) FROM users GROUP BY role;
+Roles are stored as a JSON column since Oracle has no native array type.
+Backfill maps the old single `role` onto a one-element list; unknown values
+fall back to ["readonly"].
 """
 
 from typing import Sequence, Union
@@ -38,8 +32,7 @@ _BACKFILL_ROLES = (
 
 
 def upgrade() -> None:
-    # 1. Add the new columns. `roles` starts nullable so we can backfill before
-    #    enforcing NOT NULL.
+    # Nullable at first so it can be backfilled before NOT NULL is enforced.
     op.add_column("users", sa.Column("roles", JSONText(), nullable=True))
     op.add_column(
         "users",
@@ -51,10 +44,8 @@ def upgrade() -> None:
         ),
     )
 
-    # 2. Backfill roles from the old single-role column.
     op.execute(_BACKFILL_ROLES)
 
-    # 3. Now that every row has a value, enforce NOT NULL and drop `role`.
     op.alter_column("users", "roles", nullable=False)
     op.drop_column("users", "role")
 
@@ -69,7 +60,6 @@ def downgrade() -> None:
             server_default="readonly",
         ),
     )
-    # Take the first role back into the single-role column.
     op.execute("UPDATE users SET role = COALESCE(JSON_VALUE(roles, '$[0]'), 'readonly')")
     op.drop_column("users", "session_version")
     op.drop_column("users", "roles")

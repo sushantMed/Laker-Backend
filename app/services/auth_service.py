@@ -475,9 +475,7 @@ class AuthService:
             )
         consumed = await self.repo.consume_refresh_token_atomic(presented_hash)
         if consumed is None:
-            # The row exists and hasn't expired, so it was already spent or
-            # revoked — distinct from the unknown-token case above, and worth
-            # saying so: the client needs to log in again, not retry.
+            # Row exists and hasn't expired, so it was already spent or revoked.
             if current.family_id:
                 await self.repo.revoke_refresh_family(current.family_id)
             logger.warning(

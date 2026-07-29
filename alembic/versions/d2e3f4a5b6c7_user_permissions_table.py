@@ -7,15 +7,7 @@ Create Date: 2026-07-28
 Creates a table shaped like the legacy `sql.userperm`: one row per screen
 (`pername`) with `viewperm` / `saveperm` flags, granted directly to a user.
 
-This table is the only source of authorization. There is no role mapping here
-and no backfill from `users.roles` — a user can do exactly what their rows say,
-and a user with no rows can do nothing. Grants are inserted as data (see
-e3f4a5b6c7d8), not derived from anything.
-
-`users.roles` still exists as a column but nothing reads it.
-
-    After running, users hold no grants until they are inserted:
-        SELECT COUNT(*) FROM user_permissions;
+No backfill from `users.roles` — grants are inserted as data, see e3f4a5b6c7d8.
 """
 
 from typing import Sequence, Union

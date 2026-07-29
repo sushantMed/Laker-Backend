@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 
-from app.core.rbac import Perm  # re-exported for convenience
+from app.core.rbac import Perm
 from app.dependencies.auth import get_current_user
 from app.models.user_model import UserModel
 
@@ -10,7 +10,7 @@ __all__ = ["Perm", "RequireUser", "require"]
 
 
 def require(*perms: str):
-    """Dependency factory — passes only if the user holds every listed permission."""
+    """Passes only if the user holds every listed permission."""
 
     async def _check(
         current_user: Annotated[UserModel, Depends(get_current_user)],

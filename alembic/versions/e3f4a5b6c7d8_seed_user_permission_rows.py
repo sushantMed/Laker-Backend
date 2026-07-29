@@ -4,27 +4,10 @@ Revision ID: e3f4a5b6c7d8
 Revises: d2e3f4a5b6c7
 Create Date: 2026-07-29
 
-Grants for the accounts in app/scripts/users.json, so a fresh environment has
-something to exercise the screens with. Data only — no schema change.
+Grants for the accounts in app/scripts/users.json. Data only, no schema change.
 
-Since d2e3f4a5b6c7 derives nothing from `users.roles`, inserts like these are
-the only way anyone gets a permission. Accounts not listed here hold no grants
-and can reach no screen until rows are added for them.
-
-Users are matched by email rather than id, since ids are UUIDs minted at seed
-time. Anything that doesn't line up is skipped rather than failing the migration:
-
-  - a user in the list who isn't in this environment (the seed never ran, or the
-    account was removed) is passed over,
-  - a (user, screen) pair that already has a row is left as-is, so this can run
-    after d2e3f4a5b6c7's role backfill without tripping
-    uq_userperm_user_pername.
-
-Both make the migration re-runnable and safe on an environment that has already
-been granted by hand.
-
-    To see what it will touch:
-        SELECT email FROM users WHERE LOWER(email) IN (...);
+Users are matched by email since ids are minted at seed time. Missing accounts
+and already-granted pairs are skipped, so this is re-runnable.
 """
 
 import uuid
@@ -39,8 +22,8 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# Every screen, both flags. Written out rather than imported from
-# app.core.rbac: a migration has to keep working when the catalog changes.
+# Listed here rather than imported from app.core.rbac so the migration keeps
+# working when the catalog changes.
 _ALL_SCREENS = (
     "Memeber Screen",
     "Mem cancel Card Request",
@@ -60,16 +43,11 @@ _ALL_SCREENS = (
     "user admin",
 )
 
-# email -> (pername, viewperm, saveperm). Pernames must match the canonical
-# spelling in PERNAME_RESOURCES (app/core/rbac.py) — lookup tolerates casing,
-# but /auth/me echoes these strings straight back to the client.
-# 16 admin rows + 20 demo rows.
+# email -> (pername, viewperm, saveperm). Pernames must match the spelling in
+# PERNAME_RESOURCES (app/core/rbac.py); /auth/me echoes them back to the client.
 _GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
-    # d2e3f4a5b6c7 no longer backfills from roles, so this is the only thing
-    # granting the "user admin" screen — without it GET /users/{id} is
-    # unreachable by anyone.
     "admin@example.com": tuple((screen, "Y", "Y") for screen in _ALL_SCREENS),
-    # Member servicing: full member screen, read-only everywhere else.
+    # Member servicing: full member screen, read-only elsewhere.
     "user@example.com": (
         ("Memeber Screen", "Y", "Y"),
         ("Paid claim lookup screen", "Y", "N"),
@@ -78,7 +56,7 @@ _GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("web member dependents", "Y", "N"),
         ("pricing", "Y", "N"),
     ),
-    # Read-only analyst: view on the lookup/reporting screens, no saves at all.
+    # Read-only analyst: view on the lookup/reporting screens.
     "sushant.sinha@businessonetech.com": (
         ("Memeber Screen", "Y", "N"),
         ("Paid claim lookup screen", "Y", "N"),
@@ -88,7 +66,7 @@ _GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("web accum", "Y", "N"),
         ("groups screen", "Y", "N"),
     ),
-    # Card/eligibility handling: saves on the two screens that need it.
+    # Card/eligibility handling.
     "dhanush@hotmail.com": (
         ("Memeber Screen", "Y", "Y"),
         ("Mem cancel Card Request", "Y", "Y"),
@@ -113,9 +91,8 @@ _user_permissions = sa.table(
 def _as_uuid(value) -> uuid.UUID:
     """Coerce a users.id back into a UUID.
 
-    Same reason as in d2e3f4a5b6c7: sa.text() carries no type information, so
-    Oracle returns the raw CHAR(32) hex string and sa.Uuid's bind processor
-    needs a real UUID object.
+    sa.text() carries no type information, so Oracle returns the raw CHAR(32)
+    hex string while sa.Uuid's bind processor needs a real UUID object.
     """
     if isinstance(value, uuid.UUID):
         return value
@@ -134,8 +111,7 @@ def _user_ids_by_email(bind) -> dict[str, uuid.UUID]:
 
 
 def _existing_pairs(bind) -> set[tuple[uuid.UUID, str]]:
-    """(user_id, normalized pername) pairs already present, so a re-run or a
-    prior backfill doesn't collide with uq_userperm_user_pername."""
+    """(user_id, normalized pername) pairs already present."""
     rows = bind.execute(
         sa.text("SELECT user_id, pername FROM user_permissions")
     ).fetchall()
@@ -151,10 +127,10 @@ def upgrade() -> None:
     for email, grants in _GRANTS.items():
         user_id = ids.get(email)
         if user_id is None:
-            continue  # account not in this environment
+            continue
         for pername, viewperm, saveperm in grants:
             if (user_id, pername.strip().lower()) in existing:
-                continue  # already granted; don't clobber what's there
+                continue
             rows.append(
                 {
                     "id": uuid.uuid4(),
@@ -170,11 +146,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Remove only the (user, screen) pairs this migration lists.
+    """Remove the (user, screen) pairs this migration lists.
 
-    Rows upgrade() skipped as pre-existing are deleted too — they can't be told
-    apart from ones it inserted. That is the safe direction for a downgrade of a
-    grant: it revokes access rather than leaving it behind.
+    Pre-existing rows go too, since they can't be told apart from inserted ones.
     """
     bind = op.get_bind()
     ids = _user_ids_by_email(bind)
@@ -183,9 +157,8 @@ def downgrade() -> None:
         user_id = ids.get(email)
         if user_id is None:
             continue
-        # Deleted through the typed table, not sa.text(): sa.Uuid stores the id
-        # as 32-char hex, so a str(uuid) bind — which carries dashes — matches
-        # nothing at all and the downgrade silently no-ops.
+        # Through the typed table, not sa.text(): sa.Uuid stores the id as
+        # 32-char hex, so a str(uuid) bind carries dashes and matches nothing.
         bind.execute(
             _user_permissions.delete().where(
                 sa.and_(

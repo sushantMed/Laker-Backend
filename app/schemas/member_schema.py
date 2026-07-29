@@ -160,6 +160,7 @@ class MemberSearch(BaseModel):
 
     search_by_prev_card_id: bool = Field(False, alias="searchByPrevCardId")
     include_termed_members: bool = Field(False, alias="includeTermedMembers")
+    sort_dir: str = Field("desc", alias="sortDir")
 
     @model_validator(mode="after")
     def at_least_one_criterion(self) -> MemberSearch:

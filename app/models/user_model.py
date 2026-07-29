@@ -19,9 +19,8 @@ class UserModel(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="ACTIVE", nullable=False)
 
-    # Legacy, and no longer consulted: authorization comes from `grants` alone.
-    # Still mapped because the column is NOT NULL with no server default, so
-    # inserts would fail without it. Nothing should read this.
+    # Legacy column, not used for authorization. Still mapped because it is
+    # NOT NULL with no server default.
     roles: Mapped[list[str]] = mapped_column(
         MutableList.as_mutable(JSONText),
         default=lambda: [],
@@ -29,9 +28,8 @@ class UserModel(Base):
     )
     session_version: Mapped[int] = mapped_column(default=1, nullable=False)
 
-    # selectin, not lazy: permission_set is a sync property read inside request
-    # handlers, where a lazy load would raise MissingGreenlet under asyncio.
-    # This way the grants arrive with the user in one extra query.
+    # selectin, not lazy: permission_set is read synchronously in request
+    # handlers, where a lazy load raises MissingGreenlet under asyncio.
     grants: Mapped[list[UserPermissionModel]] = relationship(
         lazy="selectin",
         cascade="all, delete-orphan",
@@ -43,12 +41,12 @@ class UserModel(Base):
 
     @property
     def permission_set(self) -> set[str]:
-        """Permission codes this user holds. No grants -> no permissions."""
+        """Permission codes this user holds."""
         return permissions_from_grants(self._grant_rows)
 
     @property
     def grant_map(self) -> dict[str, list[str]]:
-        """``{screen: [actions]}`` as returned by /auth/me, screens hyphenated."""
+        """``{screen: [actions]}`` as returned by /auth/me."""
         return grant_map(self._grant_rows)
 
     def can(self, perm: str) -> bool:

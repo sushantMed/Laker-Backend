@@ -40,10 +40,8 @@ AUTH_BASE = "/api/v1/auth"
 class FakeMailer:
     """Stand-in for app.core.mailer.Mailer that records instead of sending.
 
-    Without it the OTP path opens a real SMTP connection to settings.smtp_host,
-    which fails wherever the suite runs without live mail credentials — and the
-    service treats a send failure as fatal (503), so the test never sees the
-    challenge it is asserting on.
+    Without it the OTP path opens a real SMTP connection and the service treats
+    the failure as fatal (503).
     """
 
     def __init__(self) -> None:
@@ -267,8 +265,7 @@ class TestMe:
         assert "userId" in profile
         assert "firstName" in profile
         assert "lastName" in profile
-        # permissions mirrors the legacy userperm rows, keyed by pername with
-        # spaces joined by '-' so the client can use the key unquoted.
+        # Keyed by pername with spaces joined by '-'.
         assert profile["permissions"] == {
             "Memeber-Screen": ["view"],
             "Paid-claim-lookup-screen": ["view"],
@@ -427,12 +424,7 @@ class TestLogout:
     async def test_refresh_token_is_dead_after_logout(
         self, raw_client: AsyncClient, seeded_user: dict, otp_disabled
     ):
-        """Logout revokes the user's refresh tokens, so the refresh token handed
-        out at login must not still buy a new pair.
-
-        Logout only ever set `revoked`; the consume query didn't look at it, so
-        the refresh survived its own revocation.
-        """
+        """A refresh token handed out at login must not work after logout."""
         login = (await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)).json()[
             "data"
         ]

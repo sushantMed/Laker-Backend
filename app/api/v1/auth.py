@@ -23,11 +23,9 @@ from app.schemas.auth_schema import (
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
-# Shared by other routers (prescribers/drugs/pharmacies) — keep auto_error so a
-# missing token is rejected before reaching the handler.
 bearer = HTTPBearer()
-# Auth endpoints below handle the missing-token case themselves to return a
-# 401 with a spec-defined message instead of the default 403.
+# Auth endpoints handle the missing-token case themselves so they can return a
+# 401 instead of the default 403.
 _optional_bearer = HTTPBearer(auto_error=False)
 
 
@@ -106,9 +104,6 @@ async def me(
     session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> ApiResponse[UserProfile]:
-    # No try/except: the global handlers in main.py turn AuthService's 401/403/404
-    # into the right status code. Catching here would answer an expired token with
-    # a 200.
     data = await AuthService(session, redis).me(token)
     return ApiResponse.ok(data, message="User profile retrieved successfully")
 

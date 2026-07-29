@@ -55,7 +55,7 @@ from app.schemas.common_schema import ApiResponse
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
-    validate_permission_catalog()  # every Perm code must be grantable by a screen
+    validate_permission_catalog()
     yield
     await close_redis()
     engine = globals().get("engine")

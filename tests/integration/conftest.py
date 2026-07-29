@@ -105,9 +105,8 @@ async def _fake_current_user() -> UserModel:
         last_name="User",
         hashed_password="x",
         status="ACTIVE",
-        # Authorization now comes from grants alone, so the test double needs
-        # them: every screen, both flags. Endpoint-level permission behaviour is
-        # covered in tests/unit/test_rbac.py, not here.
+        # Every screen, both flags. Permission behaviour is covered in
+        # tests/unit/test_rbac.py.
         grants=[
             UserPermissionModel(pername=pername, viewperm="Y", saveperm="Y")
             for pername in PERNAME_RESOURCES

@@ -129,13 +129,8 @@ async def test_search_drugs_by_gpi_maintenance_and_tier(client, seeded_lookups):
 
 @pytest.mark.asyncio
 async def test_search_drugs_without_drug_grant_is_forbidden(client, seeded_lookups):
-    """The gate has to refuse someone, not just wave through the fixture user.
-
-    `client`'s double holds every screen, so every other test here would pass
-    with or without the dependency. This one swaps in a user granted a different
-    screen entirely — proving the refusal is about "drug lookup screen" and not
-    about being unauthenticated.
-    """
+    """`client`'s user holds every screen, so swap in one granted another
+    screen entirely."""
 
     async def _user_without_drug_grant() -> UserModel:
         return UserModel(
@@ -165,7 +160,6 @@ async def test_search_drugs_without_drug_grant_is_forbidden(client, seeded_looku
     assert resp.status_code == 403
     body = resp.json()
     assert body["success"] is False
-    # Names the permission, so this can't pass on some unrelated 403.
     assert body["message"] == "Missing permission: drug:view"
 
 

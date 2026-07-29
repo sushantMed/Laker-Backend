@@ -9,10 +9,8 @@ from app.database.base import Base
 class UserPermissionModel(Base):
     """Per-user screen grant, mirroring the legacy ``sql.userperm`` shape.
 
-    One row per screen the user can reach, with the same two flags the legacy
-    query selects (``viewperm``, ``saveperm``). Stored as CHAR(1) 'Y'/'N' —
-    Oracle has no native boolean, and the check constraints keep out anything
-    else, so the flags can't drift into a third truthiness.
+    One row per screen, with the same ``viewperm``/``saveperm`` flags. Stored as
+    CHAR(1) 'Y'/'N' since Oracle has no native boolean.
     """
 
     __tablename__ = "user_permissions"

@@ -37,9 +37,8 @@ def load_users(json_file):
 def _grants_for(spec) -> list[UserPermissionModel]:
     """Turn a users.json ``permissions`` block into user_permissions rows.
 
-    ``"*"`` means every known screen with both actions; otherwise the block is
-    the same ``{pername: [actions]}`` shape /auth/me returns, so what you seed
-    reads back identically.
+    ``"*"`` means every known screen with both actions; otherwise it is the same
+    ``{pername: [actions]}`` shape /auth/me returns.
     """
     if spec == "*":
         spec = {p: [VIEW, SAVE] for p in PERNAME_RESOURCES}
