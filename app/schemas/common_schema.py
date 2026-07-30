@@ -33,7 +33,8 @@ class SearchRequest(GenericModel, Generic[TSearch]):
 class ErrorDetail(BaseModel):
     statusCode: int
     message: str
-    attemptsRemaining: int | None = None
+    otpVerificationAttemptsRemaining: int | None = None
+    otpResendAttemptsRemaining: int | None = None
 
 
 class ApiResponse(GenericModel, Generic[T]):
@@ -60,8 +61,9 @@ class ApiResponse(GenericModel, Generic[T]):
         cls,
         message: str,
         status_code: int = 400,
-        attempts_remaining: int | None = None,
         exception_message: str | None = None,
+        otp_verification_attempts_remaining: int | None = None,
+        otp_resend_attempts_remaining: int | None = None,
     ) -> "ApiResponse[None]":
         return cls(
             success=False,
@@ -70,7 +72,8 @@ class ApiResponse(GenericModel, Generic[T]):
             error=ErrorDetail(
                 statusCode=status_code,
                 message=exception_message or message,
-                attemptsRemaining=attempts_remaining,
+                otpVerificationAttemptsRemaining=otp_verification_attempts_remaining,
+                otpResendAttemptsRemaining=otp_resend_attempts_remaining,
             ),
         )
 
@@ -106,7 +109,7 @@ class PagedApiResponse(GenericModel, Generic[T]):
         return cls(
             success=False,
             message=message,
-            data=[],
+            data=None,
             pagination=None,
             error=ErrorDetail(
                 statusCode=status_code,

@@ -112,15 +112,24 @@ def create_app() -> FastAPI:
 
 
 def app_exception_handler(request: Request, exc: AppException):
-    return JSONResponse(
+    response = ApiResponse.fail(
+        message=exc.message,
         status_code=exc.status_code,
-        content=ApiResponse.fail(
-            message=exc.message,
-            status_code=exc.status_code,
-            exception_message=str(exc),
-            attempts_remaining=getattr(exc, "attempts_remaining", 0),
-        ).model_dump(),
+        exception_message=str(exc),
+        otp_verification_attempts_remaining=getattr(
+            exc, "otp_verification_attempts_remaining", None
+        ),
+        otp_resend_attempts_remaining=getattr(
+            exc, "otp_resend_attempts_remaining", None
+        ),
     )
+
+    content = response.model_dump(exclude_none=False)
+    # Only strip None fields inside `error`, so unrelated exceptions
+    if response.error:
+        content["error"] = response.error.model_dump(exclude_none=True)
+
+    return JSONResponse(status_code=exc.status_code, content=content)
 
 
 def http_exception_handler(
