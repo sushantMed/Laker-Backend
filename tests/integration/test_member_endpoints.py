@@ -89,7 +89,6 @@ class TestGetMember:
 
         assert resp.status_code == 200, resp.json()
         body = resp.json()
-        print("Response body:", body)  # Debugging line
         assert body["success"] is True
         assert body["message"] == "Member retrieved successfully."
         assert body["data"]["memberId"] == "MBR001"
@@ -141,7 +140,6 @@ class TestSearchMembers:
             json={"searchRequest": {"lastName": "Nobody"}},
             headers=_auth_header(),
         )
-        print(resp)
         assert resp.status_code == 200
 
     async def test_search_excludes_termed_members_by_default(
@@ -291,7 +289,6 @@ class TestAddFamilyMember:
             json=self._body(relCode="03", covType="Dependent"),
             headers=_auth_header(),
         )
-        print(resp)
         assert resp.status_code == 201, resp.json()
         body = resp.json()
         assert body["data"]["firstName"] == "Jane"
