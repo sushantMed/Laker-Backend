@@ -53,6 +53,7 @@ class ClaimSummary(BaseModel):
 
     auth_num: str = Field(alias="authNum")
     date_filled: date = Field(alias="dateFilled")
+    date_written: date | None = Field(None, alias="dateWritten")
     member_id: str = Field(alias="memberId")
     first_name: str | None = Field(None, alias="firstName")
     last_name: str | None = Field(None, alias="lastName")
@@ -120,8 +121,8 @@ class ClaimSearch(BaseModel):
 
     member_id: str | None = Field(None, alias="memberId")
     auth_num: str | None = Field(None, alias="authNum")
-    date_filled_start: date | None = Field(None, alias="dateFilledStart")
-    date_filled_end: date | None = Field(None, alias="dateFilledEnd")
+    date_filled: date | None = Field(None, alias="endDate")
+    date_written: date | None = Field(None, alias="startDate")
 
     # Checked by default in the UI ("Exclude Test Claims")
     exclude_test_claims: bool = Field(True, alias="excludeTestClaims")
@@ -140,8 +141,8 @@ class ClaimSearch(BaseModel):
             [
                 self.member_id,
                 self.auth_num,
-                self.date_filled_start,
-                self.date_filled_end,
+                self.date_filled,
+                self.date_written,
             ]
         )
         if not has_any_criteria:
@@ -149,37 +150,37 @@ class ClaimSearch(BaseModel):
 
             raise NoSearchCriteriaException(
                 "At least one search criterion (memberId, authNum, "
-                "dateFilledStart, or dateFilledEnd) must be provided."
+                "startDate, or endDate) must be provided."
             )
 
-        if not self.member_id and not (self.date_filled_start and self.date_filled_end):
+        if not self.member_id and not (self.date_filled and self.date_written):
             from app.core.exceptions import NoSearchCriteriaException
 
             raise NoSearchCriteriaException(
-                "A full dateFilled range (dateFilledStart and dateFilledEnd) "
+                "A full dateFilled range (startDate and endDate) "
                 "is required when memberId is not provided."
             )
         return self
 
     @model_validator(mode="after")
     def validate_date_filled_range(self) -> ClaimSearch:
-        if self.date_filled_start and self.date_filled_end:
-            if self.date_filled_end < self.date_filled_start:
+        if self.date_filled and self.date_written:
+            if self.date_filled < self.date_written:
                 from app.core.exceptions import InvalidDateRangeException
 
                 raise InvalidDateRangeException(
-                    f"dateFilledEnd ({self.date_filled_end}) must be >= "
-                    f"dateFilledStart ({self.date_filled_start})."
+                    f"endDate ({self.date_filled}) must be >= "
+                    f"startDate ({self.date_written})."
                 )
 
-            span_days = (self.date_filled_end - self.date_filled_start).days
+            span_days = (self.date_filled - self.date_written).days
             if span_days > _MAX_DATE_RANGE_DAYS:
                 from app.core.exceptions import InvalidDateRangeException
 
                 raise InvalidDateRangeException(
                     "Date Filled range cannot exceed 12 months "
-                    f"(dateFilledStart={self.date_filled_start}, "
-                    f"dateFilledEnd={self.date_filled_end})."
+                    f"(endDate={self.date_filled}, "
+                    f"startDate={self.date_written})."
                 )
         return self
 
@@ -197,8 +198,8 @@ class ClaimSearchByMemberPath(BaseModel):
         json_schema_extra={
             "example": {
                 "authNum": None,
-                "dateFilledStart": None,
-                "dateFilledEnd": None,
+                "startDate": None,
+                "endDate": None,
                 "excludeTestClaims": True,
             }
         },
@@ -206,21 +207,21 @@ class ClaimSearchByMemberPath(BaseModel):
 
     # memberId intentionally excluded — comes from path param
     auth_num: str | None = None
-    date_filled_start: date | None = None
-    date_filled_end: date | None = None
+    date_filled: date | None = None
+    date_written: date | None = None
     exclude_test_claims: bool = True
 
     @model_validator(mode="after")
     def validate_date_filled_range(self) -> ClaimSearchByMemberPath:
-        if self.date_filled_start and self.date_filled_end:
-            if self.date_filled_end < self.date_filled_start:
+        if self.date_filled and self.date_written:
+            if self.date_written > self.date_filled:
                 from app.core.exceptions import InvalidDateRangeException
 
                 raise InvalidDateRangeException(
-                    f"dateFilledEnd ({self.date_filled_end}) must be >= "
-                    f"dateFilledStart ({self.date_filled_start})."
+                    f"endDate ({self.date_written}) must be >= "
+                    f"startDate ({self.date_filled})."
                 )
-            span_days = (self.date_filled_end - self.date_filled_start).days
+            span_days = (self.date_written - self.date_filled).days
             if span_days > _MAX_DATE_RANGE_DAYS:
                 from app.core.exceptions import InvalidDateRangeException
 
@@ -243,8 +244,8 @@ class ClaimSearchRequestByMemberPath(SearchRequest[ClaimSearchByMemberPath]):
             "example": {
                 "searchRequest": {
                     "authNum": None,
-                    "dateFilledStart": None,
-                    "dateFilledEnd": None,
+                    "startDate": None,
+                    "endDate": None,
                     "excludeTestClaims": True,
                 },
                 "sort": {"sortBy": "id", "sortDir": "ASC"},
