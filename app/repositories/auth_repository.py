@@ -18,7 +18,6 @@ class AuthRepository:
         return result.scalar_one_or_none()
 
     async def get_user_by_id(self, user_id: int) -> UserModel | None:
-        print(f"Got user_id: {user_id}")
         return await self.session.get(UserModel, user_id)
 
     async def save_refresh_token(self, token: RefreshTokenModel) -> RefreshTokenModel:

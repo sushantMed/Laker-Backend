@@ -346,7 +346,6 @@ class AuthService:
     async def resend_otp(self, login_session_id: str) -> LoginChallengeResponse:
         """Resend OTP to user email."""
         challenge = await self.otp_store.get(login_session_id)
-        print(challenge)
         if not challenge:
             raise InvalidOrExpiredOtpError()
 

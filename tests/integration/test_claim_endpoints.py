@@ -87,8 +87,6 @@ class TestSearchClaims:
             headers=_auth_header(),
         )
 
-        print(resp.json())
-
         assert resp.status_code == 200
         auth_nums = [r["authNum"] for r in resp.json()["data"]]
         assert "AUTH-SPECIFIC" in auth_nums
@@ -280,7 +278,6 @@ class TestGetClaim:
 
         assert resp.status_code == 200
         body = resp.json()
-        print(body)
         assert body["data"]["pharmacy"]["pharmacyNpi"] == "1111111111"
         assert body["data"]["pharmacy"]["pharmacyName"] == "Test Pharmacy"
         assert body["data"]["prescriber"]["prescriberNpi"] == "2222222222"
@@ -319,7 +316,6 @@ class TestGetClaim:
         )
 
         body = resp.json()
-        print(body)
         # Verify API surface uses camelCase keys
         assert body["data"]["authNum"] == "AUTH-CAMEL-01"
         assert body["data"]["memberId"] == "MBR001"
@@ -350,7 +346,6 @@ class TestSearchClaimsForMember:
             json={"searchRequest": {"excludeTestClaims": False}},
             headers=_auth_header(),
         )
-        print(resp.json())
         assert resp.status_code == 200
         assert resp.json()["data"][0]["memberId"] == "MBR-TARGET"
 
@@ -401,7 +396,6 @@ class TestSearchClaimsForMember:
             },
             headers=_auth_header(),
         )
-        print(resp.json())
         assert resp.status_code == 200
         auth_nums = [r["authNum"] for r in resp.json()["data"]]
         assert in_range.auth_num in auth_nums
@@ -423,7 +417,6 @@ class TestSearchClaimsForMember:
             json={"searchRequest": {}},
             headers=_auth_header(),
         )
-        print(resp.json())
         assert resp.status_code == 200
         auth_nums = [r["authNum"] for r in resp.json()["data"]]
         assert c1.auth_num in auth_nums
@@ -444,7 +437,6 @@ class TestSearchClaimsForMember:
             },
             headers=_auth_header(),
         )
-        print(resp.json())
         assert resp.status_code in (400, 422)
 
     async def test_member_search_end_before_start_returns_error(
@@ -460,7 +452,6 @@ class TestSearchClaimsForMember:
             },
             headers=_auth_header(),
         )
-        print(resp.json())
         assert resp.status_code in (400, 422)
 
 
