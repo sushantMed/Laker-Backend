@@ -50,8 +50,8 @@ class ClaimRepository:
         self,
         member_id: str | None = None,
         auth_num: str | None = None,
-        date_filled_start: date | None = None,
-        date_filled_end: date | None = None,
+        date_filled: date | None = None,
+        date_written: date | None = None,
         exclude_test_claims: bool = True,
         page: int = 1,
         page_size: int = 10,
@@ -63,10 +63,10 @@ class ClaimRepository:
             stmt = stmt.where(ClaimModel.member_id.ilike(member_id))
         if auth_num:
             stmt = stmt.where(ClaimModel.auth_num.ilike(auth_num))
-        if date_filled_start:
-            stmt = stmt.where(ClaimModel.date_filled >= date_filled_start)
-        if date_filled_end:
-            stmt = stmt.where(ClaimModel.date_filled <= date_filled_end)
+        if date_written:
+            stmt = stmt.where(ClaimModel.date_filled >= date_written)
+        if date_filled:
+            stmt = stmt.where(ClaimModel.date_filled <= date_filled)
         if exclude_test_claims:
             stmt = stmt.where(ClaimModel.is_test_claim == false())
 
@@ -98,8 +98,8 @@ class ClaimRepository:
     async def get_claims_by_pharmacy_nabp(
         self,
         nabp: str,
-        date_filled_start: date | None = None,
-        date_filled_end: date | None = None,
+        date_filled: date | None = None,
+        date_written: date | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> tuple[Sequence[ClaimModel], int]:
@@ -108,14 +108,14 @@ class ClaimRepository:
             .options(joinedload(ClaimModel.member))
             .where(ClaimModel.pharmacy_nabp == nabp)
         )
-        stmt = self._apply_date_range(stmt, date_filled_start, date_filled_end)
+        stmt = self._apply_date_range(stmt, date_filled, date_written)
         return await self._paginate(stmt, page, page_size, None, "desc")
 
     async def get_claims_by_prescriber_npi(
         self,
         npi: str,
-        date_filled_start: date | None = None,
-        date_filled_end: date | None = None,
+        date_filled: date | None = None,
+        date_written: date | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> tuple[Sequence[ClaimModel], int]:
@@ -124,14 +124,14 @@ class ClaimRepository:
             .options(joinedload(ClaimModel.member))
             .where(ClaimModel.prescriber_npi == npi)
         )
-        stmt = self._apply_date_range(stmt, date_filled_start, date_filled_end)
+        stmt = self._apply_date_range(stmt, date_filled, date_written)
         return await self._paginate(stmt, page, page_size, None, "desc")
 
     async def get_claims_by_drug_ndc(
         self,
         ndc: str,
-        date_filled_start: date | None = None,
-        date_filled_end: date | None = None,
+        date_filled: date | None = None,
+        date_written: date | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> tuple[Sequence[ClaimModel], int]:
@@ -140,7 +140,7 @@ class ClaimRepository:
             .options(joinedload(ClaimModel.member))
             .where(ClaimModel.ndc == ndc)
         )
-        stmt = self._apply_date_range(stmt, date_filled_start, date_filled_end)
+        stmt = self._apply_date_range(stmt, date_filled, date_written)
         return await self._paginate(stmt, page, page_size, None, "desc")
 
     # ── Mutations ────────────────────────────────────────────────────────────
@@ -159,13 +159,13 @@ class ClaimRepository:
     @staticmethod
     def _apply_date_range(
         stmt,
-        date_filled_start: date | None,
-        date_filled_end: date | None,
+        date_filled: date | None,
+        date_written: date | None,
     ):
-        if date_filled_start:
-            stmt = stmt.where(ClaimModel.date_filled >= date_filled_start)
-        if date_filled_end:
-            stmt = stmt.where(ClaimModel.date_filled <= date_filled_end)
+        if date_filled:
+            stmt = stmt.where(ClaimModel.date_filled >= date_filled)
+        if date_written:
+            stmt = stmt.where(ClaimModel.date_filled <= date_written)
         return stmt
 
     async def _paginate(

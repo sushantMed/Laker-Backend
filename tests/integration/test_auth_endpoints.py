@@ -194,7 +194,6 @@ class TestMe:
             f"{AUTH_BASE}/me",
             headers={"Authorization": "Bearer invalidtoken"},
         )
-        print(resp.json())
         assert resp.status_code == 401
         assert resp.json()["success"] is False
 
@@ -249,7 +248,6 @@ class TestMe:
             f"{AUTH_BASE}/me",
             headers={"Authorization": f"Bearer {token}"},
         )
-        print(resp.json())
         assert resp.status_code == 401
         assert resp.json()["success"] is False
 
@@ -270,8 +268,6 @@ class TestRefresh:
             f"{AUTH_BASE}/refresh",
             json={"refreshToken": refresh_token},
         )
-
-        print(resp.json())
 
         assert resp.status_code == 200
         assert resp.json()["success"] is True

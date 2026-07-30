@@ -64,6 +64,11 @@ class LoginChallengeResponse(BaseModel):
     loginSessionId: str
     otpRequired: bool = True
     expiresIn: int  # seconds
+    nextOtpResendTimeInSeconds: int | None = None  # seconds
+    otpVerificationAttemptsRemaining: int | None = (
+        None  # remaining OTP verification attempts
+    )
+    otpResendAttemptsRemaining: int | None = None  # remaining OTP resend attempts
 
 
 class VerifyOtpRequest(BaseModel):

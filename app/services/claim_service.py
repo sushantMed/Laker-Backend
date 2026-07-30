@@ -34,6 +34,7 @@ from app.schemas.claim_schema import (
     ClaimDetail,
     ClaimsByEntityQuery,
     ClaimSearchRequest,
+    ClaimSearchRequestByMemberPath,
     ClaimSummary,
     PharmacySummary,
     PrescriberSummary,
@@ -131,15 +132,15 @@ class ClaimService:
 
         Search-criteria validation (at least one criterion; date range
         required if memberId absent; max 12-month range) is enforced by
-        ClaimSearch's model_validators, not repeated here.
+        ClaimSearch's model_validators.
         """
         criteria = request.searchRequest
 
         items, total = await self._repo.search(
             member_id=criteria.member_id,
             auth_num=criteria.auth_num,
-            date_filled_start=criteria.date_filled_start,
-            date_filled_end=criteria.date_filled_end,
+            date_filled=criteria.date_filled,
+            date_written=criteria.date_written,
             exclude_test_claims=criteria.exclude_test_claims,
             page=request.pagination.page,
             page_size=request.pagination.page_size,
@@ -155,7 +156,7 @@ class ClaimService:
         )
 
     async def search_claims_for_member(
-        self, member_id: str, request: ClaimSearchRequest
+        self, member_id: str, request: ClaimSearchRequestByMemberPath
     ) -> PagedResponse[ClaimSummary]:
         """
         Same underlying query as C1, but memberId is taken from the path
@@ -171,8 +172,8 @@ class ClaimService:
         items, total = await self._repo.search(
             member_id=member_id,  # path param takes precedence over body
             auth_num=criteria.auth_num,
-            date_filled_start=criteria.date_filled_start,
-            date_filled_end=criteria.date_filled_end,
+            date_written=criteria.date_written,
+            date_filled=criteria.date_filled,
             exclude_test_claims=criteria.exclude_test_claims,
             page=request.pagination.page,
             page_size=request.pagination.page_size,
@@ -224,8 +225,8 @@ class ClaimService:
 
         items, total = await self._repo.get_claims_by_pharmacy_nabp(
             nabp,
-            date_filled_start=query.start_date,
-            date_filled_end=query.end_date,
+            date_written=query.start_date,
+            date_filled=query.end_date,
             page=query.page,
             page_size=query.page_size,
         )
@@ -245,8 +246,8 @@ class ClaimService:
 
         items, total = await self._repo.get_claims_by_prescriber_npi(
             npi,
-            date_filled_start=query.start_date,
-            date_filled_end=query.end_date,
+            date_written=query.start_date,
+            date_filled=query.end_date,
             page=query.page,
             page_size=query.page_size,
         )
@@ -266,8 +267,8 @@ class ClaimService:
 
         items, total = await self._repo.get_claims_by_drug_ndc(
             ndc,
-            date_filled_start=query.start_date,
-            date_filled_end=query.end_date,
+            date_written=query.start_date,
+            date_filled=query.end_date,
             page=query.page,
             page_size=query.page_size,
         )
