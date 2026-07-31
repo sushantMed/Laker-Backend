@@ -93,8 +93,12 @@ def test_grant_map_is_keyed_by_hyphenated_pername():
     ) == {
         "Memeber-Screen": ["save", "view"],
         "pricing": ["view"],
-        "web-accum": ["save"],
+        "web-accum": ["save", "view"],
     }
+
+
+def test_grant_map_reports_view_for_a_save_only_grant():
+    assert grant_map([("pricing", "N", "Y")]) == {"pricing": ["save", "view"]}
 
 
 def test_grant_map_omits_screens_with_no_flag_set():

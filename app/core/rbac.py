@@ -111,13 +111,14 @@ def grant_map(grants: Iterable[tuple[str, Any, Any]]) -> dict[str, list[str]]:
 
         {"Memeber-Screen": ["save", "view"], "pricing": ["view"]}
 
-    Screens with neither flag set are omitted. Unmapped screens are kept.
+    ``saveperm`` implies view, so a save grant reports both actions. Screens with
+    neither flag set are omitted. Unmapped screens are kept.
     """
     granted: dict[str, list[str]] = {}
     for pername, viewperm, saveperm in grants:
         flags = []
         if _is_granted(saveperm):
-            flags.append(SAVE)
+            flags.extend((SAVE, VIEW))
         if _is_granted(viewperm):
             flags.append(VIEW)
         if flags:
