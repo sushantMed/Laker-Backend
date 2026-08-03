@@ -19,7 +19,8 @@ from app.core.exceptions import (
     InvalidOrExpiredOtpError,
     OtpResendLimitExceedError,
     OtpResendRateLimitedError,
-    TooManyAttemptsError,
+    TooManyLoginAttemptsError,
+    TooManyOTPVerificationAttemptsError,
     UserInactiveError,
 )
 from app.core.security import (
@@ -237,9 +238,9 @@ class AuthService:
     refresh_token_expired: str = "Refresh token expired"
     unauthorized: str = "Unauthorized"
 
-    MAX_ATTEMPTS = 5
+    MAX_LOGIN_ATTEMPTS = 5
     WINDOW_SECONDS = 15 * 60  # 15 minutes
-    IP_MAX_ATTEMPTS = 30
+    IP_MAX_ATTEMPTS = 5
     IP_WINDOW_SECONDS = 15 * 60
 
     def __init__(
@@ -280,7 +281,7 @@ class AuthService:
           - OTP_ENABLED = False -> issue access/refresh tokens directly.
         """
         if await self._is_rate_limited(request.email, client_ip):
-            raise TooManyAttemptsError()
+            raise TooManyLoginAttemptsError()
 
         user = await self.repo.get_user_by_email(request.email)
 
@@ -316,7 +317,7 @@ class AuthService:
 
         if challenge.attempts >= MAX_OTP_VERIFICATION_ATTEMPTS:
             await self.otp_store.delete(request.loginSessionId)
-            raise TooManyAttemptsError()
+            raise TooManyOTPVerificationAttemptsError()
 
         candidate_hash = _hash_otp(
             request.otp, request.loginSessionId, self.otp_secret, user.email
@@ -327,7 +328,7 @@ class AuthService:
             remaining = max(MAX_OTP_VERIFICATION_ATTEMPTS - attempts, 0)
             if attempts >= MAX_OTP_VERIFICATION_ATTEMPTS:
                 await self.otp_store.delete(request.loginSessionId)
-                raise TooManyAttemptsError()
+                raise TooManyOTPVerificationAttemptsError()
             logger.info(
                 "OTP verification failed for session=%s, attempts_used=%s, remaining=%s",
                 request.loginSessionId,
@@ -464,7 +465,7 @@ class AuthService:
     async def _is_rate_limited(self, email: str, client_ip: str | None) -> bool:
         email_key = f"login_attempts:email:{email.lower()}"
         attempts = await self.redis.get(email_key)
-        if attempts is not None and int(attempts) >= self.MAX_ATTEMPTS:
+        if attempts is not None and int(attempts) >= self.MAX_LOGIN_ATTEMPTS:
             return True
 
         if client_ip:
