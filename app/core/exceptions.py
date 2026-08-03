@@ -102,10 +102,19 @@ class UserInactiveError(AppException):
         super().__init__(status_code=403, message=detail)
 
 
-class TooManyAttemptsError(AppException):
+class TooManyLoginAttemptsError(AppException):
     def __init__(
         self,
-        detail: str = "Maximum OTP attempts exceeded. Please login again to request a new OTP.",
+        detail: str = "Too many login attempts.Please try after 15 minutes.",
+        attempts_remaining: int | None = None,
+    ):
+        super().__init__(status_code=429, message=detail)
+
+
+class TooManyOTPVerificationAttemptsError(AppException):
+    def __init__(
+        self,
+        detail: str = "Maximum OTP verification attempts exceeded. Please login again to request a new OTP.",
         attempts_remaining: int | None = None,
     ):
         super().__init__(status_code=429, message=detail)
