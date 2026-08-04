@@ -88,24 +88,36 @@ class NotFoundException(AppException):
 
 
 class UserNotFoundError(AppException):
-    def __init__(self, detail: str = "User not found"):
+    def __init__(self, detail: str = "User not found."):
         super().__init__(status_code=404, message=detail)
 
 
 class InvalidCredentialsError(AppException):
-    def __init__(self, detail: str = "Invalid email or password"):
+    def __init__(self, detail: str = "Invalid username or password."):
         super().__init__(status_code=401, message=detail)
 
 
 class UserInactiveError(AppException):
-    def __init__(self, detail: str = "Account is inactive"):
+    def __init__(
+        self,
+        detail: str = "Your account is inactive. Please contact the administrator.",
+    ):
         super().__init__(status_code=403, message=detail)
 
 
-class TooManyAttemptsError(AppException):
+class TooManyLoginAttemptsError(AppException):
     def __init__(
         self,
-        detail: str = "Maximum OTP attempts exceeded. Please login again to request a new OTP.",
+        detail: str = "Too many login attempts.Please try after 15 minutes.",
+        attempts_remaining: int | None = None,
+    ):
+        super().__init__(status_code=429, message=detail)
+
+
+class TooManyOTPVerificationAttemptsError(AppException):
+    def __init__(
+        self,
+        detail: str = "Maximum OTP verification attempts exceeded. Please login again to request a new OTP.",
         attempts_remaining: int | None = None,
     ):
         super().__init__(status_code=429, message=detail)
