@@ -4,27 +4,55 @@
     "first_name": "Admin",
     "last_name": "User",
     "password": "Admin@123",
-    "role": "admin"
+    "_comment": "'*' grants every screen in PERNAME_RESOURCES with both actions.",
+    "permissions": "*"
   },
   {
     "email": "user@example.com",
     "first_name": "Test",
     "last_name": "User",
     "password": "User@123",
-    "role": "user"
+    "permissions": {
+      "Memeber Screen": ["view", "save"],
+      "Paid claim lookup screen": ["view"],
+      "groups screen": ["view"],
+      "drug lookup screen": ["view"]
+    }
   },
   {
     "email": "sushant.sinha@businessonetech.com",
     "first_name": "Sushant",
     "last_name": "Sinha",
     "password": "Sus@12345",
-    "role": "user"
+    "permissions": {
+      "Memeber Screen": ["view"],
+      "Paid claim lookup screen": ["view"],
+      "groups screen": ["view"],
+      "drug lookup screen": ["view"]
+    }
+  },
+  {
+    "email": "dhanush@hotmail.com",
+    "first_name": "Dhanush",
+    "last_name": "User",
+    "password": "Dhanush#123",
+    "permissions": {
+      "Memeber Screen": ["view"],
+      "Paid claim lookup screen": ["view"],
+      "groups screen": ["view"],
+      "drug lookup screen": ["view"]
+    }
   },
   {
     "email": "sushant1058jan@gmail.com",
     "first_name": "Sushant",
     "last_name": "Sinha",
     "password": "Sus@12345",
-    "role": "user"
+    "permissions": {
+      "Memeber Screen": ["view"],
+      "Paid claim lookup screen": ["view"],
+      "groups screen": ["view"],
+      "drug lookup screen": ["view"]
+    }
   }
 ]

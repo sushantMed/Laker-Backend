@@ -40,6 +40,7 @@ from app.core.exceptions import (
     generic_error_handler,
 )
 from app.core.logging import setup_logging
+from app.core.rbac import validate_permission_catalog
 from app.middleware.correlation_id import CorrelationIdMiddleware
 from app.middleware.logging import LoggingMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -54,6 +55,7 @@ from app.schemas.common_schema import ApiResponse
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
+    validate_permission_catalog()
     yield
     await close_redis()
     engine = globals().get("engine")

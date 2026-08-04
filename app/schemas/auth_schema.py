@@ -32,12 +32,12 @@ class UserProfile(BaseModel):
     firstName: str
     lastName: str
     email: str
-    role: str
     initials: str
     status: str
     lastLogin: datetime | None = None
     createdAt: datetime | None = None
-    permissions: list[str]
+    # {screen: [actions]}, e.g. {"Memeber-Screen": ["save", "view"]}
+    permissions: dict[str, list[str]]
 
 
 class LoginResponse(BaseModel):

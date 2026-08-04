@@ -11,8 +11,10 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from app.core.rbac import PERNAME_RESOURCES, SAVE, VIEW
 from app.core.security import hash_password
 from app.database.session import AsyncSessionLocal
+from app.models.permission_model import UserPermissionModel
 from app.models.user_model import UserModel
 
 # For mocking in the db
@@ -30,6 +32,25 @@ def load_users(json_file):
         raise ValueError(f"{json_file} is empty")
 
     return json.loads(content)
+
+
+def _grants_for(spec) -> list[UserPermissionModel]:
+    """Turn a users.json ``permissions`` block into user_permissions rows.
+
+    ``"*"`` means every known screen with both actions; otherwise it is the same
+    ``{pername: [actions]}`` shape /auth/me returns.
+    """
+    if spec == "*":
+        spec = {p: [VIEW, SAVE] for p in PERNAME_RESOURCES}
+
+    return [
+        UserPermissionModel(
+            pername=pername,
+            viewperm="Y" if VIEW in flags else "N",
+            saveperm="Y" if SAVE in flags else "N",
+        )
+        for pername, flags in spec.items()
+    ]
 
 
 async def seed_users():
@@ -62,8 +83,8 @@ async def seed_users():
                 first_name=user_data["first_name"],
                 last_name=user_data["last_name"],
                 hashed_password=hash_password(user_data["password"]),
-                role=user_data.get("role", "user"),
                 status="ACTIVE",
+                grants=_grants_for(user_data.get("permissions", {})),
             )
 
             session.add(user)

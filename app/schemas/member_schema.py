@@ -160,6 +160,7 @@ class MemberSearch(BaseModel):
 
     search_by_prev_card_id: bool = Field(False, alias="searchByPrevCardId")
     include_termed_members: bool = Field(False, alias="includeTermedMembers")
+    sort_dir: str = Field("desc", alias="sortDir")
 
     @field_validator(
         "carrier", "member_id", "first_name", "last_name", "mi", mode="before"

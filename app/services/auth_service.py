@@ -22,6 +22,7 @@ from app.core.exceptions import (
     TooManyLoginAttemptsError,
     TooManyOTPVerificationAttemptsError,
     UserInactiveError,
+    UserNotFoundError,
 )
 from app.core.security import (
     create_access_token,
@@ -233,10 +234,13 @@ def _is_valid_otp_format(otp: str) -> bool:
 
 
 class AuthService:
-    credentials_invalid: str = "Invalid credentials"
-    refresh_token_invalid: str = "Invalid refresh token"
-    refresh_token_expired: str = "Refresh token expired"
-    unauthorized: str = "Unauthorized"
+    credentials_invalid: str = "Invalid username or password."
+    refresh_token_invalid: str = "Invalid refresh token."
+    refresh_token_expired: str = "Refresh token has expired. Please log in again."
+    refresh_token_revoked: str = (
+        "Refresh token is no longer valid. Please log in again."
+    )
+    token_invalid: str = "Invalid authentication token."
 
     MAX_LOGIN_ATTEMPTS = 3
     WINDOW_SECONDS = 15 * 60  # 15 minutes
@@ -437,7 +441,6 @@ class AuthService:
         access_token, _, expires_in = create_access_token(
             subject=str(user.id),
             email=user.email,
-            role=user.role,
         )
         refresh_token = await self._create_refresh_token(user)
 
@@ -501,7 +504,7 @@ class AuthService:
             # FIX: don't let a malformed/tampered token throw a raw 500 —
             # logout is idempotent from the caller's point of view.
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.token_invalid
             ) from None
 
         await self.repo.revoke_user_refresh_tokens(user_id)
@@ -530,6 +533,7 @@ class AuthService:
             )
         consumed = await self.repo.consume_refresh_token_atomic(presented_hash)
         if consumed is None:
+            # Row exists and hasn't expired, so it was already spent or revoked.
             if current.family_id:
                 await self.repo.revoke_refresh_family(current.family_id)
             logger.warning(
@@ -537,7 +541,7 @@ class AuthService:
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=self.refresh_token_invalid,
+                detail=self.refresh_token_revoked,
             )
 
         user = await self.repo.get_user_by_id(consumed.user_id)
@@ -553,7 +557,6 @@ class AuthService:
         access_token, _, expires_in = create_access_token(
             subject=str(user.id),
             email=user.email,
-            role=user.role,
         )
         return RefreshResponse(
             accessToken=access_token,
@@ -572,19 +575,18 @@ class AuthService:
         except Exception:
             # FIX: any decode/parse failure -> clean 401, not a 500.
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.token_invalid
             ) from None
 
         if await self.repo.is_access_token_revoked(token_hash(access_token)):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.token_invalid
             )
-
         user = await self.repo.get_user_by_id(user_id)
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=self.unauthorized
-            )
+            raise UserNotFoundError()
+        if user.status != "ACTIVE":
+            raise UserInactiveError("User account is inactive.")
         return user
 
     # ── Private helpers ─────────────────────────────────────────────────
@@ -614,24 +616,7 @@ class AuthService:
             firstName=user.first_name,
             lastName=user.last_name,
             email=user.email,
-            role=user.role,
             initials=f"{first}{last}".upper(),
             status=user.status,
-            permissions=AuthService._permissions(user.role),
+            permissions=user.grant_map,
         )
-
-    @staticmethod
-    def _permissions(role: str) -> list[str]:
-        _map = {
-            "superadmin": [
-                "users:read",
-                "users:write",
-                "members:read",
-                "claims:read",
-                "auth:read",
-            ],
-            "admin": ["users:read", "members:read", "claims:read", "auth:read"],
-            "readonly": ["members:read", "claims:read"],
-            "user": ["members:read", "claims:read"],
-        }
-        return _map.get(role, ["members:read", "claims:read"])

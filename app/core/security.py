@@ -38,13 +38,14 @@ def verify_password(password: str, stored_hash: str) -> bool:
 # ── JWT ───────────────────────────────────────────────────────────────────────
 
 
-def create_access_token(*, subject: str, email: str, role: str) -> tuple[str, str, int]:
+def create_access_token(*, subject: str, email: str) -> tuple[str, str, int]:
+    # No permissions in the token: they're read from user_permissions on each
+    # request, so revoking a grant takes effect immediately instead of at expiry.
     now = int(time.time())
     jti = secrets.token_urlsafe(16)
     payload = {
         "sub": subject,
         "email": email,
-        "role": role,
         "jti": jti,
         "iat": now,
         "exp": now + ACCESS_TOKEN_EXPIRE_SECONDS,
@@ -59,14 +60,19 @@ def decode_access_token(token: str, *, verify_exp: bool = True) -> dict[str, Any
         if not hmac.compare_digest(signature, expected):
             raise ValueError("Invalid token signature")
         claims = json.loads(_b64decode(payload))
-        if verify_exp and int(claims["exp"]) < int(time.time()):
-            raise ValueError("Token expired")
-        return claims
+        expired = int(claims["exp"]) < int(time.time())
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized",
+            detail="Invalid authentication token.",
         ) from exc
+
+    if verify_exp and expired:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token has expired.",
+        )
+    return claims
 
 
 def token_expires_at(token: str) -> datetime:
