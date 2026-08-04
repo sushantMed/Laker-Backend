@@ -52,10 +52,10 @@ logger = logging.getLogger("auth_service")
 # ---------------------------------------------------------------------------
 
 OTP_TTL_SECONDS = 1800  # 30 minutes
-MAX_OTP_VERIFICATION_ATTEMPTS = 5
+MAX_OTP_VERIFICATION_ATTEMPTS = 3
 OTP_RESEND_COOLDOWN_SECONDS = 120  # 2 mins
 OTP_LENGTH = 6
-MAX_OTP_RESEND_ATTEMPTS = 5
+MAX_OTP_RESEND_ATTEMPTS = 3
 
 OTP_KEY_PREFIX = "otp:challenge:"
 OTP_RESEND_COOLDOWN_PREFIX = "otp:cooldown:"
@@ -238,9 +238,9 @@ class AuthService:
     refresh_token_expired: str = "Refresh token expired"
     unauthorized: str = "Unauthorized"
 
-    MAX_LOGIN_ATTEMPTS = 5
+    MAX_LOGIN_ATTEMPTS = 3
     WINDOW_SECONDS = 15 * 60  # 15 minutes
-    IP_MAX_ATTEMPTS = 5
+    IP_MAX_ATTEMPTS = 3
     IP_WINDOW_SECONDS = 15 * 60
 
     def __init__(
