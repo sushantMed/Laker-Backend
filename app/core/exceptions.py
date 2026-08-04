@@ -59,6 +59,13 @@ class AppException(Exception):
         self.status_code = status_code
         super().__init__(message)
 
+    @property
+    def extra(self) -> dict:
+        """Optional additional fields to merge into the error response.
+        Subclasses override this to expose extra context (e.g. attemptsRemaining).
+        Defaults to empty so unrelated exceptions are unaffected."""
+        return {}
+
 
 class AuthException(AppException):
     def __init__(self, message: str = "Unauthorized"):
@@ -98,9 +105,20 @@ class UserInactiveError(AppException):
         super().__init__(status_code=403, message=detail)
 
 
-class TooManyAttemptsError(AppException):
+class TooManyLoginAttemptsError(AppException):
     def __init__(
-        self, detail: str = "Too many failed login attempts. Please try again later."
+        self,
+        detail: str = "Too many login attempts.Please try after 15 minutes.",
+        attempts_remaining: int | None = None,
+    ):
+        super().__init__(status_code=429, message=detail)
+
+
+class TooManyOTPVerificationAttemptsError(AppException):
+    def __init__(
+        self,
+        detail: str = "Maximum OTP verification attempts exceeded. Please login again to request a new OTP.",
+        attempts_remaining: int | None = None,
     ):
         super().__init__(status_code=429, message=detail)
 
@@ -108,12 +126,30 @@ class TooManyAttemptsError(AppException):
 class InvalidOrExpiredOtpError(AppException):
     """Used for both 'wrong OTP' and 'expired/not found' — don't leak which."""
 
-    def __init__(self, detail: str = "Invalid or expired OTP"):
+    def __init__(
+        self,
+        detail: str = "Invalid or expired OTP.",
+        otp_verification_attempts_remaining: int | None = None,
+    ):
+        self.otp_verification_attempts_remaining = otp_verification_attempts_remaining
         super().__init__(status_code=401, message=detail)
 
 
 class OtpResendRateLimitedError(AppException):
-    def __init__(self, detail: str = "OTP resend rate limited"):
+    def __init__(
+        self,
+        detail: str = "Maximum OTP resend rate exceeded. Please wait before trying again.",
+    ):
+        super().__init__(status_code=429, message=detail)
+
+
+class OtpResendLimitExceedError(AppException):
+    def __init__(
+        self,
+        detail: str = "Maximum OTP resend attempts exceeded. Please login again to request a new OTP.",
+        otp_resend_attempts_remaining: int = 0,
+    ):
+        self.otp_resend_attempts_remaining = otp_resend_attempts_remaining
         super().__init__(status_code=429, message=detail)
 
 

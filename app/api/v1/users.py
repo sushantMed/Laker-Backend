@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.permissions import Perm, require
 from app.dependencies.auth import get_current_user
 from app.models.user_model import UserModel
-from app.schemas.auth_schema import ApiResponse, UserProfile
+from app.schemas.auth_schema import UserProfile
+from app.schemas.common_schema import ApiResponse
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -17,19 +18,12 @@ router = APIRouter(prefix="/users", tags=["Users"])
 async def get_me(
     current_user: UserModel = Depends(get_current_user),
 ) -> ApiResponse[UserProfile]:
-    try:
-        data = AuthService._profile(current_user)
+    data = AuthService._profile(current_user)
 
-        return ApiResponse.ok(
-            data,
-            message="User profile retrieved successfully",
-        )
-
-    except ValueError as e:
-        return ApiResponse.fail(
-            message="Invalid user profile data",
-            errors=[str(e)],
-        )
+    return ApiResponse.ok(
+        data=data,
+        message="User profile retrieved successfully",
+    )
 
 
 @router.get(
@@ -42,23 +36,13 @@ async def get_user(
     user_id: int,
     current_user: UserModel = Depends(get_current_user),
 ) -> ApiResponse[UserProfile]:
-    try:
-        if current_user.id != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found",
-            )
-
-        return ApiResponse.ok(
-            AuthService._profile(current_user),
-            message="User profile retrieved successfully",
+    if current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
         )
 
-    except HTTPException:
-        raise
-
-    except ValueError as e:
-        return ApiResponse.fail(
-            message="Invalid user profile data",
-            errors=[str(e)],
-        )
+    return ApiResponse.ok(
+        data=AuthService._profile(current_user),
+        message="User profile retrieved successfully",
+    )

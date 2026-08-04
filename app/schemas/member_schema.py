@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from app.schemas.common_schema import SearchRequest
 from app.utils.enums import CoverageType, FamilyRole, Gender, MemberStatus, RelCode
@@ -161,6 +161,16 @@ class MemberSearch(BaseModel):
     search_by_prev_card_id: bool = Field(False, alias="searchByPrevCardId")
     include_termed_members: bool = Field(False, alias="includeTermedMembers")
     sort_dir: str = Field("desc", alias="sortDir")
+
+    @field_validator(
+        "carrier", "member_id", "first_name", "last_name", "mi", mode="before"
+    )
+    @classmethod
+    def strip_and_blank_to_none(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        return v or None
 
     @model_validator(mode="after")
     def at_least_one_criterion(self) -> MemberSearch:

@@ -125,12 +125,12 @@ class TestLogin:
         assert resp.status_code == 200
 
     async def test_login_success_response_shape(
-        self, raw_client: AsyncClient, seeded_user: dict
+        self, raw_client: AsyncClient, seeded_user: dict, otp_enabled
     ):
         resp = await raw_client.post(f"{AUTH_BASE}/login", json=seeded_user)
         body = resp.json()
         assert body["success"] is True
-        assert body["message"] == "OTP send succssfully to your email"
+        assert body["message"] == "OTP sent successfully to your email"
         assert "data" in body
 
     async def test_login_returns_access_and_refresh_tokens(
@@ -307,8 +307,6 @@ class TestRefresh:
             f"{AUTH_BASE}/refresh",
             json={"refreshToken": refresh_token},
         )
-
-        print(resp.json())
 
         assert resp.status_code == 200
         assert resp.json()["success"] is True
