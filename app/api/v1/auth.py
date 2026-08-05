@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +25,23 @@ from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 bearer = HTTPBearer()
+# Auth endpoints handle the missing-token case themselves so they can return a
+# 401 instead of the default 403.
+_optional_bearer = HTTPBearer(auto_error=False)
+
+
+def get_bearer_token(
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(_optional_bearer)
+    ],
+) -> str:
+    """Extract the bearer token, returning 401 when it is missing."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token is missing.",
+        )
+    return credentials.credentials
 
 
 @router.post(
@@ -60,15 +77,16 @@ async def login(
 
 @router.post(
     "/logout",
-    status_code=status.HTTP_204_NO_CONTENT,
+    status_code=status.HTTP_200_OK,
     summary="Revoke current access + refresh tokens",
 )
 async def logout(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    token: Annotated[str, Depends(get_bearer_token)],
     session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
-) -> None:
-    await AuthService(session, redis).logout(credentials.credentials)
+) -> ApiResponse[None]:
+    await AuthService(session, redis).logout(token)
+    return ApiResponse.ok(None, message="Logout successful.")
 
 
 @router.post(
@@ -81,7 +99,7 @@ async def refresh(
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> ApiResponse[RefreshResponse]:
     data = await AuthService(session, redis).refresh(body)
-    return ApiResponse.ok(data, message="Token refresh successful")
+    return ApiResponse.ok(data, message="Token refreshed successfully.")
 
 
 @router.get(
@@ -89,11 +107,11 @@ async def refresh(
     summary="Return the profile of the authenticated user",
 )
 async def me(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+    token: Annotated[str, Depends(get_bearer_token)],
     session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> ApiResponse[UserProfile]:
-    data = await AuthService(session, redis).me(credentials.credentials)
+    data = await AuthService(session, redis).me(token)
     return ApiResponse.ok(data, message="User profile retrieved successfully")
 
 

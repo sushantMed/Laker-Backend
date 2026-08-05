@@ -5,6 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import RequireUser
+from app.core.rbac import Perm
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user_model import UserModel
@@ -22,7 +24,7 @@ router = APIRouter(prefix="/drugs", tags=["Drugs"])
 @router.post("/search", response_model=PagedApiResponse[DrugInfo])
 async def search_drugs(
     request: DrugSearchRequest,
-    current_user: Annotated[UserModel, Depends(get_current_user)],
+    current_user: RequireUser(Perm.DRUG_VIEW),
     session: AsyncSession = Depends(get_db),
 ) -> PagedApiResponse[DrugInfo]:
     data = await DrugService(session).search_drugs(request)
