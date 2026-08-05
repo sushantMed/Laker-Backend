@@ -9,6 +9,7 @@ HTTP status mapping is the controller's responsibility.
 from __future__ import annotations
 
 import hashlib
+from asyncio.log import logger
 from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -142,6 +143,7 @@ class MemberService:
         member_id = member_id.strip()
         cached = await self._cache.get(member_id, MemberDetail)
         if cached:
+            logger.info(f"CACHE HIT for member_id={member_id}")
             return cached
 
         member = await self._repo.get_by_member_id(member_id)
@@ -150,6 +152,8 @@ class MemberService:
 
         detail = _to_member_detail(member)
         await self._cache.set(member_id, detail)
+        logger.info(f"CACHE MISS for member_id={member_id}")
+
         return detail
 
     # ── Search ───────────────────────────────────────────────────────────────
@@ -160,6 +164,7 @@ class MemberService:
         cache_key = self._search_cache_key(request)
         cached = await self._cache.get(cache_key, PagedResponse[MemberSummary])
         if cached:
+            logger.info(f"CACHE HIT for search query={cache_key}")
             return cached
 
         items, total = await self._repo.search(
