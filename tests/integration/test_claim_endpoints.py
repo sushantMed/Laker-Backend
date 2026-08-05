@@ -22,7 +22,7 @@ Test strategy
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from httpx import AsyncClient  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
@@ -319,7 +319,7 @@ class TestGetClaim:
         # Verify API surface uses camelCase keys
         assert body["data"]["authNum"] == "AUTH-CAMEL-01"
         assert body["data"]["memberId"] == "MBR001"
-        assert body["data"]["dateFilled"] == "2024-05-20"
+        assert body["data"]["endDate"] == "2024-05-20"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -552,3 +552,37 @@ class TestGetClaimsForMember:
         resp = await client.get(self._url("MBR-MSG-01"), headers=_auth_header())
 
         assert resp.json()["message"] == "Claims retrieved successfully."
+
+
+class TestGetRecentClaimsForMember:
+    """Tests for GET /api/v1/members/{memberId}/recent-claims"""
+
+    def _url(self, memberId: str) -> str:
+        return f"{BASE_PATH}/members/{memberId}/recent-claims"
+
+    async def test_returns_only_claims_within_90_days(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        db_session.add(_make_member(member_id="MBR-RECENT-01"))
+        await db_session.flush()
+
+        recent_claim = _make_claim(
+            member_id="MBR-RECENT-01",
+            auth_num="AUTH-RECENT-01",
+            date_filled=date.today() - timedelta(days=30),
+        )
+        older_claim = _make_claim(
+            member_id="MBR-RECENT-01",
+            auth_num="AUTH-OLD-01",
+            date_filled=date.today() - timedelta(days=100),
+        )
+        await _seed(db_session, recent_claim, older_claim)
+
+        resp = await client.get(self._url("MBR-RECENT-01"), headers=_auth_header())
+
+        assert resp.status_code == 200
+        body = resp.json()
+        auth_nums = [r["authNum"] for r in body["data"]]
+        assert "AUTH-RECENT-01" in auth_nums
+        assert "AUTH-OLD-01" not in auth_nums
+        assert body["message"] == "Recent claims retrieved successfully."

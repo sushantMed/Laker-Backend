@@ -14,6 +14,8 @@ a search and isn't listed as an error response for those routes.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cache.cache_service import CacheService
@@ -39,60 +41,61 @@ from app.schemas.claim_schema import (
     PharmacySummary,
     PrescriberSummary,
 )
-from app.utils.pagination import PagedResponse, PaginationRequest
+from app.utils.pagination import PagedResponse
 
 
 def _to_claim_summary(c: ClaimModel) -> ClaimSummary:
     return ClaimSummary(
-        authNum=c.auth_num,
-        dateFilled=c.date_filled,
-        memberId=c.member_id,
-        firstName=c.member.first_name if c.member else None,
-        lastName=c.member.last_name if c.member else None,
-        rxNumber=c.rx_number,
+        auth_num=c.auth_num,
+        date_filled=c.date_filled,
+        date_written=c.date_written,
+        member_id=c.member_id,
+        first_name=c.member.first_name if c.member else None,
+        last_name=c.member.last_name if c.member else None,
+        rx_number=c.rx_number,
         drug=c.drug_name,
         ndc=c.ndc,
-        isTestClaim=c.is_test_claim,
+        is_test_claim=c.is_test_claim,
     )
 
 
 def _to_claim_detail(c: ClaimModel) -> ClaimDetail:
     return ClaimDetail(
-        claimId=c.claim_id,
-        authNum=c.auth_num,
-        memberId=c.member_id,
-        firstName=c.member.first_name if c.member else None,
-        lastName=c.member.last_name if c.member else None,
-        rxNumber=c.rx_number,
+        claim_id=c.claim_id,
+        auth_num=c.auth_num,
+        member_id=c.member_id,
+        first_name=c.member.first_name if c.member else None,
+        last_name=c.member.last_name if c.member else None,
+        rx_number=c.rx_number,
         drug=c.drug_name,
         ndc=c.ndc,
-        dateFilled=c.date_filled,
-        dateWritten=c.date_written,
+        date_filled=c.date_filled,
+        date_written=c.date_written,
         quantity=c.quantity,
-        daysSupply=c.days_supply,
-        refillsRemaining=c.refills_remaining,
+        days_supply=c.days_supply,
+        refills_remaining=c.refills_remaining,
         pharmacy=(
             PharmacySummary(
-                pharmacyNpi=c.pharmacy_npi,
-                pharmacyName=c.pharmacy_name,
+                pharmacy_npi=c.pharmacy_npi,
+                pharmacy_name=c.pharmacy_name,
             )
             if c.pharmacy_npi or c.pharmacy_name
             else None
         ),
         prescriber=(
             PrescriberSummary(
-                prescriberNpi=c.prescriber_npi,
-                prescriberName=c.prescriber_name,
+                prescriber_npi=c.prescriber_npi,
+                prescriber_name=c.prescriber_name,
             )
             if c.prescriber_npi or c.prescriber_name
             else None
         ),
-        ingredientCost=c.ingredient_cost,
-        dispensingFee=c.dispensing_fee,
+        ingredient_cost=c.ingredient_cost,
+        dispensing_fee=c.dispensing_fee,
         copay=c.copay,
-        totalPaid=c.total_paid,
-        isTestClaim=c.is_test_claim,
-        planId=c.plan_id,
+        total_paid=c.total_paid,
+        is_test_claim=c.is_test_claim,
+        plan_id=c.plan_id,
     )
 
 
@@ -188,29 +191,35 @@ class ClaimService:
             total=total,
         )
 
-    async def get_claims_for_member(
+    async def get_claims_for_member[T](
         self,
         member_id: str,
-        request: PaginationRequest,
+        request: ClaimsByEntityQuery,
+        transform: Callable[[ClaimModel], T],
         exclude_test_claims: bool = True,
-    ) -> PagedResponse[ClaimSummary]:
+    ) -> PagedResponse[T]:
         """
-        Return the claim history for a single member.
-        Validates the member exists before querying claims, mirroring
-        the subscriber check used when pulling a family unit.
+        Return claims for a member.
+
+        The caller provides a mapper that converts each ClaimModel into the
+        desired response DTO (e.g. ClaimSummary, ClaimDetail).
         """
+
         member = await self._member_repo.get_by_member_id(member_id)
         if not member:
             raise MemberNotFoundException(f"Member '{member_id}' not found.")
 
         items, total = await self._repo.get_claims_by_member_id(
-            member_id,
+            member_id=member_id,
             exclude_test_claims=exclude_test_claims,
+            date_filled=request.start_date,
+            date_written=request.end_date,
             page=request.page,
             page_size=request.page_size,
         )
+
         return PagedResponse.of(
-            data=[_to_claim_summary(c) for c in items],
+            data=[transform(item) for item in items],
             page=request.page,
             page_size=request.page_size,
             total=total,
