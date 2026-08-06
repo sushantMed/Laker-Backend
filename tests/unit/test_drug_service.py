@@ -24,7 +24,6 @@ def make_drug(
     brand_generic: BrandGeneric = BrandGeneric.GENERIC,
     maintenance: Maintenance = Maintenance.YES,
     desi: str | None = None,
-    tier: int | None = 1,
     formulary_status: str | None = "PREFERRED",
     repackage_ind: bool = False,
 ) -> DrugModel:
@@ -35,7 +34,6 @@ def make_drug(
         brand_generic=brand_generic,
         maintenance=maintenance,
         desi=desi,
-        tier=tier,
         formulary_status=formulary_status,
         repackage_ind=repackage_ind,
     )
@@ -50,7 +48,7 @@ def service() -> DrugService:
 
 
 def test_to_drug_info_maps_all_fields():
-    drug = make_drug(desi="5", tier=3, formulary_status="NON_PREFERRED")
+    drug = make_drug(desi="5", formulary_status="NON_PREFERRED")
     info = _to_drug_info(drug)
 
     assert isinstance(info, DrugInfo)
@@ -60,17 +58,15 @@ def test_to_drug_info_maps_all_fields():
     assert info.brand_generic == BrandGeneric.GENERIC
     assert info.maintenance == Maintenance.YES
     assert info.desi == "5"
-    assert info.tier == 3
     assert info.formulary_status == "NON_PREFERRED"
     assert info.repackage_ind is False
 
 
 def test_to_drug_info_handles_optional_nones():
-    drug = make_drug(desi=None, tier=None, formulary_status=None)
+    drug = make_drug(desi=None, formulary_status=None)
     info = _to_drug_info(drug)
 
     assert info.desi is None
-    assert info.tier is None
     assert info.formulary_status is None
 
 

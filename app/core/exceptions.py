@@ -196,6 +196,11 @@ class MissingSearchCriteriaException(AppException):
         super().__init__(message, status_code=400)
 
 
+class InvalidSearchCriteriaException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=400)
+
+
 class DrugNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)

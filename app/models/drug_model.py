@@ -3,7 +3,6 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Integer,
     String,
     func,
 )
@@ -33,7 +32,6 @@ class DrugModel(Base):
     )
 
     desi: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    tier: Mapped[int | None] = mapped_column(Integer, nullable=True)
     formulary_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
     repackage_ind: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 

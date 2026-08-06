@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.exceptions import MissingSearchCriteriaException
+from app.core.exceptions import (
+    InvalidSearchCriteriaException,
+    MissingSearchCriteriaException,
+)
 from app.schemas.drug_schema import DrugSearch
 from app.schemas.pharmacy_schema import PharmacySearch
 from app.schemas.prescriber_schema import PrescriberSearch
@@ -25,10 +28,19 @@ def test_drug_search_requires_at_least_one_criterion():
         DrugSearch()
 
 
-@pytest.mark.parametrize("tier", [0, 6])
-def test_drug_search_rejects_out_of_range_tier(tier):
-    with pytest.raises(Exception):
-        DrugSearch(tier=tier)
+@pytest.mark.parametrize("ndc", ["12345678", "123456789012"])
+def test_drug_search_rejects_out_of_range_ndc_length(ndc):
+    with pytest.raises(InvalidSearchCriteriaException):
+        DrugSearch(ndc=ndc)
+
+
+def test_drug_search_pads_nine_digit_ndc():
+    assert DrugSearch(ndc="093721410").ndc == "00093721410"
+
+
+@pytest.mark.parametrize("ndc", ["0093721410", "00093721410"])
+def test_drug_search_keeps_longer_ndc_as_is(ndc):
+    assert DrugSearch(ndc=ndc).ndc == ndc
 
 
 def test_pharmacy_search_accepts_single_criterion():

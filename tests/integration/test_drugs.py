@@ -109,22 +109,72 @@ async def test_search_drugs_by_ndc(client, seeded_lookups):
 
 
 @pytest.mark.asyncio
-async def test_search_drugs_by_gpi_maintenance_and_tier(client, seeded_lookups):
+async def test_search_drugs_by_ndc_pads_nine_digit_value(client, seeded_lookups):
+    resp = await client.post(
+        "/api/v1/drugs/search",
+        json={"searchRequest": {"ndc": "074312811"}},
+        headers=AUTH,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["pagination"]["total"] == 1
+    assert body["data"][0]["ndc"] == "00074312811"
+
+
+@pytest.mark.asyncio
+async def test_search_drugs_by_ndc_is_exact_match(client, seeded_lookups):
+    """A 10-char prefix of a stored NDC no longer matches."""
+    resp = await client.post(
+        "/api/v1/drugs/search",
+        json={"searchRequest": {"ndc": "0007431281"}},
+        headers=AUTH,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["pagination"]["total"] == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ndc", ["12345678", "123456789012"])
+async def test_search_drugs_rejects_bad_ndc_length(client, seeded_lookups, ndc):
+    resp = await client.post(
+        "/api/v1/drugs/search",
+        json={"searchRequest": {"ndc": ndc}},
+        headers=AUTH,
+    )
+    assert resp.status_code == 400
+    assert resp.json()["success"] is False
+
+
+@pytest.mark.asyncio
+async def test_search_drugs_by_gpi_matches_anywhere(client, seeded_lookups):
+    """GPI is a contains match, so a middle fragment still hits."""
+    resp = await client.post(
+        "/api/v1/drugs/search",
+        json={"searchRequest": {"gpi": "0001010031"}},
+        headers=AUTH,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["pagination"]["total"] == 2
+    assert {d["ndc"] for d in body["data"]} == {"00093721410", "00093721420"}
+
+
+@pytest.mark.asyncio
+async def test_search_drugs_by_gpi_and_maintenance(client, seeded_lookups):
     resp = await client.post(
         "/api/v1/drugs/search",
         json={
             "searchRequest": {
                 "gpi": "39400010100310",
                 "maintenance": Maintenance.YES.value,
-                "tier": 1,
             }
         },
         headers=AUTH,
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["pagination"]["total"] == 1
-    assert body["data"][0]["ndc"] == "00093721410"
+    assert body["pagination"]["total"] == 2
+    assert {d["ndc"] for d in body["data"]} == {"00093721410", "00093721420"}
 
 
 @pytest.mark.asyncio

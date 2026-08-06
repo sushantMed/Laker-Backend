@@ -19,6 +19,9 @@ from app.utils.pagination import PaginationRequest, SortRequest
 
 _CAMEL = {"populate_by_name": True}
 
+# Minimum characters accepted for a member name search term.
+_MIN_NAME_SEARCH_LENGTH = 3
+
 
 def _calculate_age(date_of_birth: date) -> str:
     today = date.today()
@@ -191,6 +194,22 @@ class MemberSearch(BaseModel):
                 "At least one search criterion (carrier, memberId, firstName, "
                 "lastName, mi, or dateOfBirth) must be provided."
             )
+        return self
+
+    @model_validator(mode="after")
+    def names_meet_minimum_length(self) -> MemberSearch:
+        """Name searches are prefix matches — require enough characters to be
+        selective."""
+        for label, value in (
+            ("firstName", self.first_name),
+            ("lastName", self.last_name),
+        ):
+            if value and len(value) < _MIN_NAME_SEARCH_LENGTH:
+                from app.core.exceptions import InvalidSearchCriteriaException
+
+                raise InvalidSearchCriteriaException(
+                    f"{label} must be at least {_MIN_NAME_SEARCH_LENGTH} characters."
+                )
         return self
 
 

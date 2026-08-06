@@ -20,7 +20,6 @@ def _to_drug_info(d: DrugModel) -> DrugInfo:
         brandGeneric=d.brand_generic,
         maintenance=d.maintenance,
         desi=d.desi,
-        tier=d.tier,
         formularyStatus=d.formulary_status,
         repackageInd=d.repackage_ind,
     )

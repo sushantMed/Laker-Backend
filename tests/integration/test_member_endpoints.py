@@ -130,6 +130,19 @@ class TestSearchMembers:
         assert "MBR010" in ids
         assert body["message"] == "Members retrieved successfully."
 
+    @pytest.mark.parametrize("field", ["firstName", "lastName"])
+    async def test_search_rejects_short_name(self, client: AsyncClient, field: str):
+        resp = await client.post(
+            self.URL,
+            json={"searchRequest": {field: "An"}},
+            headers=_auth_header(),
+        )
+
+        assert resp.status_code == 400
+        body = resp.json()
+        assert body["success"] is False
+        assert "at least 3 characters" in body["error"]["message"]
+
     async def test_search_no_match_returns_200(
         self, client: AsyncClient, db_session: AsyncSession
     ):

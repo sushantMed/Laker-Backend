@@ -53,9 +53,11 @@ class DrugRepository(BaseRepository[DrugModel]):
         if criteria.name:
             stmt = stmt.where(DrugModel.drug_name.ilike(f"{criteria.name}%"))
         if criteria.ndc:
-            stmt = stmt.where(DrugModel.ndc.ilike(f"{criteria.ndc}%"))
+            # NDC is an exact match; the schema has already padded a 9-digit
+            # value to its 11-digit form.
+            stmt = stmt.where(DrugModel.ndc == criteria.ndc)
         if criteria.gpi:
-            stmt = stmt.where(DrugModel.gpi.ilike(f"{criteria.gpi}%"))
+            stmt = stmt.where(DrugModel.gpi.ilike(f"%{criteria.gpi}%"))
         if criteria.brand_generic:
             if criteria.brand_generic == "ALL":
                 stmt = stmt.where(
@@ -65,11 +67,6 @@ class DrugRepository(BaseRepository[DrugModel]):
                 stmt = stmt.where(DrugModel.brand_generic == criteria.brand_generic)
         if criteria.maintenance:
             stmt = stmt.where(DrugModel.maintenance == criteria.maintenance)
-        if criteria.tier or criteria.tier == 0:
-            if criteria.tier == 0:  # include all from 1 to 4
-                stmt = stmt.where(DrugModel.tier.in_([1, 2, 3, 4]))
-            else:
-                stmt = stmt.where(DrugModel.tier == criteria.tier)
 
         return await self.paginate(
             stmt,
