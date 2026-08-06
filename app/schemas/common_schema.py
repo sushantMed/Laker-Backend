@@ -79,10 +79,14 @@ class ApiResponse(GenericModel, Generic[T]):
 
 
 class PagedApiResponse(GenericModel, Generic[T]):
+    model_config = {"populate_by_name": True}
+
     success: bool
     message: str
     data: list[T]  # flat list, no nesting
     pagination: PaginationMeta | None = None
+    recent_claim_count: int | None = Field(None, alias="recentClaimCount")
+    total_claim_count: int | None = Field(None, alias="totalClaimCount")
     error: ErrorDetail | None = None
 
     @classmethod
@@ -90,12 +94,16 @@ class PagedApiResponse(GenericModel, Generic[T]):
         cls,
         data: PagedResponse[T],
         message: str = "Success",
+        recent_claim_count: int | None = None,
+        total_claim_count: int | None = None,
     ) -> "PagedApiResponse[T]":
         return cls(
             success=True,
             message=message,
             data=data.data,
             pagination=data.pagination,
+            recent_claim_count=recent_claim_count,
+            total_claim_count=total_claim_count,
             error=None,
         )
 

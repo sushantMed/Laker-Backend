@@ -225,6 +225,20 @@ class ClaimService:
             total=total,
         )
 
+    async def count_claims_for_member(
+        self,
+        member_id: str,
+        exclude_test_claims: bool = True,
+    ) -> int:
+        member = await self._member_repo.get_by_member_id(member_id)
+        if not member:
+            raise MemberNotFoundException(f"Member '{member_id}' not found.")
+
+        return await self._repo.count_claims_by_member_id(
+            member_id=member_id,
+            exclude_test_claims=exclude_test_claims,
+        )
+
     async def get_claims_for_pharmacy(
         self, nabp: str, query: ClaimsByEntityQuery
     ) -> PagedResponse[ClaimSummary]:
