@@ -12,11 +12,10 @@ redis_pool = redis.ConnectionPool(
     socket_connect_timeout=2,
     socket_timeout=2,
 )
-Redis = redis.Redis
 redis_client = redis.Redis(connection_pool=redis_pool)
 
 
-def get_redis() -> Redis:
+def get_redis() -> redis.Redis:
     """FastAPI dependency — returns the shared Redis client."""
     return redis_client
 

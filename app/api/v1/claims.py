@@ -14,6 +14,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
+from app.core.permissions import RequireUser
+from app.core.rbac import Perm
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user_model import UserModel
@@ -38,7 +40,7 @@ CLAIM_RETRIEVAL_SUCCESS_MESSAGE = "Claims retrieved successfully."
 async def search_claims(
     request: ClaimSearchRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[UserModel, Depends(get_current_user)],
+    current_user: RequireUser(Perm.CLAIM_SEARCH),
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
 ) -> PagedApiResponse[ClaimSummary]:
@@ -50,7 +52,7 @@ async def search_claims(
 async def get_claim(
     authNum: str,
     session: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[UserModel, Depends(get_current_user)],
+    current_user: RequireUser(Perm.CLAIM_VIEW),
 ) -> ApiResponse[ClaimDetail]:
     detail = await ClaimService(session).get_claim_by_auth_num(authNum)
     return ApiResponse.ok(data=detail, message="Claim retrieved successfully.")

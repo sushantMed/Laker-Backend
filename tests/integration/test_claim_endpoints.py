@@ -22,12 +22,27 @@ Test strategy
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Callable, Iterator
 from datetime import date
 
+import pytest  # type: ignore
 from httpx import AsyncClient  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
-from .conftest import BASE_PATH, _auth_header, _make_claim, _make_member, _seed
+from app.dependencies.auth import get_current_user
+from app.main import app
+from app.models.permission_model import UserPermissionModel
+from app.models.user_model import UserModel
+
+from .conftest import (
+    BASE_PATH,
+    _auth_header,
+    _fake_current_user,
+    _make_claim,
+    _make_member,
+    _seed,
+)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -552,3 +567,164 @@ class TestGetClaimsForMember:
         resp = await client.get(self._url("MBR-MSG-01"), headers=_auth_header())
 
         assert resp.json()["message"] == "Claims retrieved successfully."
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Permission enforcement on the claim endpoints
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture()
+def as_user() -> Iterator[Callable[..., None]]:
+    """Swap the `client` fixture's all-screens user for a narrower one.
+
+    `client` authenticates as a user granted every screen, which is what the
+    functional tests above want; these tests need users who hold less.
+    """
+
+    def _swap(*grants: tuple[str, str, str], status: str = "ACTIVE") -> None:
+        async def _current_user() -> UserModel:
+            return UserModel(
+                id=uuid.uuid4(),
+                email="scoped@example.com",
+                first_name="Scoped",
+                last_name="User",
+                hashed_password="x",
+                status=status,
+                grants=[
+                    UserPermissionModel(
+                        pername=pername, viewperm=viewperm, saveperm=saveperm
+                    )
+                    for pername, viewperm, saveperm in grants
+                ],
+            )
+
+        app.dependency_overrides[get_current_user] = _current_user
+
+    yield _swap
+
+    app.dependency_overrides[get_current_user] = _fake_current_user
+
+
+class TestClaimPermissions:
+    """POST /claims/search needs claimsearch:view; GET /claims/{authNum} needs
+    claim:view. The two screens are granted separately in `sql.userperm`."""
+
+    SEARCH_URL = f"{BASE_PATH}/claims/search"
+
+    @staticmethod
+    def _search_body() -> dict:
+        return {"searchRequest": {"memberId": "MBR-PERM", "excludeTestClaims": False}}
+
+    # ── POST /api/v1/claims/search ────────────────────────────────────────────
+
+    async def test_search_allowed_with_claim_search_screen_grant(
+        self, client: AsyncClient, db_session: AsyncSession, as_user
+    ):
+        as_user(("Claim Search Screen", "Y", "N"))
+        claim = _make_claim(member_id="MBR-PERM")
+        await _seed(db_session, claim)
+
+        resp = await client.post(
+            self.SEARCH_URL, json=self._search_body(), headers=_auth_header()
+        )
+
+        assert resp.status_code == 200
+        assert claim.auth_num in [r["authNum"] for r in resp.json()["data"]]
+
+    async def test_search_forbidden_without_any_claim_grant(
+        self, client: AsyncClient, as_user
+    ):
+        as_user(("Memeber Screen", "Y", "Y"))
+
+        resp = await client.post(
+            self.SEARCH_URL, json=self._search_body(), headers=_auth_header()
+        )
+
+        assert resp.status_code == 403
+        body = resp.json()
+        assert body["success"] is False
+        assert body["message"] == "Missing permission: claimsearch:view"
+
+    async def test_search_forbidden_with_only_the_paid_claim_lookup_grant(
+        self, client: AsyncClient, as_user
+    ):
+        """claim:view opens the detail screen, not the search screen."""
+        as_user(("Paid claim lookup screen", "Y", "Y"))
+
+        resp = await client.post(
+            self.SEARCH_URL, json=self._search_body(), headers=_auth_header()
+        )
+
+        assert resp.status_code == 403
+        assert resp.json()["message"] == "Missing permission: claimsearch:view"
+
+    async def test_search_forbidden_for_inactive_user(
+        self, client: AsyncClient, as_user
+    ):
+        as_user(("Claim Search Screen", "Y", "Y"), status="INACTIVE")
+
+        resp = await client.post(
+            self.SEARCH_URL, json=self._search_body(), headers=_auth_header()
+        )
+
+        assert resp.status_code == 403
+        assert resp.json()["message"] == "Account is not active"
+
+    # ── GET /api/v1/claims/{authNum} ──────────────────────────────────────────
+
+    async def test_get_claim_allowed_with_paid_claim_lookup_grant(
+        self, client: AsyncClient, db_session: AsyncSession, as_user
+    ):
+        as_user(("Paid claim lookup screen", "Y", "N"))
+        claim = _make_claim(auth_num="AUTH-PERM-OK")
+        await _seed(db_session, claim)
+
+        resp = await client.get(
+            f"{BASE_PATH}/claims/{claim.auth_num}", headers=_auth_header()
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["data"]["authNum"] == "AUTH-PERM-OK"
+
+    async def test_get_claim_forbidden_with_only_the_search_grant(
+        self, client: AsyncClient, db_session: AsyncSession, as_user
+    ):
+        as_user(("Claim Search Screen", "Y", "Y"))
+        claim = _make_claim(auth_num="AUTH-PERM-DENY")
+        await _seed(db_session, claim)
+
+        resp = await client.get(
+            f"{BASE_PATH}/claims/{claim.auth_num}", headers=_auth_header()
+        )
+
+        assert resp.status_code == 403
+        assert resp.json()["message"] == "Missing permission: claim:view"
+
+    async def test_get_claim_permission_is_checked_before_the_claim_is_looked_up(
+        self, client: AsyncClient, as_user
+    ):
+        """An unauthorized caller gets 403, not a 404 that would leak whether
+        the auth number exists."""
+        as_user(("Memeber Screen", "Y", "Y"))
+
+        resp = await client.get(
+            f"{BASE_PATH}/claims/AUTH-DOES-NOT-EXIST", headers=_auth_header()
+        )
+
+        assert resp.status_code == 403
+        assert resp.json()["message"] == "Missing permission: claim:view"
+
+    async def test_get_claim_forbidden_for_inactive_user(
+        self, client: AsyncClient, db_session: AsyncSession, as_user
+    ):
+        as_user(("Paid claim lookup screen", "Y", "Y"), status="INACTIVE")
+        claim = _make_claim(auth_num="AUTH-PERM-INACTIVE")
+        await _seed(db_session, claim)
+
+        resp = await client.get(
+            f"{BASE_PATH}/claims/{claim.auth_num}", headers=_auth_header()
+        )
+
+        assert resp.status_code == 403
+        assert resp.json()["message"] == "Account is not active"

@@ -2,9 +2,10 @@ from typing import Annotated
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.cache.redis_client import Redis, get_redis
+from app.cache.redis_client import get_redis
 from app.database.session import get_db
 from app.models.user_model import UserModel
 from app.services.auth_service import AuthService
