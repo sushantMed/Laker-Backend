@@ -10,7 +10,6 @@ from __future__ import annotations
 from datetime import date
 
 from pydantic import (  # type:ignore
-    BaseModel,
     ConfigDict,
     Field,
     field_validator,
@@ -18,6 +17,7 @@ from pydantic import (  # type:ignore
 )
 from pydantic.alias_generators import to_camel  # type:ignore
 
+from app.core.base_model import AppBaseModel as BaseModel
 from app.schemas.common_schema import SearchRequest
 from app.utils.pagination import PaginationRequest, SortRequest
 
@@ -231,7 +231,7 @@ class ClaimSearchByMemberPath(BaseModel):
         return self
 
 
-class ClaimSearchRequestByMemberPath(SearchRequest[ClaimSearchByMemberPath]):
+class ClaimSearchRequestByMemberPath(BaseModel, SearchRequest[ClaimSearchByMemberPath]):
     """
     Full request envelope — /members/{memberId}/claims/search.
     memberId is taken from path param, not from body.
@@ -255,15 +255,15 @@ class ClaimSearchRequestByMemberPath(SearchRequest[ClaimSearchByMemberPath]):
     )
 
 
-class ClaimSearchRequest(SearchRequest[ClaimSearch]):
+class ClaimSearchRequest(BaseModel, SearchRequest[ClaimSearch]):
     pass
 
 
-class ClaimsByMemberRequest(PaginationRequest, SortRequest):
+class ClaimsByMemberRequest(BaseModel, PaginationRequest, SortRequest):
     pass
 
 
-class ClaimsByEntityQuery(PaginationRequest):
+class ClaimsByEntityQuery(BaseModel, PaginationRequest):
     """
     Shared query-param — claim history scoped to a
     pharmacy (NABP), prescriber (NPI), or drug (NDC), with an optional

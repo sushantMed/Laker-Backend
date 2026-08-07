@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
 
+from app.core.base_model import AppBaseModel as BaseModel
 from app.schemas.common_schema import SearchRequest
 
 _CAMEL = {"populate_by_name": True}
@@ -51,5 +52,5 @@ class PrescriberSearch(BaseModel):
         return self
 
 
-class PrescriberSearchRequest(SearchRequest[PrescriberSearch]):
+class PrescriberSearchRequest(BaseModel, SearchRequest[PrescriberSearch]):
     pass

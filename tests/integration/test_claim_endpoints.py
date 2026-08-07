@@ -319,7 +319,7 @@ class TestGetClaim:
         # Verify API surface uses camelCase keys
         assert body["data"]["authNum"] == "AUTH-CAMEL-01"
         assert body["data"]["memberId"] == "MBR001"
-        assert body["data"]["endDate"] == "2024-05-20"
+        assert body["data"]["endDate"] == "05/20/2024"
 
 
 # ═════════════════════════════════════════════════════════════════════════════

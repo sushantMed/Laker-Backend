@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
 
+from app.core.base_model import AppBaseModel as BaseModel
 from app.schemas.common_schema import SearchRequest
 from app.utils.enums import BrandGeneric, Maintenance
 from app.utils.pagination import PaginationRequest, SortRequest
@@ -55,9 +56,9 @@ class DrugSearch(BaseModel):
         return self
 
 
-class DrugSearchRequest(SearchRequest[DrugSearch]):
+class DrugSearchRequest(BaseModel, SearchRequest[DrugSearch]):
     pass
 
 
-class GpiLookupRequest(PaginationRequest, SortRequest):
+class GpiLookupRequest(BaseModel, PaginationRequest, SortRequest):
     pass

@@ -1,8 +1,9 @@
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from pydantic.generics import GenericModel
 
+from app.core.base_model import AppBaseModel as BaseModel
 from app.utils.pagination import (
     PagedResponse,
     PaginationMeta,

@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import EmailStr, Field, field_validator, model_validator
 
+from app.core.base_model import AppBaseModel as BaseModel
 from app.schemas.common_schema import SearchRequest
 from app.utils.enums import CoverageType, FamilyRole, Gender, MemberStatus, RelCode
 from app.utils.pagination import PaginationRequest, SortRequest
@@ -194,7 +195,7 @@ class MemberSearch(BaseModel):
         return self
 
 
-class MemberSearchRequest(SearchRequest[MemberSearch]):
+class MemberSearchRequest(BaseModel, SearchRequest[MemberSearch]):
     pass
 
 
@@ -258,5 +259,5 @@ class AddFamilyMemberRequest(BaseModel):
         return self
 
 
-class FamilyMembersRequest(PaginationRequest, SortRequest):
+class FamilyMembersRequest(BaseModel, PaginationRequest, SortRequest):
     pass
