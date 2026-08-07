@@ -78,6 +78,8 @@ class ClaimRepository:
         self,
         member_id: str,
         exclude_test_claims: bool = True,
+        date_filled: date | None = None,
+        date_written: date | None = None,
         page: int = 1,
         page_size: int = 10,
         sort_by: str | None = None,
@@ -91,7 +93,23 @@ class ClaimRepository:
         if exclude_test_claims:
             stmt = stmt.where(ClaimModel.is_test_claim == false())
 
+        stmt = self._apply_date_range(stmt, date_filled, date_written)
         return await self._paginate(stmt, page, page_size, sort_by, sort_dir)
+
+    async def count_claims_by_member_id(
+        self,
+        member_id: str,
+        exclude_test_claims: bool = True,
+    ) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(ClaimModel)
+            .where(ClaimModel.member_id.ilike(member_id))
+        )
+        if exclude_test_claims:
+            stmt = stmt.where(ClaimModel.is_test_claim == false())
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
 
     # ── Claims for a pharmacy / prescriber / drug ───────────────────────────
 

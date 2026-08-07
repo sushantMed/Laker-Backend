@@ -28,6 +28,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
@@ -170,3 +171,32 @@ def validation_error_handler(request: Request, exc: RequestValidationError):
 
 
 app = create_app()
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title, version=app.version, routes=app.routes
+    )
+
+    def patch_date_examples(node):
+        if isinstance(node, dict):
+            fmt = node.get("format")
+            if fmt == "date":
+                node["example"] = "mm/dd/yyyy"
+            elif fmt == "date-time":
+                node["example"] = "mm/dd/yyyy hh:mm:ss"
+            for v in node.values():
+                patch_date_examples(v)
+        elif isinstance(node, list):
+            for item in node:
+                patch_date_examples(item)
+
+    patch_date_examples(openapi_schema)
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
