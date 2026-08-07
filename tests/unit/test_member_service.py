@@ -184,6 +184,7 @@ def test_address_schema_maps_fields():
             "state": "IL",
             "zip": "62704",
             "location": "USA",
+            "region_code": "US",
         },
     )()
     schema = _address_schema(address)
@@ -193,6 +194,7 @@ def test_address_schema_maps_fields():
     assert schema.state == "IL"
     assert schema.zip == "62704"
     assert schema.location == "USA"
+    assert schema.region_code == "US"
 
 
 def test_to_member_detail_maps_all_fields():

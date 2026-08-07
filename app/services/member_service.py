@@ -71,6 +71,7 @@ def _address_schema(addr) -> MemberAddressSchema | None:
         state=addr.state,
         zip=addr.zip,
         location=addr.location,
+        region_code=addr.region_code,
     )
 
 
