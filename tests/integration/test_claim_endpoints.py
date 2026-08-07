@@ -22,9 +22,9 @@ Test strategy
 
 from __future__ import annotations
 
-from datetime import date, timedelta
 import uuid
 from collections.abc import Callable, Iterator
+from datetime import date, timedelta
 
 import pytest  # type: ignore
 from httpx import AsyncClient  # type: ignore
@@ -633,6 +633,8 @@ class TestGetRecentClaimsForMember:
         assert body["recentClaimCount"] == 5
         assert body["totalClaimCount"] == 15
         assert len(body["data"]) == 5
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # Permission enforcement on the claim endpoints
 # ═════════════════════════════════════════════════════════════════════════════

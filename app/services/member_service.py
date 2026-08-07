@@ -70,6 +70,7 @@ def _address_schema(addr) -> MemberAddressSchema | None:
         city=addr.city,
         state=addr.state,
         zip=addr.zip,
+        location=addr.location,
     )
 
 

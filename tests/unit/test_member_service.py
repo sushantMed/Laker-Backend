@@ -183,6 +183,7 @@ def test_address_schema_maps_fields():
             "city": "Springfield",
             "state": "IL",
             "zip": "62704",
+            "location": "USA",
         },
     )()
     schema = _address_schema(address)
@@ -190,6 +191,8 @@ def test_address_schema_maps_fields():
     assert schema.address1 == "1 Main St"
     assert schema.city == "Springfield"
     assert schema.state == "IL"
+    assert schema.zip == "62704"
+    assert schema.location == "USA"
 
 
 def test_to_member_detail_maps_all_fields():
