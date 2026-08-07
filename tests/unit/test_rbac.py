@@ -32,8 +32,13 @@ def test_save_grant_adds_save():
     assert Perm.MEMBER_SAVE in perms
 
 
-def test_save_without_view_grants_only_save():
-    assert permissions_from_grants([("Memeber Screen", "N", "Y")]) == {Perm.MEMBER_SAVE}
+def test_save_without_view_still_grants_view():
+    assert permissions_from_grants([("Memeber Screen", "N", "Y")]) == {
+        Perm.MEMBER_SAVE,
+        Perm.MEMBER_VIEW,
+        Perm.MEMBER_SEARCH,
+        Perm.MEMBER_SEARCH_PREVCARDID,
+    }
 
 
 @pytest.mark.parametrize("flag", ["N", "n", 0, "0", None, "", False, "junk"])

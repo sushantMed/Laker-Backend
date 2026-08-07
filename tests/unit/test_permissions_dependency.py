@@ -85,12 +85,11 @@ async def test_status_is_checked_before_permissions():
     assert exc.value.detail == "Account is not active"
 
 
-async def test_save_grant_alone_does_not_satisfy_view():
-    """`saveperm` reads as "view" in /auth/me but grants no view permission here."""
+async def test_save_grant_alone_satisfies_view():
+    """`saveperm` implies view, matching how /auth/me reports the grant."""
     user = _user(("drug lookup screen", "N", "Y"))
     assert await require(Perm.DRUG_SAVE)(user) is user
-    with pytest.raises(HTTPException):
-        await require(Perm.DRUG_VIEW)(user)
+    assert await require(Perm.DRUG_VIEW)(user) is user
 
 
 def test_require_user_is_an_annotated_user_dependency():
