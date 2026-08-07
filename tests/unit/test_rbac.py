@@ -61,6 +61,27 @@ def test_unknown_pername_is_skipped_not_raised():
     assert perms == {Perm.CLAIM_VIEW}
 
 
+def test_claim_search_screen_maps_to_its_own_resource():
+    assert resource_for_pername("Claim Search Screen") == "claimsearch"
+
+
+def test_claim_search_grant_expands_to_claim_search_perm():
+    assert Perm.CLAIM_SEARCH in permissions_from_grants(
+        [("Claim Search Screen", "Y", "N")]
+    )
+
+
+def test_claim_search_and_paid_claim_lookup_are_separate_grants():
+    """The two claim screens are granted independently in `sql.userperm`, so
+    neither implies the other."""
+    search_only = permissions_from_grants([("Claim Search Screen", "Y", "Y")])
+    lookup_only = permissions_from_grants([("Paid claim lookup screen", "Y", "Y")])
+
+    assert Perm.CLAIM_VIEW not in search_only
+    assert Perm.CLAIM_SAVE not in search_only
+    assert Perm.CLAIM_SEARCH not in lookup_only
+
+
 def test_no_grants_fails_closed():
     assert permissions_from_grants([]) == set()
 

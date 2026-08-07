@@ -24,6 +24,7 @@ class Perm:
     MEMCARDCANCEL_SAVE = "memcardcancel:save"
     CLAIM_VIEW = "claim:view"
     CLAIM_SAVE = "claim:save"
+    CLAIM_SEARCH = "claimsearch:view"
     MEMBERCOB_VIEW = "membercob:view"
     MEMBERCOB_SAVE = "membercob:save"
     MEMBERPRIORAUTH_VIEW = "memberpriorauth:view"
@@ -57,6 +58,7 @@ PERNAME_RESOURCES: dict[str, str] = {
     "Memeber Screen": "member",
     "Mem cancel Card Request": "memcardcancel",
     "Paid claim lookup screen": "claim",
+    "Claim Search Screen": "claimsearch",
     "membercob": "membercob",
     "member prior auth": "memberpriorauth",
     "mem subgroups": "memsubgroups",
