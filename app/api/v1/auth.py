@@ -10,7 +10,6 @@ from app.core.mailer import Mailer
 from app.database.session import get_db
 from app.dependencies.mailer import get_mailer
 from app.schemas.auth_schema import (
-    ApiResponse,
     LoginChallengeResponse,
     LoginRequest,
     LoginResponse,
@@ -20,6 +19,7 @@ from app.schemas.auth_schema import (
     UserProfile,
     VerifyOtpRequest,
 )
+from app.schemas.common_schema import ApiResponse
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -65,7 +65,13 @@ async def login(
     data = await AuthService(
         session, redis, otp_secret=settings.otp_secret, mailer=mailer
     ).login(body)
-    return ApiResponse.ok(data, message="OTP send succssfully to your email")
+
+    if isinstance(data, LoginChallengeResponse):
+        message = "OTP sent successfully to your email"
+    else:
+        message = "Logged in successfully"
+
+    return ApiResponse.ok(data, message=message)
 
 
 @router.post(
@@ -124,13 +130,8 @@ async def verify_otp(
     session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> ApiResponse[LoginResponse]:
-    try:
-        data = await AuthService(session, redis).verify_otp(body)
-        return ApiResponse.ok(
-            data, message="OTP verified successfully. You are logged in."
-        )
-    except Exception as e:
-        return ApiResponse.fail(message="OTP verification failed", errors=[str(e)])
+    data = await AuthService(session, redis).verify_otp(body)
+    return ApiResponse.ok(data, message="OTP verified successfully. You are logged in.")
 
 
 @router.post(
@@ -148,9 +149,9 @@ async def resend_otp(
     body: ResendOtpRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
+    mailer: Annotated[Mailer, Depends(get_mailer)],
 ) -> ApiResponse[LoginChallengeResponse]:
-    try:
-        data = await AuthService(session, redis).resend_otp(body.loginSessionId)
-        return ApiResponse.ok(data, message="OTP resent successfully")
-    except Exception as e:
-        return ApiResponse.fail(message="OTP resend failed", errors=[str(e)])
+    data = await AuthService(session, redis, mailer=mailer).resend_otp(
+        body.loginSessionId
+    )
+    return ApiResponse.ok(data, message="OTP resent successfully")

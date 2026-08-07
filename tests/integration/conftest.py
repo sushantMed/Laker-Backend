@@ -22,6 +22,7 @@ from app.core.rbac import PERNAME_RESOURCES
 from app.database.base import Base
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
+from app.dependencies.mailer import get_mailer
 from app.main import app
 from app.models.claim_model import ClaimModel
 from app.models.drug_model import DrugModel
@@ -128,6 +129,37 @@ async def fake_redis() -> AsyncGenerator[fakeredis.FakeRedis, None]:
         yield r
     finally:
         await r.aclose()
+
+
+class _FakeMailer:
+    """Records outgoing mail instead of opening an SMTP connection."""
+
+    def __init__(self) -> None:
+        self.sent: list[dict] = []
+
+    async def send_email(
+        self,
+        *,
+        to: list[str],
+        subject: str,
+        html: str,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+    ) -> None:
+        self.sent.append({"to": to, "subject": subject, "html": html})
+
+
+@pytest.fixture
+def fake_mailer() -> _FakeMailer:
+    return _FakeMailer()
+
+
+@pytest.fixture(autouse=True)
+def override_mailer(fake_mailer: _FakeMailer):
+    """Never hit a real SMTP server from tests (OTP emails go through this)."""
+    app.dependency_overrides[get_mailer] = lambda: fake_mailer
+    yield fake_mailer
+    app.dependency_overrides.pop(get_mailer, None)
 
 
 # ── Settings override ─────────────────────────────────────────────────────────

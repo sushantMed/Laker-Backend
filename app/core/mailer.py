@@ -50,9 +50,6 @@ class Mailer:
 
         recipients = to + (cc or []) + (bcc or [])
 
-        print(f"SMTP host = {self.host}")
-        print("SMTP port = %s", self.port)
-
         await aiosmtplib.send(
             message,
             hostname=self.host,

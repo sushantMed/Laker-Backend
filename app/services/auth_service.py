@@ -17,8 +17,10 @@ from app.core.constants import REFRESH_TOKEN_REMEMBER_ME_DAYS
 from app.core.exceptions import (
     InvalidCredentialsError,
     InvalidOrExpiredOtpError,
+    OtpResendLimitExceedError,
     OtpResendRateLimitedError,
-    TooManyAttemptsError,
+    TooManyLoginAttemptsError,
+    TooManyOTPVerificationAttemptsError,
     UserInactiveError,
     UserNotFoundError,
 )
@@ -50,10 +52,11 @@ logger = logging.getLogger("auth_service")
 # OTP configuration
 # ---------------------------------------------------------------------------
 
-OTP_TTL_SECONDS = 300  # 5 minutes
-OTP_MAX_ATTEMPTS = 5
-OTP_RESEND_COOLDOWN_SECONDS = 60
+OTP_TTL_SECONDS = 1800  # 30 minutes
+MAX_OTP_VERIFICATION_ATTEMPTS = 3
+OTP_RESEND_COOLDOWN_SECONDS = 120  # 2 mins
 OTP_LENGTH = 6
+MAX_OTP_RESEND_ATTEMPTS = 3
 
 OTP_KEY_PREFIX = "otp:challenge:"
 OTP_RESEND_COOLDOWN_PREFIX = "otp:cooldown:"
@@ -71,6 +74,7 @@ class OtpChallenge:
     email: str
     otp_hash: str
     attempts: int
+    otp_resend_attempts: int
     created_at: float
 
 
@@ -104,10 +108,10 @@ class OtpStore:
             "email": email,
             "otp_hash": otp_hash,
             "attempts": "0",
+            "otp_resend_attempts": "0",
             "created_at": str(time.time()),
         }
         key = self._key(login_session_id)
-        # SCALABILITY: hset + expire is two round trips; pipeline them so
         # OTP creation stays a single network round trip under load.
         async with self.redis.pipeline(transaction=True) as pipe:
             pipe.hset(key, mapping=payload)
@@ -134,10 +138,18 @@ class OtpStore:
         user_id = self._decode_field(data, "user_id")
         email = self._decode_field(data, "email")
         otp_hash = self._decode_field(data, "otp_hash")
-        attempts = self._decode_field(data, "attempts")
+        attempts = self._decode_field(data, "attempts")  # otp_verification_attempts
+        otp_resend_attempts = self._decode_field(data, "otp_resend_attempts")
         created_at = self._decode_field(data, "created_at")
 
-        if None in (user_id, email, otp_hash, attempts, created_at):
+        if None in (
+            user_id,
+            email,
+            otp_hash,
+            attempts,
+            otp_resend_attempts,
+            created_at,
+        ):
             # Corrupt/partial record — treat as absent rather than 500ing.
             logger.warning(
                 "Corrupt OTP challenge record for session %s", login_session_id
@@ -149,15 +161,35 @@ class OtpStore:
             email=email,
             otp_hash=otp_hash,
             attempts=int(attempts),
+            otp_resend_attempts=int(otp_resend_attempts),
             created_at=float(created_at),
         )
 
     async def increment_attempts(self, login_session_id: str) -> int:
         key = self._key(login_session_id)
-        return await self.redis.hincrby(key, "attempts", 1)
+        logger.info("Incrementing attempts for %s", key)
+        attempts = await self.redis.hincrby(key, "attempts", 1)
+        logger.info("Attempts after increment: %s", attempts)
+        return attempts
+
+    async def increment_otp_resend_attempts(self, login_session_id: str) -> int:
+        key = self._key(login_session_id)
+        logger.info("Incrementing OTP resend attempts for %s", key)
+        attempts = await self.redis.hincrby(key, "otp_resend_attempts", 1)
+        logger.info("OTP resend attempts after increment: %s", attempts)
+        return attempts
 
     async def delete(self, login_session_id: str) -> None:
         await self.redis.delete(self._key(login_session_id))
+
+    async def update_otp_hash(self, login_session_id: str, otp_hash: str) -> None:
+        """Overwrite the OTP hash and reset verification attempts on resend,
+        while preserving otp_resend_attempts and refreshing TTL."""
+        key = self._key(login_session_id)
+        async with self.redis.pipeline(transaction=True) as pipe:
+            pipe.hset(key, mapping={"otp_hash": otp_hash, "attempts": "0"})
+            pipe.expire(key, OTP_TTL_SECONDS)
+            await pipe.execute()
 
 
 # ---------------------------------------------------------------------------
@@ -170,16 +202,16 @@ def _generate_otp() -> str:
     return f"{secrets.randbelow(10**OTP_LENGTH):0{OTP_LENGTH}d}"
 
 
-def _derive_user_otp_key(secret_key: str, user_id) -> bytes:
+def _derive_user_otp_key(secret_key: str, user_email) -> bytes:
     """
     Derive a per-user HMAC key from the master otp_secret.
 
-    Uses HKDF (RFC 5869): user_id is used as the info/context parameter,
-    not as a salt — the master secret is the entropy source, user_id just
+    Uses HKDF (RFC 5869): user_email is used as the info/context parameter,
+    not as a salt — the master secret is the entropy source, user_email just
     domain-separates the output so each user gets an independent key.
     """
     ikm = secret_key.encode()  # Input Key Material
-    info = f"otp-key:v1:user:{user_id}".encode()
+    info = f"otp-key:v1:user:{user_email}".encode()
     # HKDF-Extract: pull a pseudorandom key from the master secret.
     # Using a fixed, static salt here (rather than none) per RFC 5869 guidance.
     prk = hmac.new(
@@ -189,12 +221,11 @@ def _derive_user_otp_key(secret_key: str, user_id) -> bytes:
     return hmac.new(prk, info + b"\x01", hashlib.sha256).digest()
 
 
-def _hash_otp(otp: str, login_session_id: str, secret_key: str, user_id) -> str:
+def _hash_otp(otp: str, login_session_id: str, secret_key: str, user_email: str) -> str:
     """HMAC the OTP under a key derived specifically for this user,
     so it's never stored in plaintext and never verifiable cross-user."""
-    user_key = _derive_user_otp_key(secret_key, user_id)
-    msg = f"{login_session_id}:{user_id}:{otp}".encode()
-    print("Hashing OTP with user_key:", user_key.hex(), msg, otp)
+    user_key = _derive_user_otp_key(secret_key, user_email)
+    msg = f"{login_session_id}:{user_email}:{otp}".encode()
     return hmac.new(user_key, msg, hashlib.sha256).hexdigest()
 
 
@@ -211,10 +242,9 @@ class AuthService:
     )
     token_invalid: str = "Invalid authentication token."
 
-    MAX_ATTEMPTS = 5
+    MAX_LOGIN_ATTEMPTS = 3
     WINDOW_SECONDS = 15 * 60  # 15 minutes
-
-    IP_MAX_ATTEMPTS = 30
+    IP_MAX_ATTEMPTS = 3
     IP_WINDOW_SECONDS = 15 * 60
 
     def __init__(
@@ -255,7 +285,7 @@ class AuthService:
           - OTP_ENABLED = False -> issue access/refresh tokens directly.
         """
         if await self._is_rate_limited(request.email, client_ip):
-            raise TooManyAttemptsError()
+            raise TooManyLoginAttemptsError()
 
         user = await self.repo.get_user_by_email(request.email)
 
@@ -273,7 +303,7 @@ class AuthService:
         await self._clear_attempts(request.email, client_ip)
 
         if settings.otp_enabled:
-            return await self._issue_otp_challenge(user)
+            return await self._issue_otp_challenge(user, login_session_id=None)
 
         return await self._issue_tokens(user)
 
@@ -283,27 +313,35 @@ class AuthService:
             raise InvalidOrExpiredOtpError()
 
         challenge = await self.otp_store.get(request.loginSessionId)
+        if not challenge:
+            raise InvalidOrExpiredOtpError()
         user = await self.repo.get_user_by_id(UUID(challenge.user_id))
         if not user or user.status != "ACTIVE":
             raise UserInactiveError()
 
-        if not challenge:
-            raise InvalidOrExpiredOtpError()
-
-        if challenge.attempts >= OTP_MAX_ATTEMPTS:
+        if challenge.attempts >= MAX_OTP_VERIFICATION_ATTEMPTS:
             await self.otp_store.delete(request.loginSessionId)
-            raise TooManyAttemptsError()
+            raise TooManyOTPVerificationAttemptsError()
 
         candidate_hash = _hash_otp(
-            request.otp, request.loginSessionId, self.otp_secret, user.id
+            request.otp, request.loginSessionId, self.otp_secret, user.email
         )
 
         if not hmac.compare_digest(candidate_hash, challenge.otp_hash):
             attempts = await self.otp_store.increment_attempts(request.loginSessionId)
-            if attempts >= OTP_MAX_ATTEMPTS:
+            remaining = max(MAX_OTP_VERIFICATION_ATTEMPTS - attempts, 0)
+            if attempts >= MAX_OTP_VERIFICATION_ATTEMPTS:
                 await self.otp_store.delete(request.loginSessionId)
-                raise TooManyAttemptsError()
-            raise InvalidOrExpiredOtpError()
+                raise TooManyOTPVerificationAttemptsError()
+            logger.info(
+                "OTP verification failed for session=%s, attempts_used=%s, remaining=%s",
+                request.loginSessionId,
+                attempts,
+                remaining,
+            )
+            raise InvalidOrExpiredOtpError(
+                otp_verification_attempts_remaining=remaining
+            )
 
         # Success — consume the challenge immediately so it can't be replayed.
         await self.otp_store.delete(request.loginSessionId)
@@ -319,30 +357,46 @@ class AuthService:
         if await self.otp_store.is_resend_rate_limited(challenge.user_id):
             raise OtpResendRateLimitedError()
 
+        if challenge.otp_resend_attempts >= MAX_OTP_RESEND_ATTEMPTS:
+            remaining = max(MAX_OTP_RESEND_ATTEMPTS - challenge.otp_resend_attempts, 0)
+            raise OtpResendLimitExceedError(otp_resend_attempts_remaining=remaining)
+
         user = await self.repo.get_user_by_id(UUID(challenge.user_id))
         if not user or user.status != "ACTIVE":
             raise UserInactiveError()
 
-        await self.otp_store.delete(login_session_id)
-        return await self._issue_otp_challenge(user)
+        new_challenge_response = await self._issue_otp_challenge(
+            user, login_session_id=login_session_id
+        )
+        return new_challenge_response
 
-    async def _issue_otp_challenge(self, user: UserModel) -> LoginChallengeResponse:
+    async def _issue_otp_challenge(
+        self, user: UserModel, login_session_id: str | None
+    ) -> LoginChallengeResponse:
         """Generate an OTP, persist the challenge, and enforce delivery via email.
 
         Email delivery is treated as required: if we can't send the code,
         the challenge is torn down and a 503 is raised rather than
         leaving the user stuck waiting on an email that never arrives.
         """
-        login_session_id = str(uuid.uuid4())
+        is_resend = login_session_id is not None
+        login_session_id = login_session_id or str(uuid.uuid4())
         otp = _generate_otp()
-        otp_hash = _hash_otp(otp, login_session_id, self.otp_secret, user.id)
+        otp_hash = _hash_otp(otp, login_session_id, self.otp_secret, user.email)
 
-        await self.otp_store.create(
-            login_session_id=login_session_id,
-            user_id=str(user.id),
-            email=user.email,
-            otp_hash=otp_hash,
-        )
+        if is_resend:
+            resend_attempts = await self.otp_store.increment_otp_resend_attempts(
+                login_session_id
+            )
+            await self.otp_store.update_otp_hash(login_session_id, otp_hash)
+        else:
+            resend_attempts = 0
+            await self.otp_store.create(
+                login_session_id=login_session_id,
+                user_id=str(user.id),
+                email=user.email,
+                otp_hash=otp_hash,
+            )
 
         if not self.mailer:
             logger.error(
@@ -371,11 +425,15 @@ class AuthService:
             ) from e
 
         await self.otp_store.set_resend_cooldown(str(user.id))
+        remaining_resends = max(MAX_OTP_RESEND_ATTEMPTS - resend_attempts, 0)
 
         return LoginChallengeResponse(
             loginSessionId=login_session_id,
             otpRequired=True,
             expiresIn=OTP_TTL_SECONDS,
+            nextOtpResendTimeInSeconds=OTP_RESEND_COOLDOWN_SECONDS,
+            otpVerificationAttemptsRemaining=MAX_OTP_VERIFICATION_ATTEMPTS,
+            otpResendAttemptsRemaining=remaining_resends,
         )
 
     async def _issue_tokens(self, user: UserModel) -> LoginResponse:
@@ -410,7 +468,7 @@ class AuthService:
     async def _is_rate_limited(self, email: str, client_ip: str | None) -> bool:
         email_key = f"login_attempts:email:{email.lower()}"
         attempts = await self.redis.get(email_key)
-        if attempts is not None and int(attempts) >= self.MAX_ATTEMPTS:
+        if attempts is not None and int(attempts) >= self.MAX_LOGIN_ATTEMPTS:
             return True
 
         if client_ip:

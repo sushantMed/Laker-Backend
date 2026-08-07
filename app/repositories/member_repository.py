@@ -68,9 +68,9 @@ class MemberRepository(BaseRepository[MemberModel]):
                 stmt = stmt.where(MemberModel.member_id.ilike(f"{criteria.member_id}%"))
 
         if criteria.first_name:
-            stmt = stmt.where(MemberModel.first_name.ilike(f"%{criteria.first_name}%"))
+            stmt = stmt.where(MemberModel.first_name.ilike(f"{criteria.first_name}%"))
         if criteria.last_name:
-            stmt = stmt.where(MemberModel.last_name.ilike(f"%{criteria.last_name}%"))
+            stmt = stmt.where(MemberModel.last_name.ilike(f"{criteria.last_name}%"))
         if criteria.mi:
             stmt = stmt.where(MemberModel.mi.ilike(f"{criteria.mi}%"))
         if criteria.date_of_birth:

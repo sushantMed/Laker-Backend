@@ -42,5 +42,17 @@
       "groups screen": ["view"],
       "drug lookup screen": ["view"]
     }
+  },
+  {
+    "email": "sushant1058jan@gmail.com",
+    "first_name": "Sushant",
+    "last_name": "Sinha",
+    "password": "Sus@12345",
+    "permissions": {
+      "Memeber Screen": ["view"],
+      "Paid claim lookup screen": ["view"],
+      "groups screen": ["view"],
+      "drug lookup screen": ["view"]
+    }
   }
 ]
