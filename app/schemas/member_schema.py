@@ -41,6 +41,7 @@ class MemberAddressSchema(BaseModel):
     state: str | None = Field(None, max_length=2)
     zip: str | None = Field(None, max_length=10)
     location: str | None = Field(None, max_length=10)
+    region_code: str | None = Field(None, max_length=20)
 
 
 # ── Plan summary (embedded in member responses) ──────────────────────────────
