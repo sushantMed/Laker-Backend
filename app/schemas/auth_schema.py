@@ -2,7 +2,9 @@ import re
 from datetime import datetime
 from typing import TypeVar
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
+
+from app.core.base_model import AppBaseModel as BaseModel
 
 T = TypeVar("T")
 

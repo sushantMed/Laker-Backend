@@ -146,10 +146,11 @@ def permissions_from_grants(grants: Iterable[tuple[str, Any, Any]]) -> set[str]:
         resource = resource_for_pername(pername)
         if resource is None:
             continue
-        if _is_granted(viewperm):
+        can_save = _is_granted(saveperm)
+        if can_save or _is_granted(viewperm):
             perms.add(f"{resource}:view")
             perms.update(_IMPLIED_BY_VIEW.get(resource, ()))
-        if _is_granted(saveperm):
+        if can_save:
             perms.add(f"{resource}:save")
     return perms
 
