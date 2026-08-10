@@ -9,6 +9,7 @@ so carrier filter can use the join directly.
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from datetime import date as date_type
 
 from sqlalchemy import false, func, select
@@ -32,6 +33,17 @@ class MemberRepository(BaseRepository[MemberModel]):
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def get_by_insured_ids(self, insured_ids: Sequence[str]) -> list[MemberModel]:
+        if not insured_ids:
+            return []
+
+        stmt = select(MemberModel).where(
+            MemberModel.insured_id.in_(list(insured_ids)),
+            MemberModel.is_deleted == false(),
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().unique().all())
 
     # ── Search ───────────────────────────────────────────────────────────────
 
