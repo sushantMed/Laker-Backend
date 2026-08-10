@@ -27,7 +27,7 @@ router = APIRouter(prefix="/members", tags=["Members"])
 @router.get("/{member_id}", status_code=status.HTTP_200_OK)
 async def get_member(
     member_id: str,
-    current_user: Annotated[UserModel, Depends(get_current_user)],
+    current_user: RequireUser(Perm.MEMBER_SEARCH),
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[MemberDetail]:
     detail = await MemberService(session).get_member_by_id(member_id)
