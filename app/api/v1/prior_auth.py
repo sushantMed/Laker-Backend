@@ -28,7 +28,7 @@ PA_RETRIEVAL_SUCCESS_MESSAGE = "Prior authorizations retrieved successfully."
 PA_DETAIL_SUCCESS_MESSAGE = "Prior authorization retrieved successfully."
 
 
-@router.post("/prior-auth/search")
+@router.post("/prior-auth/search", include_in_schema=False)
 async def search_prior_auths(
     request: PASearchRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -38,7 +38,9 @@ async def search_prior_auths(
     return PagedApiResponse.ok(data=data, message=PA_RETRIEVAL_SUCCESS_MESSAGE)
 
 
-@router.post("/prior-auth", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/prior-auth", status_code=status.HTTP_201_CREATED, include_in_schema=False
+)
 async def create_prior_auth(
     request: CreatePARequest,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -52,7 +54,9 @@ async def create_prior_auth(
     )
 
 
-@router.get("/prior-auth/{paId}", status_code=status.HTTP_200_OK)
+@router.get(
+    "/prior-auth/{paId}", status_code=status.HTTP_200_OK, include_in_schema=False
+)
 async def get_prior_auth(
     paId: str,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -62,7 +66,9 @@ async def get_prior_auth(
     return ApiResponse.ok(data=detail, message=PA_DETAIL_SUCCESS_MESSAGE)
 
 
-@router.put("/prior-auth/{paId}", status_code=status.HTTP_200_OK)
+@router.put(
+    "/prior-auth/{paId}", status_code=status.HTTP_200_OK, include_in_schema=False
+)
 async def update_prior_auth(
     paId: str,
     request: UpdatePARequest,
@@ -77,7 +83,9 @@ async def update_prior_auth(
     )
 
 
-@router.patch("/prior-auth/{paId}", status_code=status.HTTP_200_OK)
+@router.patch(
+    "/prior-auth/{paId}", status_code=status.HTTP_200_OK, include_in_schema=False
+)
 async def patch_prior_auth(
     paId: str,
     request: PatchPARequest,
@@ -119,7 +127,9 @@ async def search_prior_auths_for_member(
     return PagedApiResponse.ok(data=data, message=PA_RETRIEVAL_SUCCESS_MESSAGE)
 
 
-@router.get("/drugs/{ndc}/prior-auth", status_code=status.HTTP_200_OK)
+@router.get(
+    "/drugs/{ndc}/prior-auth", status_code=status.HTTP_200_OK, include_in_schema=False
+)
 async def get_prior_auths_for_drug(
     ndc: str,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -133,7 +143,11 @@ async def get_prior_auths_for_drug(
     return PagedApiResponse.ok(data=data, message=PA_RETRIEVAL_SUCCESS_MESSAGE)
 
 
-@router.get("/prescribers/{npi}/prior-auth", status_code=status.HTTP_200_OK)
+@router.get(
+    "/prescribers/{npi}/prior-auth",
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
 async def get_prior_auths_for_prescriber(
     npi: str,
     session: Annotated[AsyncSession, Depends(get_db)],
