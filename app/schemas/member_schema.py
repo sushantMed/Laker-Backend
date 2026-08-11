@@ -130,6 +130,12 @@ class MemberDetail(BaseModel):
     plan: PlanSummary | None = None
     address: MemberAddressSchema | None = None
 
+    @model_validator(mode="after")
+    def mask_ssn(self) -> MemberDetail:
+        if self.ssn is not None:
+            self.ssn = f"***-**-{self.ssn[-4:]}"
+        return self
+
 
 # ── Eligibility response ──────────────────────────────────────────────────────
 
