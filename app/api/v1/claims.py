@@ -104,7 +104,11 @@ async def get_recent_claims_for_member(
         endDate=today.isoformat(),
     )
     recent_claims = await ClaimService(session).get_claims_for_member(
-        memberId, query, transform=_to_claim_detail
+        memberId,
+        query,
+        transform=_to_claim_detail,
+        sort_by="dateWritten",
+        sort_dir="desc",
     )
     total_member_claims = await ClaimService(session).count_claims_for_member(memberId)
     return PagedApiResponse.ok(
