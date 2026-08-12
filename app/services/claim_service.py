@@ -197,6 +197,8 @@ class ClaimService:
         request: ClaimsByEntityQuery,
         transform: Callable[[ClaimModel], T],
         exclude_test_claims: bool = True,
+        sort_by: str | None = None,
+        sort_dir: str = "asc",
     ) -> PagedResponse[T]:
         """
         Return claims for a member.
@@ -216,6 +218,8 @@ class ClaimService:
             date_written=request.end_date,
             page=request.page,
             page_size=request.page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
 
         return PagedResponse.of(

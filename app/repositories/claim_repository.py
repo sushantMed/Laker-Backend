@@ -21,6 +21,7 @@ from app.models.claim_model import ClaimModel
 _SORTABLE_COLUMNS = {
     "authNum": ClaimModel.auth_num,
     "dateFilled": ClaimModel.date_filled,
+    "dateWritten": ClaimModel.date_written,
     "memberId": ClaimModel.member_id,
     "rxNumber": ClaimModel.rx_number,
     "drug": ClaimModel.drug_name,
