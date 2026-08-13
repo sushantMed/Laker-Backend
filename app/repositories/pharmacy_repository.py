@@ -18,6 +18,14 @@ class PharmacyRepository(BaseRepository[PharmacyModel]):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
+    async def get_by_npi(self, npi: str) -> PharmacyModel | None:
+        stmt = select(PharmacyModel).where(
+            PharmacyModel.npi == npi,
+            PharmacyModel.is_deleted == false(),
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
     async def search(
         self,
         criteria: PharmacySearch,

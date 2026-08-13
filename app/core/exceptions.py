@@ -189,6 +189,11 @@ class InvalidEligibilityException(AppException):
         super().__init__(message, status_code=422)
 
 
+class InvalidSearchCriteriaException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=400)
+
+
 class MissingSearchCriteriaException(AppException):
     def __init__(
         self, message: str = "At least one search criterion must be provided."

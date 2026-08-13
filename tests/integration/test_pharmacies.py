@@ -7,7 +7,9 @@ from tests.integration.conftest import AUTH
 
 @pytest.mark.asyncio
 async def test_get_pharmacy_by_nabp_success(client, seeded_lookups):
-    resp = await client.get("/api/v1/pharmacies/1234567", headers=AUTH)
+    resp = await client.get(
+        "/api/v1/pharmacies", params={"nabp": "1234567"}, headers=AUTH
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["nabp"] == "1234567"
@@ -16,14 +18,42 @@ async def test_get_pharmacy_by_nabp_success(client, seeded_lookups):
 
 
 @pytest.mark.asyncio
+async def test_get_pharmacy_by_npi_success(client, seeded_lookups):
+    resp = await client.get(
+        "/api/v1/pharmacies", params={"npi": "1023456789"}, headers=AUTH
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["data"]["npi"] == "1023456789"
+
+
+@pytest.mark.asyncio
 async def test_get_pharmacy_by_nabp_not_found(client, seeded_lookups):
-    resp = await client.get("/api/v1/pharmacies/0000000", headers=AUTH)
+    resp = await client.get(
+        "/api/v1/pharmacies", params={"nabp": "0000000"}, headers=AUTH
+    )
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
+async def test_get_pharmacy_missing_identifier(client, seeded_lookups):
+    resp = await client.get("/api/v1/pharmacies", headers=AUTH)
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_get_pharmacy_both_identifiers_provided(client, seeded_lookups):
+    resp = await client.get(
+        "/api/v1/pharmacies",
+        params={"nabp": "1234567", "npi": "1023456789"},
+        headers=AUTH,
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_get_pharmacy_requires_auth(raw_client, seeded_lookups):
-    resp = await raw_client.get("/api/v1/pharmacies/1234567")
+    resp = await raw_client.get("/api/v1/pharmacies", params={"nabp": "1234567"})
     assert resp.status_code == 403
 
 
