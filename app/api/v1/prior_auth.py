@@ -28,7 +28,7 @@ PA_RETRIEVAL_SUCCESS_MESSAGE = "Prior authorizations retrieved successfully."
 PA_DETAIL_SUCCESS_MESSAGE = "Prior authorization retrieved successfully."
 
 
-@router.post("/prior-auth/search", include_in_schema=False)
+@router.post("/prior-auth/search")
 async def search_prior_auths(
     request: PASearchRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -100,7 +100,11 @@ async def patch_prior_auth(
     )
 
 
-@router.get("/members/{memberId}/prior-auth", status_code=status.HTTP_200_OK)
+@router.get(
+    "/members/{memberId}/prior-auth",
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
 async def get_prior_auths_for_member(
     memberId: str,
     session: Annotated[AsyncSession, Depends(get_db)],

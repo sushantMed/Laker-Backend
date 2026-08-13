@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -625,6 +625,163 @@ async def test_member_prior_auth_search_unknown_member(client, seeded_pa):
     )
 
     assert resp.status_code == 404
+
+
+MEMBER_SEARCH_PATH = "/members/MBR001/prior-auth/search"
+EFF = (TODAY - timedelta(days=30)).strftime("%m/%d/%Y")
+
+
+async def member_search(client, criteria: dict, **envelope):
+    return await search(
+        client,
+        {"searchRequest": criteria, **envelope},
+        path=MEMBER_SEARCH_PATH,
+    )
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_by_ndc(client, seeded_pa):
+    resp = await member_search(client, {"ndc": "00093721410"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert {row["paId"] for row in body["data"]} == {"2002"}
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_by_eff_date_is_exact(client, seeded_pa):
+    resp = await member_search(client, {"effDate": EFF})
+
+    body = resp.json()
+    assert {row["paId"] for row in body["data"]} == {"2001", "2003", "2004", "2005"}
+    assert {row["effDate"] for row in body["data"]} == {EFF}
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_by_term_date_is_exact(client, seeded_pa):
+    resp = await member_search(client, {"termDate": PAST.strftime("%m/%d/%Y")})
+
+    body = resp.json()
+    assert body["pagination"]["total"] == 1
+    assert body["data"][0]["paId"] == "2005"
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_combines_criteria(client, seeded_pa):
+    resp = await member_search(
+        client,
+        {
+            "ndc": "00074312811",
+            "effDate": EFF,
+            "termDate": FUTURE.strftime("%m/%d/%Y"),
+        },
+    )
+
+    body = resp.json()
+    assert {row["paId"] for row in body["data"]} == {"2001", "2003", "2004"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "field", ["memberId", "paId", "drugName", "provider", "status"]
+)
+async def test_member_prior_auth_search_ignores_unsupported_criteria(
+    client, seeded_pa, field
+):
+    """Only ndc/effDate/termDate filter; other keys are accepted and dropped."""
+    resp = await member_search(client, {field: "nonsense", "ndc": "00093721410"})
+
+    assert resp.status_code == 200
+    assert {row["paId"] for row in resp.json()["data"]} == {"2002"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("blank", ["", "   ", None])
+async def test_member_prior_auth_search_ignores_blank_dates(client, seeded_pa, blank):
+    """Empty date boxes must drop the filter, not 422."""
+    resp = await member_search(client, {"effDate": blank, "termDate": blank})
+
+    assert resp.status_code == 200
+    assert resp.json()["pagination"]["total"] == 5
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_blank_date_keeps_other_filters(
+    client, seeded_pa
+):
+    resp = await member_search(client, {"ndc": "00093721410", "effDate": ""})
+
+    assert resp.status_code == 200
+    assert {row["paId"] for row in resp.json()["data"]} == {"2002"}
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_rejects_malformed_date(client, seeded_pa):
+    resp = await member_search(client, {"effDate": "13/45/2025"})
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("page_size", [10, 25, 50, 100, 10000])
+async def test_member_prior_auth_search_accepts_large_page_sizes(
+    client, seeded_pa, page_size
+):
+    resp = await member_search(
+        client, {}, pagination={"page": 1, "pageSize": page_size}
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["pagination"]["pageSize"] == page_size
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_rejects_page_size_above_cap(client, seeded_pa):
+    resp = await member_search(client, {}, pagination={"page": 1, "pageSize": 10001})
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_accepts_full_spec_payload(client, seeded_pa):
+    """The PA screen's full payload -- unsupported keys must not 422."""
+    resp = await search(
+        client,
+        {
+            "pagination": {"page": 1, "pageSize": 10000},
+            "searchRequest": {
+                "paId": "1003",
+                "memberId": "MBR005",
+                "drugName": "LANTUS SOLN 100UNIT/ML",
+                "ndc": "00088502005",
+                "provider": "DR. SUSAN KIM",
+                "effDate": "05/01/2025",
+                "termDate": "04/30/2026",
+            },
+            "sort": {"sortBy": "effDate", "sortDir": "DESC"},
+        },
+        path=MEMBER_SEARCH_PATH,
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"] == []
+    assert body["pagination"]["pageSize"] == 10000
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_sorts_by_eff_date_desc(client, seeded_pa):
+    resp = await member_search(
+        client, {}, sort={"sortBy": "effDate", "sortDir": "DESC"}
+    )
+
+    eff_dates = [row["effDate"] for row in resp.json()["data"]]
+    assert eff_dates == sorted(eff_dates, key=_as_date, reverse=True)
+
+
+def _as_date(value: str) -> date:
+    return datetime.strptime(value, "%m/%d/%Y").date()
 
 
 @pytest.mark.asyncio

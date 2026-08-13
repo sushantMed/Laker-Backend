@@ -254,14 +254,11 @@ class PriorAuthService:
         criteria = request.searchRequest
 
         items, total = await self._repo.search(
-            pa_id=criteria.pa_id,
             insured_id=member.insured_id,
             person_code=member.person_code,
-            drug_name=criteria.drug_name,
             ndc=criteria.ndc,
-            status=criteria.status,
-            eff_date_from=criteria.eff_date_from,
-            eff_date_to=criteria.eff_date_to,
+            eff_date=criteria.eff_date,
+            term_date=criteria.term_date,
             page=request.pagination.page,
             page_size=request.pagination.page_size,
             sort_by=request.sort.sort_by,
