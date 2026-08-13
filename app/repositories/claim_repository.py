@@ -181,10 +181,10 @@ class ClaimRepository:
         date_filled: date | None,
         date_written: date | None,
     ):
-        if date_filled:
-            stmt = stmt.where(ClaimModel.date_filled >= date_filled)
         if date_written:
-            stmt = stmt.where(ClaimModel.date_filled <= date_written)
+            stmt = stmt.where(ClaimModel.date_filled >= date_written)
+        if date_filled:
+            stmt = stmt.where(ClaimModel.date_filled <= date_filled)
         return stmt
 
     async def _paginate(
