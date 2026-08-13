@@ -14,6 +14,7 @@ from app.models.member_model import MemberModel
 from app.models.pharmacy_model import PharmacyModel
 from app.models.plan_model import PlanModel
 from app.models.prescriber_model import PrescriberModel
+from app.models.prior_auth_model import PriorAuthModel
 from app.models.user_model import UserModel
 
 __all__ = [
@@ -24,6 +25,7 @@ __all__ = [
     "PharmacyModel",
     "PlanModel",
     "PrescriberModel",
+    "PriorAuthModel",
     "RefreshTokenModel",
     "RevokedAccessTokenModel",
     "UserModel",
