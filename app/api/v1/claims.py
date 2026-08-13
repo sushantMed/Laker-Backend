@@ -72,7 +72,7 @@ async def search_claims_for_member(
 ) -> PagedApiResponse[ClaimDetail]:
     query = ClaimsByEntityQuery(
         page=page,
-        pageSize=10 if params.recent else pageSize,
+        pageSize=pageSize,
         startDate=params.date_written.isoformat() if params.date_written else None,
         endDate=params.date_filled.isoformat() if params.date_filled else None,
     )
@@ -82,7 +82,6 @@ async def search_claims_for_member(
         query,
         transform=_to_claim_detail,
     )
-    total_member_claims = await ClaimService(session).count_claims_for_member(memberId)
 
     return PagedApiResponse.ok(
         data=claims,
@@ -91,10 +90,7 @@ async def search_claims_for_member(
             if params.recent
             else CLAIM_RETRIEVAL_SUCCESS_MESSAGE
         ),
-        recent_claim_count=claims.pagination.total if params.recent else None,
-        total_claim_count=total_member_claims
-        if params.recent
-        else claims.pagination.total,
+        recent_claim_count=claims.pagination.total,
     )
 
 
@@ -137,12 +133,10 @@ async def get_recent_claims_for_member(
         sort_by="dateWritten",
         sort_dir="desc",
     )
-    total_member_claims = await ClaimService(session).count_claims_for_member(memberId)
     return PagedApiResponse.ok(
         data=recent_claims,
         message=RECENT_CLAIM_RETRIEVAL_SUCCESS_MESSAGE,
         recent_claim_count=recent_claims.pagination.total,
-        total_claim_count=total_member_claims,
     )
 
 
