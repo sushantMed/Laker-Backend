@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from sqlalchemy import false, select
 
 from app.models.drug_model import DrugModel
@@ -17,6 +19,17 @@ class DrugRepository(BaseRepository[DrugModel]):
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def get_by_ndcs(self, ndcs: Sequence[str]) -> list[DrugModel]:
+        if not ndcs:
+            return []
+
+        stmt = select(DrugModel).where(
+            DrugModel.ndc.in_(list(ndcs)),
+            DrugModel.is_deleted == false(),
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().unique().all())
 
     async def get_by_gpi(
         self,
