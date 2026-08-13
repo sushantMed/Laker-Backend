@@ -8,6 +8,7 @@ from app.api.v1 import (
     members,
     pharmacies,
     prescribers,
+    prior_auth,
     users,
 )
 
@@ -21,3 +22,4 @@ api_router.include_router(members.router)
 api_router.include_router(drugs.router)
 api_router.include_router(pharmacies.router)
 api_router.include_router(prescribers.router)
+api_router.include_router(prior_auth.router)
