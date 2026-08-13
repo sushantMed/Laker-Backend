@@ -13,6 +13,7 @@ import app.models.member_model
 import app.models.pharmacy_model
 import app.models.plan_model
 import app.models.prescriber_model
+import app.models.prior_auth_model
 import app.models.user_model  # noqa: F401
 from alembic import context
 from app.core.config import settings

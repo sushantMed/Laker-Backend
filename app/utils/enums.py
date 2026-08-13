@@ -69,3 +69,40 @@ class BrandGeneric(str, Enum):
 class Maintenance(str, Enum):
     YES = "YES"
     NO = "NO"
+
+
+class PAStatus(str, Enum):
+    AUTHORIZED = "Authorized"
+    DECLINED = "Declined"
+    PENDING = "Pending"
+    EXPIRED = "Expired"
+
+
+PA_ACTION_AUTHORIZED = "A"
+PA_ACTION_DECLINED = "D"
+
+
+def derive_pa_status(
+    action: str | None,
+    denial: str | None,
+    term_date: date | None,
+    today: date | None = None,
+) -> PAStatus:
+    today = today or date.today()
+    normalized = (action or "").strip().upper()
+
+    if normalized == PA_ACTION_DECLINED or (denial or "").strip():
+        return PAStatus.DECLINED
+    if normalized != PA_ACTION_AUTHORIZED:
+        return PAStatus.PENDING
+    if term_date and term_date < today:
+        return PAStatus.EXPIRED
+    return PAStatus.AUTHORIZED
+
+
+def pa_action_for_status(status: PAStatus) -> str | None:
+    if status is PAStatus.DECLINED:
+        return PA_ACTION_DECLINED
+    if status is PAStatus.PENDING:
+        return None
+    return PA_ACTION_AUTHORIZED

@@ -227,3 +227,21 @@ class PrescriberNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
         self.code = "PRESCRIBER_NOT_FOUND"
+
+
+class PriorAuthNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)
+        self.code = "PA_NOT_FOUND"
+
+
+class PriorAuthNotEditableException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=403)
+        self.code = "FORBIDDEN"
+
+
+class InvalidStatusTransitionException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=422)
+        self.code = "VALIDATION_ERROR"

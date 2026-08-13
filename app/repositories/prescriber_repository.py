@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from sqlalchemy import false, select
 
 from app.models.prescriber_model import PrescriberModel
@@ -17,6 +19,17 @@ class PrescriberRepository(BaseRepository[PrescriberModel]):
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def get_by_npis(self, npis: Sequence[str]) -> list[PrescriberModel]:
+        if not npis:
+            return []
+
+        stmt = select(PrescriberModel).where(
+            PrescriberModel.npi.in_(list(npis)),
+            PrescriberModel.is_deleted == false(),
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().unique().all())
 
     async def search(
         self,
