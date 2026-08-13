@@ -15,16 +15,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
+from app.core.config import settings
 from app.core.permissions import RequireUser
 from app.core.rbac import Perm
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
+from app.dependencies.claim_dependencies import get_claim_search_params
 from app.models.user_model import UserModel
 from app.schemas.claim_schema import (
     ClaimDetail,
     ClaimsByEntityQuery,
+    ClaimSearchQueryParams,
     ClaimSearchRequest,
-    ClaimSearchRequestByMemberPath,
     ClaimSummary,
 )
 from app.schemas.common_schema import ApiResponse, PagedApiResponse
@@ -35,7 +37,6 @@ router = APIRouter(tags=["Claims"])
 
 CLAIM_RETRIEVAL_SUCCESS_MESSAGE = "Claims retrieved successfully."
 RECENT_CLAIM_RETRIEVAL_SUCCESS_MESSAGE = "Recent claims retrieved successfully."
-CLAIM_RETRIEVAL_DAYS = 90
 
 
 @router.post("/claims/search")
@@ -63,14 +64,34 @@ async def get_claim(
 @router.post("/members/{memberId}/claims/search")
 async def search_claims_for_member(
     memberId: str,
-    request: ClaimSearchRequestByMemberPath,
     session: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[UserModel, Depends(get_current_user)],
+    current_user: RequireUser(Perm.CLAIM_VIEW),  # type: ignore
+    params: Annotated[ClaimSearchQueryParams, Depends(get_claim_search_params)],
     page: Annotated[int, Query(ge=1)] = 1,
-    pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
-) -> PagedApiResponse[ClaimSummary]:
-    data = await ClaimService(session).search_claims_for_member(memberId, request)
-    return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)
+    pageSize: Annotated[int, Query(ge=1, le=100)] = 10,
+) -> PagedApiResponse[ClaimDetail]:
+    query = ClaimsByEntityQuery(
+        page=page,
+        pageSize=pageSize,
+        startDate=params.date_written.isoformat() if params.date_written else None,
+        endDate=params.date_filled.isoformat() if params.date_filled else None,
+    )
+
+    claims = await ClaimService(session).get_claims_for_member(
+        memberId,
+        query,
+        transform=_to_claim_detail,
+    )
+
+    return PagedApiResponse.ok(
+        data=claims,
+        message=(
+            RECENT_CLAIM_RETRIEVAL_SUCCESS_MESSAGE
+            if params.recent
+            else CLAIM_RETRIEVAL_SUCCESS_MESSAGE
+        ),
+        recent_claim_count=claims.pagination.total,
+    )
 
 
 @router.get("/members/{memberId}/claims", status_code=status.HTTP_200_OK)
@@ -88,7 +109,7 @@ async def get_claims_for_member(
     return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)
 
 
-@router.get("/members/{memberId}/recent-claims", status_code=status.HTTP_200_OK)
+@router.post("/members/{memberId}/recent-claims", status_code=status.HTTP_200_OK)
 async def get_recent_claims_for_member(
     memberId: str,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -100,7 +121,9 @@ async def get_recent_claims_for_member(
     query = ClaimsByEntityQuery(
         page=page,
         pageSize=pageSize,
-        startDate=(today - timedelta(days=CLAIM_RETRIEVAL_DAYS)).isoformat(),
+        startDate=(
+            today - timedelta(days=settings.recent_claims_window_days)
+        ).isoformat(),
         endDate=today.isoformat(),
     )
     recent_claims = await ClaimService(session).get_claims_for_member(
@@ -110,12 +133,10 @@ async def get_recent_claims_for_member(
         sort_by="dateWritten",
         sort_dir="desc",
     )
-    total_member_claims = await ClaimService(session).count_claims_for_member(memberId)
     return PagedApiResponse.ok(
         data=recent_claims,
         message=RECENT_CLAIM_RETRIEVAL_SUCCESS_MESSAGE,
         recent_claim_count=recent_claims.pagination.total,
-        total_claim_count=total_member_claims,
     )
 
 

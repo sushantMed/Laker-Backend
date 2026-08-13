@@ -214,8 +214,8 @@ class ClaimService:
         items, total = await self._repo.get_claims_by_member_id(
             member_id=member_id,
             exclude_test_claims=exclude_test_claims,
-            date_filled=request.start_date,
-            date_written=request.end_date,
+            date_filled=request.end_date,
+            date_written=request.start_date,
             page=request.page,
             page_size=request.page_size,
             sort_by=sort_by,

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_debug: bool = False
     app_version: str = "1.0.0"
+    recent_claims_window_days: int = 90
 
     # ── Database ──────────────────────────────────────────────────
     db_driver: str
