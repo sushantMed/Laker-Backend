@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.core.base_model import AppBaseModel as BaseModel
+from app.core.exceptions import InvalidSearchCriteriaException
 from app.schemas.common_schema import SearchRequest
 from app.utils.pagination import PaginationRequest
 
@@ -68,9 +69,32 @@ class PharmacyLookupRequest(PaginationRequest):
 
     nabp: str | None = None
     npi: str | None = None
-    zip_code: str | None = Field(None, alias="zipCode")
+    zip_code: str | None = Field(
+        None,
+        alias="zipCode",
+        description="A five-digit U.S. ZIP code, optionally followed by ZIP+4.",
+    )
     radius: int | None = Field(None, ge=0)  # in miles
     is_24_hour: bool | None = Field(False, alias="is24Hour")
+
+    @field_validator("zip_code")
+    @classmethod
+    def validate_us_zip_code(cls, zip_code: str | None) -> str | None:
+        if zip_code is None:
+            return None
+
+        is_five_digit_zip = len(zip_code) == 5 and zip_code.isdigit()
+        is_zip_plus_four = (
+            len(zip_code) == 10
+            and zip_code[5] == "-"
+            and zip_code[:5].isdigit()
+            and zip_code[6:].isdigit()
+        )
+        if not (is_five_digit_zip or is_zip_plus_four):
+            raise InvalidSearchCriteriaException(
+                "zipCode must be a valid U.S. ZIP code (for example, 62704 or 62704-1234)."
+            )
+        return zip_code
 
     @model_validator(mode="after")
     def exactly_one_identifier(self) -> PharmacyLookupRequest:
@@ -81,8 +105,6 @@ class PharmacyLookupRequest(PaginationRequest):
                 "Either 'nabp', 'npi', or 'zipCode' must be provided."
             )
         if sum(bool(value) for value in (self.nabp, self.npi, self.zip_code)) > 1:
-            from app.core.exceptions import InvalidSearchCriteriaException
-
             raise InvalidSearchCriteriaException(
                 "Provide only one of 'nabp', 'npi', or 'zipCode', not all three."
             )
