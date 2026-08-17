@@ -13,6 +13,7 @@ from app.schemas.prior_auth_schema import (
     CreatePARequest,
     PAByEntityQuery,
     PADetail,
+    PAMemberSearchResult,
     PASearchRequest,
     PASearchRequestByMemberPath,
     PASearchResult,
@@ -100,7 +101,11 @@ async def patch_prior_auth(
     )
 
 
-@router.get("/members/{memberId}/prior-auth", status_code=status.HTTP_200_OK)
+@router.get(
+    "/members/{memberId}/prior-auth",
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
 async def get_prior_auths_for_member(
     memberId: str,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -120,7 +125,7 @@ async def search_prior_auths_for_member(
     request: PASearchRequestByMemberPath,
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: RequireUser(Perm.MEMBERPRIORAUTH_VIEW),
-) -> PagedApiResponse[PASearchResult]:
+) -> PagedApiResponse[PAMemberSearchResult]:
     data = await PriorAuthService(session).search_prior_auths_for_member(
         memberId, request
     )

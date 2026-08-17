@@ -13,9 +13,16 @@ from app.utils.enums import PA_ACTION_AUTHORIZED, PA_ACTION_DECLINED, PAStatus
 
 _SORTABLE_COLUMNS = {
     "paId": PriorAuthModel.authnum,
+    "authNum": PriorAuthModel.authnum,
     "memberId": PriorAuthModel.subscribernum,
+    "subscriberNum": PriorAuthModel.subscribernum,
+    "personCodes": PriorAuthModel.personcodes,
     "drugName": PriorAuthModel.genname,
+    "drugNameNdc": PriorAuthModel.manualgenname,
+    "drugNameGpi": PriorAuthModel.genname,
     "ndc": PriorAuthModel.ndc,
+    "gpi": PriorAuthModel.gpi,
+    "action": PriorAuthModel.action,
     "effDate": PriorAuthModel.effdate,
     "termDate": PriorAuthModel.termdate,
 }
@@ -79,6 +86,8 @@ class PriorAuthRepository:
         drug_name: str | None = None,
         ndc: str | None = None,
         status: PAStatus | None = None,
+        eff_date: date | None = None,
+        term_date: date | None = None,
         eff_date_from: date | None = None,
         eff_date_to: date | None = None,
         prescriber_npi: str | None = None,
@@ -103,6 +112,10 @@ class PriorAuthRepository:
             stmt = stmt.where(_drug_name_clause(drug_name))
         if ndc:
             stmt = stmt.where(PriorAuthModel.ndc == ndc)
+        if eff_date:
+            stmt = stmt.where(PriorAuthModel.effdate >= eff_date)
+        if term_date:
+            stmt = stmt.where(PriorAuthModel.termdate <= term_date)
         if prescriber_npi:
             stmt = stmt.where(PriorAuthModel.prescriberid == prescriber_npi)
         # if status:

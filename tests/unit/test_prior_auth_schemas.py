@@ -74,23 +74,90 @@ def test_search_request_defaults_sort_and_pagination():
 def test_member_path_search_allows_no_criteria():
     criteria = PASearchByMemberPath()
 
-    assert criteria.pa_id is None
-    assert criteria.status is None
+    assert criteria.ndc is None
+    assert criteria.eff_date is None
+    assert criteria.term_date is None
 
 
-def test_member_path_search_validates_date_range():
-    with pytest.raises(InvalidDateRangeException):
-        PASearchByMemberPath(effDateFrom=date(2026, 5, 1), effDateTo=date(2026, 4, 1))
+def test_member_path_search_parses_eff_and_term_dates():
+    criteria = PASearchByMemberPath(effDate="05/01/2025", termDate="04/30/2026")
+
+    assert criteria.eff_date == date(2025, 5, 1)
+    assert criteria.term_date == date(2026, 4, 30)
 
 
 def test_member_path_search_strips_blanks():
-    assert PASearchByMemberPath(drugName="  ").drug_name is None
+    assert PASearchByMemberPath(ndc="  ").ndc is None
+
+
+@pytest.mark.parametrize(
+    ("keyed", "expected"),
+    [
+        ("093721410", "00093721410"),
+        ("0093721410", "00093721410"),
+        ("00093721410", "00093721410"),
+        ("  093721410  ", "00093721410"),
+    ],
+)
+def test_member_path_search_pads_short_ndc(keyed, expected):
+    """A 9- or 10-char NDC is zero-padded to the stored 11-char width."""
+    assert PASearchByMemberPath(ndc=keyed).ndc == expected
+
+
+@pytest.mark.parametrize("keyed", ["9372141", "93721410", "000937214100"])
+def test_member_path_search_rejects_out_of_range_ndc(keyed):
+    """Under 9 or over 11 characters is a bad NDC, not something to pad."""
+    with pytest.raises(ValidationError):
+        PASearchByMemberPath(ndc=keyed)
+
+
+@pytest.mark.parametrize("blank", ["", "   ", None])
+def test_member_path_search_treats_blank_dates_as_absent(blank):
+    criteria = PASearchByMemberPath(effDate=blank, termDate=blank)
+
+    assert criteria.eff_date is None
+    assert criteria.term_date is None
+
+
+def test_member_path_search_still_rejects_malformed_dates():
+    with pytest.raises(ValidationError):
+        PASearchByMemberPath(effDate="13/45/2025")
+
+
+@pytest.mark.parametrize(
+    "field", ["memberId", "paId", "drugName", "provider", "status"]
+)
+def test_member_path_search_ignores_unsupported_criteria(field):
+    """Only ndc/effDate/termDate filter; anything else is accepted and dropped."""
+    criteria = PASearchByMemberPath(**{field: "x"}, ndc="00088502005")
+
+    assert criteria.ndc == "00088502005"
+    assert set(criteria.model_dump()) == {"ndc", "eff_date", "term_date"}
 
 
 def test_member_path_request_envelope():
     request = PASearchRequestByMemberPath(searchRequest=PASearchByMemberPath())
 
     assert request.pagination.page == 1
+    assert request.pagination.page_size == 20
+
+
+@pytest.mark.parametrize("page_size", [10, 25, 50, 100, 10_000])
+def test_member_path_request_allows_large_page_sizes(page_size):
+    request = PASearchRequestByMemberPath(
+        searchRequest=PASearchByMemberPath(),
+        pagination={"page": 1, "pageSize": page_size},
+    )
+
+    assert request.pagination.page_size == page_size
+
+
+def test_member_path_request_rejects_page_size_above_cap():
+    with pytest.raises(ValidationError):
+        PASearchRequestByMemberPath(
+            searchRequest=PASearchByMemberPath(),
+            pagination={"page": 1, "pageSize": 10_001},
+        )
 
 
 def test_by_entity_query_defaults():
