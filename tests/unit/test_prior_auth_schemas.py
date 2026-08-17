@@ -90,6 +90,27 @@ def test_member_path_search_strips_blanks():
     assert PASearchByMemberPath(ndc="  ").ndc is None
 
 
+@pytest.mark.parametrize(
+    ("keyed", "expected"),
+    [
+        ("093721410", "00093721410"),
+        ("0093721410", "00093721410"),
+        ("00093721410", "00093721410"),
+        ("  093721410  ", "00093721410"),
+    ],
+)
+def test_member_path_search_pads_short_ndc(keyed, expected):
+    """A 9- or 10-char NDC is zero-padded to the stored 11-char width."""
+    assert PASearchByMemberPath(ndc=keyed).ndc == expected
+
+
+@pytest.mark.parametrize("keyed", ["9372141", "93721410", "000937214100"])
+def test_member_path_search_rejects_out_of_range_ndc(keyed):
+    """Under 9 or over 11 characters is a bad NDC, not something to pad."""
+    with pytest.raises(ValidationError):
+        PASearchByMemberPath(ndc=keyed)
+
+
 @pytest.mark.parametrize("blank", ["", "   ", None])
 def test_member_path_search_treats_blank_dates_as_absent(blank):
     criteria = PASearchByMemberPath(effDate=blank, termDate=blank)

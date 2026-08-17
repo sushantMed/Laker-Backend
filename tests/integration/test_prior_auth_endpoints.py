@@ -649,6 +649,26 @@ async def test_member_prior_auth_search_by_ndc(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("keyed", ["093721410", "0093721410", "00093721410"])
+async def test_member_prior_auth_search_pads_short_ndc(client, seeded_pa, keyed):
+    """A 9- or 10-char NDC still finds the 11-char row it belongs to."""
+    resp = await member_search(client, {"ndc": keyed})
+
+    assert resp.status_code == 200
+    assert {row["authNum"] for row in resp.json()["data"]} == {"2002"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("keyed", ["93721410", "000937214100"])
+async def test_member_prior_auth_search_rejects_out_of_range_ndc(
+    client, seeded_pa, keyed
+):
+    resp = await member_search(client, {"ndc": keyed})
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_member_prior_auth_search_row_returns_pa_columns(client, seeded_pa):
     """The member grid gets the PA's own columns -- no member/drug resolution."""
     resp = await member_search(client, {"ndc": "00093721410"})

@@ -25,6 +25,11 @@ _DIAGNOSIS_MAX = 100
 _NDC_PATTERN = r"^\d{11}$"
 _GPI_PATTERN = r"^[A-Za-z0-9]{14}$"
 
+# NDCs are stored 11 wide. The grid lets the user key a short one, which is
+# left-padded with zeros before it hits the query.
+_NDC_LENGTH = 11
+_NDC_SEARCH_MIN = 9
+
 
 def _blank_to_none(value: str | None) -> str | None:
     if value is None:
@@ -164,6 +169,9 @@ class PASearchByMemberPath(BaseModel):
     PA's effdate and termDate an upper bound on its termdate. Every other key in
     the body is ignored, memberId included: the search is already scoped by the
     path.
+
+    ndc must be 9-11 characters and is left-padded with zeros to the stored
+    11-character width; blank or absent drops the filter.
     """
 
     model_config = ConfigDict(
@@ -178,7 +186,7 @@ class PASearchByMemberPath(BaseModel):
         },
     )
 
-    ndc: str | None = None
+    ndc: str | None = Field(None, min_length=_NDC_SEARCH_MIN, max_length=_NDC_LENGTH)
     eff_date: date | None = None
     term_date: date | None = None
 
@@ -186,6 +194,12 @@ class PASearchByMemberPath(BaseModel):
     @classmethod
     def strip_and_blank_to_none(cls, v: str | None) -> str | None:
         return _blank_to_none(v)
+
+    @field_validator("ndc", mode="after")
+    @classmethod
+    def pad_ndc(cls, v: str | None) -> str | None:
+        """A short NDC (e.g. 9 digits) is stored 11 wide -- pad zeros in front."""
+        return v.zfill(_NDC_LENGTH) if v else v
 
     @field_validator("eff_date", "term_date", mode="before")
     @classmethod
