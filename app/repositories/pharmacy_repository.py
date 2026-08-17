@@ -23,6 +23,38 @@ def _compute_bounding_box(
 
 
 def _haversine_miles(lat1: float, long1: float, lat2: float, long2: float) -> float:
+    """
+    Calculate the great-circle distance between two geographic coordinates.
+
+    The calculation uses the spherical law of cosines:
+
+        d = R * acos(
+            sin(lat1) * sin(lat2)
+            + cos(lat1) * cos(lat2) * cos(long2 - long1)
+        )
+
+    where:
+        d  = distance between the two points in miles
+        R  = Earth's radius in miles (EARTH_RADIUS_MILES)
+        lat1, lat2 = latitudes in radians
+        long1, long2 = longitudes in radians
+
+    Args:
+        lat1: Latitude of the first point in decimal degrees.
+        long1: Longitude of the first point in decimal degrees.
+        lat2: Latitude of the second point in decimal degrees.
+        long2: Longitude of the second point in decimal degrees.
+
+    Returns:
+        The great-circle distance between the two points in miles.
+        Returns 0.0 when both coordinates are identical.
+
+    Note:
+        The returned distance is the straight-line geographic distance
+        ("as the crow flies") and does not represent road or travel distance.
+        The cosine value is clamped to [-1, 1] to prevent floating-point
+        rounding errors from causing math.acos() to fail.
+    """
     if lat1 == lat2 and long1 == long2:
         return 0.0
     lat1, long1, lat2, long2 = map(math.radians, (lat1, long1, lat2, long2))
