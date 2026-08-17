@@ -367,7 +367,6 @@ async def seeded_lookups(db_session: AsyncSession):
                 phone="2175551234",
                 fax="2175555678",
                 is_24_hour=True,
-                in_network=True,
             ),
             PharmacyModel(
                 nabp="7654321",
@@ -380,7 +379,6 @@ async def seeded_lookups(db_session: AsyncSession):
                 phone="3125559876",
                 fax=None,
                 is_24_hour=False,
-                in_network=False,
             ),
             PrescriberModel(
                 npi="1112223334",
