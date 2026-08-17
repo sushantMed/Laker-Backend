@@ -79,7 +79,7 @@ def test_member_path_search_allows_no_criteria():
     assert criteria.term_date is None
 
 
-def test_member_path_search_takes_exact_eff_and_term_dates():
+def test_member_path_search_parses_eff_and_term_dates():
     criteria = PASearchByMemberPath(effDate="05/01/2025", termDate="04/30/2026")
 
     assert criteria.eff_date == date(2025, 5, 1)

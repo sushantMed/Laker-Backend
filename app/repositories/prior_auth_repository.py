@@ -106,9 +106,9 @@ class PriorAuthRepository:
         if ndc:
             stmt = stmt.where(PriorAuthModel.ndc == ndc)
         if eff_date:
-            stmt = stmt.where(PriorAuthModel.effdate == eff_date)
+            stmt = stmt.where(PriorAuthModel.effdate >= eff_date)
         if term_date:
-            stmt = stmt.where(PriorAuthModel.termdate == term_date)
+            stmt = stmt.where(PriorAuthModel.termdate <= term_date)
         if prescriber_npi:
             stmt = stmt.where(PriorAuthModel.prescriberid == prescriber_npi)
         # if status:

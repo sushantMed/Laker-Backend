@@ -649,7 +649,8 @@ async def test_member_prior_auth_search_by_ndc(client, seeded_pa):
 
 
 @pytest.mark.asyncio
-async def test_member_prior_auth_search_by_eff_date_is_exact(client, seeded_pa):
+async def test_member_prior_auth_search_by_eff_date_is_a_lower_bound(client, seeded_pa):
+    """effDate is a floor: PAs starting on or after it come back."""
     resp = await member_search(client, {"effDate": EFF})
 
     body = resp.json()
@@ -658,7 +659,19 @@ async def test_member_prior_auth_search_by_eff_date_is_exact(client, seeded_pa):
 
 
 @pytest.mark.asyncio
-async def test_member_prior_auth_search_by_term_date_is_exact(client, seeded_pa):
+async def test_member_prior_auth_search_eff_date_drops_earlier_pas(client, seeded_pa):
+    resp = await member_search(
+        client, {"effDate": (TODAY - timedelta(days=29)).strftime("%m/%d/%Y")}
+    )
+
+    assert resp.json()["pagination"]["total"] == 0
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_by_term_date_is_an_upper_bound(
+    client, seeded_pa
+):
+    """termDate is a ceiling: only the PA that already ended is at or below it."""
     resp = await member_search(client, {"termDate": PAST.strftime("%m/%d/%Y")})
 
     body = resp.json()
@@ -667,7 +680,25 @@ async def test_member_prior_auth_search_by_term_date_is_exact(client, seeded_pa)
 
 
 @pytest.mark.asyncio
+async def test_member_prior_auth_search_term_date_keeps_pas_ending_earlier(
+    client, seeded_pa
+):
+    """A ceiling at FUTURE keeps every PA on the subscriber, 2005 included."""
+    resp = await member_search(client, {"termDate": FUTURE.strftime("%m/%d/%Y")})
+
+    body = resp.json()
+    assert {row["paId"] for row in body["data"]} == {
+        "2001",
+        "2002",
+        "2003",
+        "2004",
+        "2005",
+    }
+
+
+@pytest.mark.asyncio
 async def test_member_prior_auth_search_combines_criteria(client, seeded_pa):
+    """The three filters AND together; 2005 qualifies since PAST <= FUTURE."""
     resp = await member_search(
         client,
         {
@@ -678,7 +709,23 @@ async def test_member_prior_auth_search_combines_criteria(client, seeded_pa):
     )
 
     body = resp.json()
-    assert {row["paId"] for row in body["data"]} == {"2001", "2003", "2004"}
+    assert {row["paId"] for row in body["data"]} == {"2001", "2003", "2004", "2005"}
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_combined_bounds_narrow_the_result(
+    client, seeded_pa
+):
+    resp = await member_search(
+        client,
+        {
+            "ndc": "00074312811",
+            "effDate": EFF,
+            "termDate": PAST.strftime("%m/%d/%Y"),
+        },
+    )
+
+    assert {row["paId"] for row in resp.json()["data"]} == {"2005"}
 
 
 @pytest.mark.asyncio

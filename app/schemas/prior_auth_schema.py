@@ -136,9 +136,10 @@ class PASearchByMemberPath(BaseModel):
     """
     Criteria for /members/{memberId}/prior-auth/search.
 
-    Only ndc, effDate and termDate are filters; effDate and termDate match the
-    PA's own dates exactly -- they are not a range. Every other key in the body
-    is ignored, memberId included: the search is already scoped by the path.
+    Only ndc, effDate and termDate are filters; effDate is a lower bound on the
+    PA's effdate and termDate an upper bound on its termdate. Every other key in
+    the body is ignored, memberId included: the search is already scoped by the
+    path.
     """
 
     model_config = ConfigDict(
