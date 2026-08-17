@@ -53,7 +53,7 @@ class PharmacyRepository(BaseRepository[PharmacyModel]):
     async def get_by_zip_code(
         self, zip_code: str, radius: int | None = None, is_24hr: bool = False
     ) -> list[PharmacyModel]:
-        radius = radius or 10
+        radius = 10 if radius is None else radius
 
         center_stmt = select(
             func.avg(PharmacyModel.latitude), func.avg(PharmacyModel.longitude)

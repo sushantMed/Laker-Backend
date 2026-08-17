@@ -160,6 +160,49 @@ async def test_get_pharmacies_by_zip_within_radius(client, db_session, seeded_lo
 
 
 @pytest.mark.asyncio
+async def test_get_pharmacies_by_zip_with_zero_radius(
+    client, db_session, seeded_lookups
+):
+    pharmacies = {
+        pharmacy.nabp: pharmacy
+        for pharmacy in (
+            await db_session.scalars(
+                select(PharmacyModel).where(
+                    PharmacyModel.nabp.in_(["1234567", "7654321"])
+                )
+            )
+        )
+    }
+    pharmacies["1234567"].latitude = 39.7817
+    pharmacies["1234567"].longitude = -89.6501
+    # Within the normal 10-mile default, but outside a zero-mile search.
+    pharmacies["7654321"].latitude = 39.7917
+    pharmacies["7654321"].longitude = -89.6501
+    await db_session.flush()
+
+    resp = await client.get(
+        "/api/v1/pharmacies",
+        params={"zipCode": "62704", "radius": 0},
+        headers=AUTH,
+    )
+
+    assert resp.status_code == 200
+    assert [pharmacy["nabp"] for pharmacy in resp.json()["data"]] == ["1234567"]
+
+
+@pytest.mark.asyncio
+async def test_get_pharmacy_rejects_invalid_us_zip_code(client, seeded_lookups):
+    resp = await client.get(
+        "/api/v1/pharmacies", params={"zipCode": "6270"}, headers=AUTH
+    )
+
+    assert resp.status_code == 400
+    assert resp.json()["error"]["message"] == (
+        "zipCode must be a valid U.S. ZIP code (for example, 62704 or 62704-1234)."
+    )
+
+
+@pytest.mark.asyncio
 async def test_search_pharmacies_no_match(client, seeded_lookups):
     resp = await client.post(
         "/api/v1/pharmacies/search",
