@@ -7,7 +7,7 @@ All validation uses @model_validator(mode="after").
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from pydantic import (  # type:ignore
     ConfigDict,
@@ -18,6 +18,7 @@ from pydantic import (  # type:ignore
 from pydantic.alias_generators import to_camel  # type:ignore
 
 from app.core.base_model import AppBaseModel as BaseModel
+from app.core.config import settings
 from app.schemas.common_schema import SearchRequest
 from app.utils.pagination import PaginationRequest, SortRequest
 
@@ -293,4 +294,78 @@ class ClaimsByEntityQuery(BaseModel, PaginationRequest):
                     "Date range cannot exceed 12 months "
                     f"(startDate={self.start_date}, endDate={self.end_date})."
                 )
+        return self
+
+
+# schema
+class ClaimSearchQueryParams(BaseModel):
+    """
+    Query-parameter schema for GET/POST /members/{memberId}/claims/search.
+
+    memberId comes from the path, not from here. All fields are optional
+    and bound individually from the query string via `get_claim_search_params`
+    (see app/api/v1/dependencies/claim_deps.py), then assembled into this
+    model so validation lives in one place regardless of the route.
+
+    Business rules:
+    - If `recent` is True, none of authNum/startDate/endDate may be supplied.
+      Providing both is treated as conflicting intent and rejected with a 422
+      rather than silently ignoring the extra filters.
+    - When `recent` is True, startDate/endDate are auto-populated to a
+      trailing `CLAIM_RETRIEVAL_DAYS`-day window ending today, after the
+      exclusivity check has run.
+    - startDate/endDate accept values in a few known formats (not just ISO)
+      because the current frontend sends US-style MM/DD/YYYY and sometimes
+      leaks its own placeholder text (e.g. "mm/dd/yyyy") as the literal
+      value when a date field is left unset — see OptionalDateQuery in
+      app/schemas/common_types.py for the normalization/parsing logic.
+    """
+
+    model_config = _CAMEL
+
+    auth_num: str | None = Field(None, alias="authNum")
+    date_filled: date | None = Field(None, alias="endDate")
+    date_written: date | None = Field(None, alias="startDate")
+    recent: bool = False
+    exclude_test_claims: bool = Field(True, alias="excludeTestClaims")
+
+    @field_validator("date_filled", "date_written", "auth_num", mode="before")
+    @classmethod
+    def blank_to_none(cls, v):
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
+    @model_validator(mode="after")
+    def validate_recent_is_exclusive(self) -> ClaimSearchQueryParams:
+        """
+        Reject requests that combine `recent=true` with any explicit filter.
+
+        Runs before `apply_recent_window` (Pydantic v2 runs `mode="after"`
+        validators in declaration order) so the check sees the caller's
+        original input, not the auto-filled recent-window dates.
+        """
+        if self.recent and (self.auth_num or self.date_filled or self.date_written):
+            from app.core.exceptions import (
+                InvalidSearchCriteriaException,
+            )
+
+            raise InvalidSearchCriteriaException(
+                "When recent=true, authNum, startDate, and endDate must not be provided."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def apply_recent_window(self) -> ClaimSearchQueryParams:
+        """
+        Populate startDate/endDate with the trailing recent-claims window
+        when `recent` is true. Only reached once exclusivity has already
+        been confirmed, so this never overwrites a caller-supplied date.
+        """
+        if self.recent:
+            today = date.today()
+            self.date_written = today - timedelta(
+                days=settings.recent_claims_window_days
+            )
+            self.date_filled = today
         return self
