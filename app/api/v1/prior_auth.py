@@ -13,6 +13,7 @@ from app.schemas.prior_auth_schema import (
     CreatePARequest,
     PAByEntityQuery,
     PADetail,
+    PAMemberSearchResult,
     PASearchRequest,
     PASearchRequestByMemberPath,
     PASearchResult,
@@ -28,7 +29,7 @@ PA_RETRIEVAL_SUCCESS_MESSAGE = "Prior authorizations retrieved successfully."
 PA_DETAIL_SUCCESS_MESSAGE = "Prior authorization retrieved successfully."
 
 
-@router.post("/prior-auth/search")
+@router.post("/prior-auth/search", include_in_schema=False)
 async def search_prior_auths(
     request: PASearchRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -124,7 +125,7 @@ async def search_prior_auths_for_member(
     request: PASearchRequestByMemberPath,
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: RequireUser(Perm.MEMBERPRIORAUTH_VIEW),
-) -> PagedApiResponse[PASearchResult]:
+) -> PagedApiResponse[PAMemberSearchResult]:
     data = await PriorAuthService(session).search_prior_auths_for_member(
         memberId, request
     )

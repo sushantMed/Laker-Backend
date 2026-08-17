@@ -13,9 +13,16 @@ from app.utils.enums import PA_ACTION_AUTHORIZED, PA_ACTION_DECLINED, PAStatus
 
 _SORTABLE_COLUMNS = {
     "paId": PriorAuthModel.authnum,
+    "authNum": PriorAuthModel.authnum,
     "memberId": PriorAuthModel.subscribernum,
+    "subscriberNum": PriorAuthModel.subscribernum,
+    "personCodes": PriorAuthModel.personcodes,
     "drugName": PriorAuthModel.genname,
+    "drugNameNdc": PriorAuthModel.manualgenname,
+    "drugNameGpi": PriorAuthModel.genname,
     "ndc": PriorAuthModel.ndc,
+    "gpi": PriorAuthModel.gpi,
+    "action": PriorAuthModel.action,
     "effDate": PriorAuthModel.effdate,
     "termDate": PriorAuthModel.termdate,
 }

@@ -26,6 +26,7 @@ from app.schemas.prior_auth_schema import (
     CreatePARequest,
     PAByEntityQuery,
     PADetail,
+    PAMemberSearchResult,
     PASearchRequest,
     PASearchRequestByMemberPath,
     PASearchResult,
@@ -116,6 +117,20 @@ def _drug_name(prior_auth: PriorAuthModel, drug: DrugModel | None) -> str | None
     return prior_auth.manualgenname or prior_auth.genname
 
 
+def _drug_name_for_ndc(prior_auth: PriorAuthModel) -> str | None:
+    """Name of the NDC-specific drug as recorded on the PA itself."""
+    if not prior_auth.ndc:
+        return None
+    return prior_auth.manualgenname or prior_auth.genname
+
+
+def _drug_name_for_gpi(prior_auth: PriorAuthModel) -> str | None:
+    """Generic name standing in for the PA's GPI class."""
+    if not prior_auth.gpi:
+        return None
+    return prior_auth.genname or prior_auth.manualgenname
+
+
 def _provider(
     prior_auth: PriorAuthModel, prescriber: PrescriberModel | None
 ) -> str | None:
@@ -145,6 +160,22 @@ def _to_search_result(
         status=derive_pa_status(
             prior_auth.action, prior_auth.denial, prior_auth.termdate, today
         ),
+    )
+
+
+def _to_member_search_result(prior_auth: PriorAuthModel) -> PAMemberSearchResult:
+    return PAMemberSearchResult(
+        auth_num=_format_pa_id(prior_auth.authnum),
+        ndc=prior_auth.ndc,
+        gpi=prior_auth.gpi,
+        drug_name_ndc=_drug_name_for_ndc(prior_auth),
+        drug_name_gpi=_drug_name_for_gpi(prior_auth),
+        action=prior_auth.action,
+        eff_date=prior_auth.effdate,
+        term_date=prior_auth.termdate,
+        last_user=prior_auth.changeuser,
+        subscriber_num=prior_auth.subscribernum,
+        person_codes=prior_auth.personcodes,
     )
 
 
@@ -249,7 +280,7 @@ class PriorAuthService:
 
     async def search_prior_auths_for_member(
         self, member_id: str, request: PASearchRequestByMemberPath
-    ) -> PagedResponse[PASearchResult]:
+    ) -> PagedResponse[PAMemberSearchResult]:
         member = await self._require_member(member_id)
         criteria = request.searchRequest
 
@@ -265,8 +296,13 @@ class PriorAuthService:
             sort_dir=request.sort.sort_dir,
         )
 
-        return await self._to_page(
-            items, total, request.pagination.page, request.pagination.page_size
+        # Rows are built from the PA columns alone, so no member/drug/prescriber
+        # lookups are needed here.
+        return PagedResponse.of(
+            data=[_to_member_search_result(pa) for pa in items],
+            page=request.pagination.page,
+            page_size=request.pagination.page_size,
+            total=total,
         )
 
     async def get_prior_auths_for_member(

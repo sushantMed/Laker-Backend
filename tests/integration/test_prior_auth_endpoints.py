@@ -645,7 +645,45 @@ async def test_member_prior_auth_search_by_ndc(client, seeded_pa):
 
     assert resp.status_code == 200
     body = resp.json()
-    assert {row["paId"] for row in body["data"]} == {"2002"}
+    assert {row["authNum"] for row in body["data"]} == {"2002"}
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_row_returns_pa_columns(client, seeded_pa):
+    """The member grid gets the PA's own columns -- no member/drug resolution."""
+    resp = await member_search(client, {"ndc": "00093721410"})
+
+    row = resp.json()["data"][0]
+    assert row == {
+        "authNum": "2002",
+        "ndc": "00093721410",
+        "gpi": "39400010100310",
+        "drugNameNdc": "ATORVASTATIN CALCIUM",
+        "drugNameGpi": "ATORVASTATIN CALCIUM",
+        "action": "A",
+        "effDate": "03/01/2026",
+        "termDate": FUTURE.strftime("%m/%d/%Y"),
+        "lastUser": None,
+        "subscriberNum": "INS001",
+        "personCodes": "02",
+    }
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_row_names_a_manual_drug(client, seeded_pa):
+    """With no NDC on the PA, only the GPI-side name is filled in."""
+    resp = await search(
+        client,
+        {"searchRequest": {}},
+        path="/members/MBR003/prior-auth/search",
+    )
+
+    row = resp.json()["data"][0]
+    assert row["authNum"] == "2006"
+    assert row["ndc"] is None
+    assert row["drugNameNdc"] is None
+    assert row["drugNameGpi"] == "COMPOUNDED CREAM"
+    assert row["personCodes"] == "01,02"
 
 
 @pytest.mark.asyncio
@@ -654,7 +692,7 @@ async def test_member_prior_auth_search_by_eff_date_is_a_lower_bound(client, see
     resp = await member_search(client, {"effDate": EFF})
 
     body = resp.json()
-    assert {row["paId"] for row in body["data"]} == {"2001", "2003", "2004", "2005"}
+    assert {row["authNum"] for row in body["data"]} == {"2001", "2003", "2004", "2005"}
     assert {row["effDate"] for row in body["data"]} == {EFF}
 
 
@@ -676,7 +714,7 @@ async def test_member_prior_auth_search_by_term_date_is_an_upper_bound(
 
     body = resp.json()
     assert body["pagination"]["total"] == 1
-    assert body["data"][0]["paId"] == "2005"
+    assert body["data"][0]["authNum"] == "2005"
 
 
 @pytest.mark.asyncio
@@ -687,7 +725,7 @@ async def test_member_prior_auth_search_term_date_keeps_pas_ending_earlier(
     resp = await member_search(client, {"termDate": FUTURE.strftime("%m/%d/%Y")})
 
     body = resp.json()
-    assert {row["paId"] for row in body["data"]} == {
+    assert {row["authNum"] for row in body["data"]} == {
         "2001",
         "2002",
         "2003",
@@ -709,7 +747,7 @@ async def test_member_prior_auth_search_combines_criteria(client, seeded_pa):
     )
 
     body = resp.json()
-    assert {row["paId"] for row in body["data"]} == {"2001", "2003", "2004", "2005"}
+    assert {row["authNum"] for row in body["data"]} == {"2001", "2003", "2004", "2005"}
 
 
 @pytest.mark.asyncio
@@ -725,7 +763,7 @@ async def test_member_prior_auth_search_combined_bounds_narrow_the_result(
         },
     )
 
-    assert {row["paId"] for row in resp.json()["data"]} == {"2005"}
+    assert {row["authNum"] for row in resp.json()["data"]} == {"2005"}
 
 
 @pytest.mark.asyncio
@@ -739,7 +777,7 @@ async def test_member_prior_auth_search_ignores_unsupported_criteria(
     resp = await member_search(client, {field: "nonsense", "ndc": "00093721410"})
 
     assert resp.status_code == 200
-    assert {row["paId"] for row in resp.json()["data"]} == {"2002"}
+    assert {row["authNum"] for row in resp.json()["data"]} == {"2002"}
 
 
 @pytest.mark.asyncio
@@ -759,7 +797,7 @@ async def test_member_prior_auth_search_blank_date_keeps_other_filters(
     resp = await member_search(client, {"ndc": "00093721410", "effDate": ""})
 
     assert resp.status_code == 200
-    assert {row["paId"] for row in resp.json()["data"]} == {"2002"}
+    assert {row["authNum"] for row in resp.json()["data"]} == {"2002"}
 
 
 @pytest.mark.asyncio
@@ -845,7 +883,7 @@ async def test_drug_prior_auth_list(client, seeded_pa):
 #         f"{BASE}/drugs/00074312811/prior-auth?status=Pending", headers=AUTH
 #     )
 #
-#     assert resp.json()["data"][0]["paId"] == "2003"
+#     assert resp.json()["data"][0]["authNum"] == "2003"
 
 
 @pytest.mark.asyncio

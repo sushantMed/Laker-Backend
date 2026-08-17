@@ -48,6 +48,30 @@ class PASearchResult(BaseModel):
     status: PAStatus
 
 
+class PAMemberSearchResult(BaseModel):
+    """
+    Row shape for /members/{memberId}/prior-auth/search.
+
+    The member grid wants the PA's own columns, not the resolved member/drug
+    details that PASearchResult carries -- the member is already known from the
+    path.
+    """
+
+    model_config = _CAMEL
+
+    auth_num: str = Field(alias="authNum")
+    ndc: str | None = None
+    gpi: str | None = None
+    drug_name_ndc: str | None = Field(None, alias="drugNameNdc")
+    drug_name_gpi: str | None = Field(None, alias="drugNameGpi")
+    action: str | None = None
+    eff_date: date | None = Field(None, alias="effDate")
+    term_date: date | None = Field(None, alias="termDate")
+    last_user: str | None = Field(None, alias="lastUser")
+    subscriber_num: str | None = Field(None, alias="subscriberNum")
+    person_codes: str | None = Field(None, alias="personCodes")
+
+
 class PADetail(PASearchResult):
     model_config = _CAMEL
 
