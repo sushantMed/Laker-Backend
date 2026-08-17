@@ -580,10 +580,17 @@ class TestGetClaimsForMember:
 
 
 class TestGetRecentClaimsForMember:
-    """Tests for POST /api/v1/members/{memberId}/recent-claims"""
+    """Tests for POST /api/v1/members/{memberId}/claims/search?recent=true."""
 
     def _url(self, memberId: str) -> str:
-        return f"{BASE_PATH}/members/{memberId}/recent-claims"
+        return f"{BASE_PATH}/members/{memberId}/claims/search"
+
+    async def _recent_search(self, client: AsyncClient, member_id: str):
+        return await client.post(
+            self._url(member_id),
+            params={"recent": True},
+            headers=_auth_header(),
+        )
 
     async def test_returns_only_claims_within_90_days(
         self, client: AsyncClient, db_session: AsyncSession
@@ -603,7 +610,7 @@ class TestGetRecentClaimsForMember:
         )
         await _seed(db_session, recent_claim, older_claim)
 
-        resp = await client.post(self._url("MBR-RECENT-01"), headers=_auth_header())
+        resp = await self._recent_search(client, "MBR-RECENT-01")
 
         assert resp.status_code == 200
         body = resp.json()
@@ -636,12 +643,58 @@ class TestGetRecentClaimsForMember:
         ]
         await _seed(db_session, *recent_claims, *older_claims)
 
-        resp = await client.post(self._url("MBR-COUNT-01"), headers=_auth_header())
+        resp = await self._recent_search(client, "MBR-COUNT-01")
 
         assert resp.status_code == 200
         body = resp.json()
         assert body["recentClaimCount"] == 5
         assert len(body["data"]) == 5
+
+    async def test_excludes_test_claims_by_default(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        member_id = "MBR-RECENT-TEST-CLAIM"
+        db_session.add(_make_member(member_id=member_id))
+        await db_session.flush()
+        real_claim = _make_claim(
+            member_id=member_id,
+            auth_num="AUTH-RECENT-REAL",
+            date_filled=date.today() - timedelta(days=1),
+        )
+        test_claim = _make_claim(
+            member_id=member_id,
+            auth_num="AUTH-RECENT-TEST",
+            date_filled=date.today() - timedelta(days=1),
+            is_test_claim=True,
+        )
+        await _seed(db_session, real_claim, test_claim)
+
+        resp = await self._recent_search(client, member_id)
+
+        assert resp.status_code == 200
+        auth_nums = [claim["authNum"] for claim in resp.json()["data"]]
+        assert real_claim.auth_num in auth_nums
+        assert test_claim.auth_num not in auth_nums
+
+    async def test_rejects_recent_search_with_conflicting_filters(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        member_id = "MBR-RECENT-CONFLICT"
+        db_session.add(_make_member(member_id=member_id))
+        await db_session.flush()
+
+        resp = await client.post(
+            self._url(member_id),
+            params={"recent": True, "authNum": "AUTH-CONFLICT"},
+            headers=_auth_header(),
+        )
+
+        assert resp.status_code in (400, 422)
+
+    async def test_returns_not_found_for_unknown_member(self, client: AsyncClient):
+        resp = await self._recent_search(client, "MBR-RECENT-NOT-FOUND")
+
+        assert resp.status_code == 404
 
 
 # ═════════════════════════════════════════════════════════════════════════════

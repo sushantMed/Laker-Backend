@@ -36,21 +36,40 @@ class PharmacyService:
             phone=p.phone,
             fax=p.fax,
             is24Hour=p.is_24_hour,
-            inNetwork=p.in_network,
+            zipCode=p.zip,
+            longitude=p.longitude,
+            latitude=p.latitude,
         )
 
-    async def get_pharmacy(self, request: PharmacyLookupRequest) -> PharmacyInfo:
-        pharmacy = (
-            await self._repo.get_by_nabp(request.nabp)
-            if request.nabp
-            else await self._repo.get_by_npi(request.npi)
-        )
+    async def get_pharmacy(
+        self, request: PharmacyLookupRequest
+    ) -> PagedResponse[PharmacyInfo]:
+        if request.nabp:
+            pharmacies = await self._repo.get_by_nabp(request.nabp)
 
-        if not pharmacy:
+        elif request.npi:
+            pharmacies = await self._repo.get_by_npi(request.npi)
+        else:
+            pharmacies = await self._repo.get_by_zip_code(
+                request.zip_code,
+                radius=request.radius,
+                is_24hr=bool(request.is_24_hour),
+            )
+
+        if not pharmacies:
             raise PharmacyNotFoundException("Pharmacy not found.")
 
-        data = self._to_pharmacy_info(pharmacy)
-        return data
+        total = len(pharmacies)
+        offset = request.offset
+        return PagedResponse.of(
+            data=[
+                self._to_pharmacy_info(pharmacy)
+                for pharmacy in pharmacies[offset : offset + request.page_size]
+            ],
+            page=request.page,
+            page_size=request.page_size,
+            total=total,
+        )
 
     async def search_pharmacies(
         self, request: PharmacySearchRequest

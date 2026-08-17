@@ -9,13 +9,11 @@ global exception handler -- not here.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
-from app.core.config import settings
 from app.core.permissions import RequireUser
 from app.core.rbac import Perm
 from app.database.session import get_db
@@ -107,37 +105,6 @@ async def get_claims_for_member(
         memberId, query, transform=_to_claim_summary
     )
     return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)
-
-
-@router.post("/members/{memberId}/recent-claims", status_code=status.HTTP_200_OK)
-async def get_recent_claims_for_member(
-    memberId: str,
-    session: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[UserModel, Depends(get_current_user)],
-    page: Annotated[int, Query(ge=1)] = 1,
-    pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
-) -> PagedApiResponse[ClaimDetail]:
-    today = date.today()
-    query = ClaimsByEntityQuery(
-        page=page,
-        pageSize=pageSize,
-        startDate=(
-            today - timedelta(days=settings.recent_claims_window_days)
-        ).isoformat(),
-        endDate=today.isoformat(),
-    )
-    recent_claims = await ClaimService(session).get_claims_for_member(
-        memberId,
-        query,
-        transform=_to_claim_detail,
-        sort_by="dateWritten",
-        sort_dir="desc",
-    )
-    return PagedApiResponse.ok(
-        data=recent_claims,
-        message=RECENT_CLAIM_RETRIEVAL_SUCCESS_MESSAGE,
-        recent_claim_count=recent_claims.pagination.total,
-    )
 
 
 @router.get("/pharmacies/{nabp}/claims", status_code=status.HTTP_200_OK)

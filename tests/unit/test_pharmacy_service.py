@@ -30,7 +30,6 @@ def make_pharmacy(
     phone: str = "2175551234",
     fax: str | None = "2175555678",
     is_24_hour: bool = False,
-    in_network: bool = True,
 ) -> PharmacyModel:
     return PharmacyModel(
         nabp=nabp,
@@ -43,7 +42,6 @@ def make_pharmacy(
         phone=phone,
         fax=fax,
         is_24_hour=is_24_hour,
-        in_network=in_network,
     )
 
 
@@ -60,7 +58,7 @@ def test_compose_address_formats_full_line():
 
 
 def test_to_pharmacy_info_maps_all_fields(service: PharmacyService):
-    pharmacy = make_pharmacy(is_24_hour=True, in_network=False, fax=None)
+    pharmacy = make_pharmacy(is_24_hour=True, fax=None)
     info = service._to_pharmacy_info(pharmacy)
 
     assert isinstance(info, PharmacyInfo)
@@ -71,7 +69,6 @@ def test_to_pharmacy_info_maps_all_fields(service: PharmacyService):
     assert info.phone == pharmacy.phone
     assert info.fax is None
     assert info.is_24_hour is True
-    assert info.in_network is False
 
 
 def test_resolve_sort_replaces_id_with_default():
@@ -84,22 +81,40 @@ def test_resolve_sort_keeps_other_columns():
 
 async def test_get_pharmacy_by_nabp_fetches(service: PharmacyService):
     pharmacy = make_pharmacy()
-    service._repo.get_by_nabp.return_value = pharmacy
+    service._repo.get_by_nabp.return_value = [pharmacy]
 
     result = await service.get_pharmacy(PharmacyLookupRequest(nabp=pharmacy.nabp))
 
-    assert result.nabp == pharmacy.nabp
+    assert result.data[0].nabp == pharmacy.nabp
+    assert result.pagination.total == 1
     service._repo.get_by_nabp.assert_awaited_once_with(pharmacy.nabp)
 
 
 async def test_get_pharmacy_by_npi_fetches(service: PharmacyService):
     pharmacy = make_pharmacy()
-    service._repo.get_by_npi.return_value = pharmacy
+    service._repo.get_by_npi.return_value = [pharmacy]
 
     result = await service.get_pharmacy(PharmacyLookupRequest(npi=pharmacy.npi))
 
-    assert result.npi == pharmacy.npi
+    assert result.data[0].npi == pharmacy.npi
+    assert result.pagination.total == 1
     service._repo.get_by_npi.assert_awaited_once_with(pharmacy.npi)
+
+
+async def test_get_pharmacy_applies_requested_pagination(service: PharmacyService):
+    pharmacies = [make_pharmacy(nabp=f"123456{i}") for i in range(3)]
+    service._repo.get_by_nabp.return_value = pharmacies
+
+    result = await service.get_pharmacy(
+        PharmacyLookupRequest(nabp="123456", page=2, pageSize=1)
+    )
+
+    assert [item.nabp for item in result.data] == ["1234561"]
+    assert result.pagination.total == 3
+    assert result.pagination.page == 2
+    assert result.pagination.page_size == 1
+    assert result.pagination.has_next is True
+    assert result.pagination.has_prev is True
 
 
 async def test_get_pharmacy_raises_when_missing(service: PharmacyService):
