@@ -74,7 +74,7 @@ class PharmacyLookupRequest(PaginationRequest):
         alias="zipCode",
         description="A five-digit U.S. ZIP code, optionally followed by ZIP+4.",
     )
-    radius: int | None = Field(None, ge=0)  # in miles
+    radius: int | None = Field(10, ge=0)  # in miles
     is_24_hour: bool | None = Field(False, alias="is24Hour")
 
     @field_validator("zip_code")
