@@ -109,18 +109,28 @@ class TooManyLoginAttemptsError(AppException):
     def __init__(
         self,
         detail: str = "Too many login attempts.Please try after 15 minutes.",
-        attempts_remaining: int | None = None,
+        attempts_remaining: int = 0,
     ):
+        self.attempts_remaining = attempts_remaining
         super().__init__(status_code=429, message=detail)
+
+    @property
+    def extra(self) -> dict:
+        return {"loginAttemptsRemaining": self.attempts_remaining}
 
 
 class TooManyOTPVerificationAttemptsError(AppException):
     def __init__(
         self,
         detail: str = "Maximum OTP verification attempts exceeded. Please login again to request a new OTP.",
-        attempts_remaining: int | None = None,
+        attempts_remaining: int = 0,
     ):
+        self.attempts_remaining = attempts_remaining
         super().__init__(status_code=429, message=detail)
+
+    @property
+    def extra(self) -> dict:
+        return {"otpVerificationAttemptsRemaining": self.attempts_remaining}
 
 
 class InvalidOrExpiredOtpError(AppException):
@@ -133,6 +143,14 @@ class InvalidOrExpiredOtpError(AppException):
     ):
         self.otp_verification_attempts_remaining = otp_verification_attempts_remaining
         super().__init__(status_code=401, message=detail)
+
+    @property
+    def extra(self) -> dict:
+        if self.otp_verification_attempts_remaining is None:
+            return {}
+        return {
+            "otpVerificationAttemptsRemaining": self.otp_verification_attempts_remaining
+        }
 
 
 class OtpResendRateLimitedError(AppException):
@@ -151,6 +169,10 @@ class OtpResendLimitExceedError(AppException):
     ):
         self.otp_resend_attempts_remaining = otp_resend_attempts_remaining
         super().__init__(status_code=429, message=detail)
+
+    @property
+    def extra(self) -> dict:
+        return {"otpResendAttemptsRemaining": self.otp_resend_attempts_remaining}
 
 
 class MemberNotFoundException(AppException):

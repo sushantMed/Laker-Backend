@@ -18,17 +18,16 @@ from app.core.permissions import RequireUser
 from app.core.rbac import Perm
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
-from app.dependencies.claim_dependencies import get_claim_search_params
 from app.models.user_model import UserModel
 from app.schemas.claim_schema import (
     ClaimDetail,
     ClaimsByEntityQuery,
-    ClaimSearchQueryParams,
+    ClaimSearchByMemberRequest,
     ClaimSearchRequest,
     ClaimSummary,
 )
 from app.schemas.common_schema import ApiResponse, PagedApiResponse
-from app.services.claim_service import ClaimService, _to_claim_detail, _to_claim_summary
+from app.services.claim_service import ClaimService, _to_claim_summary
 
 router = APIRouter(tags=["Claims"])
 
@@ -62,33 +61,26 @@ async def get_claim(
 @router.post("/members/{memberId}/claims/search")
 async def search_claims_for_member(
     memberId: str,
+    request: ClaimSearchByMemberRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: RequireUser(Perm.CLAIM_VIEW),  # type: ignore
-    params: Annotated[ClaimSearchQueryParams, Depends(get_claim_search_params)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> PagedApiResponse[ClaimDetail]:
-    query = ClaimsByEntityQuery(
-        page=page,
-        pageSize=pageSize,
-        startDate=params.date_written.isoformat() if params.date_written else None,
-        endDate=params.date_filled.isoformat() if params.date_filled else None,
-    )
-
-    claims = await ClaimService(session).get_claims_for_member(
+    claims = await ClaimService(session).search_claims_for_member(
         memberId,
-        query,
-        transform=_to_claim_detail,
+        request,
+        page=page,
+        page_size=pageSize,
     )
 
     return PagedApiResponse.ok(
         data=claims,
         message=(
             RECENT_CLAIM_RETRIEVAL_SUCCESS_MESSAGE
-            if params.recent
+            if request.recent
             else CLAIM_RETRIEVAL_SUCCESS_MESSAGE
         ),
-        recent_claim_count=claims.pagination.total,
     )
 
 
@@ -114,12 +106,9 @@ async def get_claims_for_pharmacy(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
-    startDate: Annotated[str | None, Query(alias="startDate")] = None,
-    endDate: Annotated[str | None, Query(alias="endDate")] = None,
+    filledDate: Annotated[str | None, Query(alias="filledDate")] = None,
 ) -> PagedApiResponse[ClaimSummary]:
-    query = ClaimsByEntityQuery(
-        page=page, pageSize=pageSize, startDate=startDate, endDate=endDate
-    )
+    query = ClaimsByEntityQuery(page=page, pageSize=pageSize, filledDate=filledDate)
     data = await ClaimService(session).get_claims_for_pharmacy(nabp, query)
     return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)
 
@@ -131,12 +120,9 @@ async def get_claims_for_prescriber(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
-    startDate: Annotated[str | None, Query(alias="startDate")] = None,
-    endDate: Annotated[str | None, Query(alias="endDate")] = None,
+    filledDate: Annotated[str | None, Query(alias="filledDate")] = None,
 ) -> PagedApiResponse[ClaimSummary]:
-    query = ClaimsByEntityQuery(
-        page=page, pageSize=pageSize, startDate=startDate, endDate=endDate
-    )
+    query = ClaimsByEntityQuery(page=page, pageSize=pageSize, filledDate=filledDate)
     data = await ClaimService(session).get_claims_for_prescriber(npi, query)
     return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)
 
@@ -148,11 +134,8 @@ async def get_claims_for_drug(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
-    startDate: Annotated[str | None, Query(alias="startDate")] = None,
-    endDate: Annotated[str | None, Query(alias="endDate")] = None,
+    filledDate: Annotated[str | None, Query(alias="filledDate")] = None,
 ) -> PagedApiResponse[ClaimSummary]:
-    query = ClaimsByEntityQuery(
-        page=page, pageSize=pageSize, startDate=startDate, endDate=endDate
-    )
+    query = ClaimsByEntityQuery(page=page, pageSize=pageSize, filledDate=filledDate)
     data = await ClaimService(session).get_claims_for_drug(ndc, query)
     return PagedApiResponse.ok(data=data, message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE)

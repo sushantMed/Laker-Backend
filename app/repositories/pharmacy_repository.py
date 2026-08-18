@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from sqlalchemy import func, select, true
+from sqlalchemy import func, select
 
 from app.models.pharmacy_model import PharmacyModel
 from app.repositories.base_repository import BaseRepository
@@ -23,6 +23,38 @@ def _compute_bounding_box(
 
 
 def _haversine_miles(lat1: float, long1: float, lat2: float, long2: float) -> float:
+    """
+    Calculate the great-circle distance between two geographic coordinates.
+
+    The calculation uses the spherical law of cosines:
+
+        d = R * acos(
+            sin(lat1) * sin(lat2)
+            + cos(lat1) * cos(lat2) * cos(long2 - long1)
+        )
+
+    where:
+        d  = distance between the two points in miles
+        R  = Earth's radius in miles (EARTH_RADIUS_MILES)
+        lat1, lat2 = latitudes in radians
+        long1, long2 = longitudes in radians
+
+    Args:
+        lat1: Latitude of the first point in decimal degrees.
+        long1: Longitude of the first point in decimal degrees.
+        lat2: Latitude of the second point in decimal degrees.
+        long2: Longitude of the second point in decimal degrees.
+
+    Returns:
+        The great-circle distance between the two points in miles.
+        Returns 0.0 when both coordinates are identical.
+
+    Note:
+        The returned distance is the straight-line geographic distance
+        ("as the crow flies") and does not represent road or travel distance.
+        The cosine value is clamped to [-1, 1] to prevent floating-point
+        rounding errors from causing math.acos() to fail.
+    """
     if lat1 == lat2 and long1 == long2:
         return 0.0
     lat1, long1, lat2, long2 = map(math.radians, (lat1, long1, lat2, long2))
@@ -51,7 +83,10 @@ class PharmacyRepository(BaseRepository[PharmacyModel]):
         return result.scalars().all()
 
     async def get_by_zip_code(
-        self, zip_code: str, radius: int | None = None, is_24hr: bool = False
+        self,
+        zip_code: str,
+        radius: int | None = None,
+        is_24hr: bool | None = None,
     ) -> list[PharmacyModel]:
         radius = 10 if radius is None else radius
 
@@ -83,20 +118,20 @@ class PharmacyRepository(BaseRepository[PharmacyModel]):
             PharmacyModel.longitude <= max_long,
         ]
 
-        if is_24hr:
-            # Oracle does not support SQLAlchemy's ``IS 1`` boolean form.
-            filters.append(PharmacyModel.is_24_hour == true())
+        if is_24hr is not None:
+            filters.append(PharmacyModel.is_24_hour == is_24hr)
 
         stmt = select(PharmacyModel).where(*filters)
         result = await self.session.execute(stmt)
         candidates = result.scalars().all()
 
-        in_range: list[tuple[float, PharmacyModel]] = []
+        in_range: list[PharmacyModel] = []
         for pharmacy in candidates:
             distance = _haversine_miles(
                 latitude, longitude, float(pharmacy.latitude), float(pharmacy.longitude)
             )
             if distance <= radius:
+                pharmacy.distance_miles = round(distance, 2)
                 in_range.append((distance, pharmacy))
 
         # Sort nearest-first

@@ -21,7 +21,7 @@ Assumptions:
 - The members table is already populated with the memberIds referenced in the claims JSON.
 - The claims JSON file is structured as a list of claim records, each with camelCase keys
   matching the ClaimModel fields (e.g., claimId, authNum, memberId, rxNumber, drug, ndc,
-  dateFilled, dateWritten, quantity, daysSupply, refillsRemaining, pharmacyNpi,
+  dateFilled, quantity, daysSupply, refillsRemaining, pharmacyNpi,
   pharmacyName, prescriberNpi, prescriberName, ingredientCost, dispensingFee, copay,
   totalPaid, isTestClaim, planId).
 """
@@ -61,7 +61,6 @@ def _claim_from_record(record: dict) -> ClaimModel:
         drug_name=record["drug"],
         ndc=record["ndc"],
         date_filled=_parse_date(record["dateFilled"]),
-        date_written=_parse_date(record.get("dateWritten")),
         quantity=record.get("quantity"),
         days_supply=record.get("daysSupply"),
         refills_remaining=record.get("refillsRemaining"),

@@ -23,6 +23,7 @@ class PharmacyInfo(BaseModel):
     longitude: float | None = None
     latitude: float | None = None
     zip: str | None = Field(alias="zipCode")
+    distance_miles: float | None = Field(default=None, alias="distanceMiles")
 
 
 class PharmacySearch(BaseModel):
@@ -75,7 +76,7 @@ class PharmacyLookupRequest(PaginationRequest):
         description="A five-digit U.S. ZIP code, optionally followed by ZIP+4.",
     )
     radius: int | None = Field(10, ge=0)  # in miles
-    is_24_hour: bool | None = Field(False, alias="is24Hour")
+    is_24_hour: bool | None = Field(None, alias="is24Hour")
 
     @field_validator("zip_code")
     @classmethod
