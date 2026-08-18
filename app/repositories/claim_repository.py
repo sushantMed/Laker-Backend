@@ -21,7 +21,6 @@ from app.models.claim_model import ClaimModel
 _SORTABLE_COLUMNS = {
     "authNum": ClaimModel.auth_num,
     "dateFilled": ClaimModel.date_filled,
-    "dateWritten": ClaimModel.date_written,
     "memberId": ClaimModel.member_id,
     "rxNumber": ClaimModel.rx_number,
     "drug": ClaimModel.drug_name,
@@ -52,7 +51,7 @@ class ClaimRepository:
         member_id: str | None = None,
         auth_num: str | None = None,
         date_filled: date | None = None,
-        date_written: date | None = None,
+        date_filled_from: date | None = None,
         exclude_test_claims: bool = True,
         page: int = 1,
         page_size: int = 10,
@@ -64,10 +63,7 @@ class ClaimRepository:
             stmt = stmt.where(ClaimModel.member_id.ilike(member_id))
         if auth_num:
             stmt = stmt.where(ClaimModel.auth_num.ilike(auth_num))
-        if date_written:
-            stmt = stmt.where(ClaimModel.date_filled >= date_written)
-        if date_filled:
-            stmt = stmt.where(ClaimModel.date_filled <= date_filled)
+        stmt = self._apply_date_range(stmt, date_filled, date_filled_from)
         if exclude_test_claims:
             stmt = stmt.where(ClaimModel.is_test_claim == false())
 
@@ -80,7 +76,6 @@ class ClaimRepository:
         member_id: str,
         exclude_test_claims: bool = True,
         date_filled: date | None = None,
-        date_written: date | None = None,
         page: int = 1,
         page_size: int = 10,
         sort_by: str | None = None,
@@ -94,7 +89,7 @@ class ClaimRepository:
         if exclude_test_claims:
             stmt = stmt.where(ClaimModel.is_test_claim == false())
 
-        stmt = self._apply_date_range(stmt, date_filled, date_written)
+        stmt = self._apply_date_range(stmt, date_filled)
         return await self._paginate(stmt, page, page_size, sort_by, sort_dir)
 
     async def count_claims_by_member_id(
@@ -118,7 +113,6 @@ class ClaimRepository:
         self,
         nabp: str,
         date_filled: date | None = None,
-        date_written: date | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> tuple[Sequence[ClaimModel], int]:
@@ -127,14 +121,13 @@ class ClaimRepository:
             .options(joinedload(ClaimModel.member))
             .where(ClaimModel.pharmacy_nabp == nabp)
         )
-        stmt = self._apply_date_range(stmt, date_filled, date_written)
+        stmt = self._apply_date_range(stmt, date_filled)
         return await self._paginate(stmt, page, page_size, None, "desc")
 
     async def get_claims_by_prescriber_npi(
         self,
         npi: str,
         date_filled: date | None = None,
-        date_written: date | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> tuple[Sequence[ClaimModel], int]:
@@ -143,14 +136,13 @@ class ClaimRepository:
             .options(joinedload(ClaimModel.member))
             .where(ClaimModel.prescriber_npi == npi)
         )
-        stmt = self._apply_date_range(stmt, date_filled, date_written)
+        stmt = self._apply_date_range(stmt, date_filled)
         return await self._paginate(stmt, page, page_size, None, "desc")
 
     async def get_claims_by_drug_ndc(
         self,
         ndc: str,
         date_filled: date | None = None,
-        date_written: date | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> tuple[Sequence[ClaimModel], int]:
@@ -159,7 +151,7 @@ class ClaimRepository:
             .options(joinedload(ClaimModel.member))
             .where(ClaimModel.ndc == ndc)
         )
-        stmt = self._apply_date_range(stmt, date_filled, date_written)
+        stmt = self._apply_date_range(stmt, date_filled)
         return await self._paginate(stmt, page, page_size, None, "desc")
 
     # ── Mutations ────────────────────────────────────────────────────────────
@@ -179,10 +171,10 @@ class ClaimRepository:
     def _apply_date_range(
         stmt,
         date_filled: date | None,
-        date_written: date | None,
+        date_filled_from: date | None = None,
     ):
-        if date_written:
-            stmt = stmt.where(ClaimModel.date_filled >= date_written)
+        if date_filled_from:
+            stmt = stmt.where(ClaimModel.date_filled >= date_filled_from)
         if date_filled:
             stmt = stmt.where(ClaimModel.date_filled <= date_filled)
         return stmt

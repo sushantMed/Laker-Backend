@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from sqlalchemy import func, select, true
+from sqlalchemy import func, select
 
 from app.models.pharmacy_model import PharmacyModel
 from app.repositories.base_repository import BaseRepository
@@ -83,7 +83,10 @@ class PharmacyRepository(BaseRepository[PharmacyModel]):
         return result.scalars().all()
 
     async def get_by_zip_code(
-        self, zip_code: str, radius: int | None = None, is_24hr: bool = False
+        self,
+        zip_code: str,
+        radius: int | None = None,
+        is_24hr: bool | None = None,
     ) -> list[PharmacyModel]:
         radius = 10 if radius is None else radius
 
@@ -115,20 +118,20 @@ class PharmacyRepository(BaseRepository[PharmacyModel]):
             PharmacyModel.longitude <= max_long,
         ]
 
-        if is_24hr:
-            # Oracle does not support SQLAlchemy's ``IS 1`` boolean form.
-            filters.append(PharmacyModel.is_24_hour == true())
+        if is_24hr is not None:
+            filters.append(PharmacyModel.is_24_hour == is_24hr)
 
         stmt = select(PharmacyModel).where(*filters)
         result = await self.session.execute(stmt)
         candidates = result.scalars().all()
 
-        in_range: list[tuple[float, PharmacyModel]] = []
+        in_range: list[PharmacyModel] = []
         for pharmacy in candidates:
             distance = _haversine_miles(
                 latitude, longitude, float(pharmacy.latitude), float(pharmacy.longitude)
             )
             if distance <= radius:
+                pharmacy.distance_miles = round(distance, 2)
                 in_range.append((distance, pharmacy))
 
         # Sort nearest-first

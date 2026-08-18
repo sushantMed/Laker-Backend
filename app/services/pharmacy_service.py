@@ -39,6 +39,7 @@ class PharmacyService:
             zipCode=p.zip,
             longitude=p.longitude,
             latitude=p.latitude,
+            distance_miles=getattr(p, "distance_miles", None),
         )
 
     async def get_pharmacy(
@@ -53,7 +54,7 @@ class PharmacyService:
             pharmacies = await self._repo.get_by_zip_code(
                 request.zip_code,
                 radius=request.radius,
-                is_24hr=bool(request.is_24_hour),
+                is_24hr=request.is_24_hour,
             )
 
         if not pharmacies:

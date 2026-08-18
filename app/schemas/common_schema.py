@@ -93,8 +93,6 @@ class SearchRequest(GenericModel, Generic[TSearch]):
 class ErrorDetail(BaseModel):
     statusCode: int
     message: str
-    otpVerificationAttemptsRemaining: int | None = None
-    otpResendAttemptsRemaining: int | None = None
 
 
 class ApiResponse(GenericModel, Generic[T]):
@@ -122,8 +120,6 @@ class ApiResponse(GenericModel, Generic[T]):
         message: str,
         status_code: int = 400,
         exception_message: str | None = None,
-        otp_verification_attempts_remaining: int | None = None,
-        otp_resend_attempts_remaining: int | None = None,
     ) -> "ApiResponse[None]":
         return cls(
             success=False,
@@ -132,8 +128,6 @@ class ApiResponse(GenericModel, Generic[T]):
             error=ErrorDetail(
                 statusCode=status_code,
                 message=exception_message or message,
-                otpVerificationAttemptsRemaining=otp_verification_attempts_remaining,
-                otpResendAttemptsRemaining=otp_resend_attempts_remaining,
             ),
         )
 
@@ -145,7 +139,6 @@ class PagedApiResponse(GenericModel, Generic[T]):
     message: str
     data: list[T]  # flat list, no nesting
     pagination: PaginationMeta | None = None
-    recent_claim_count: int | None = Field(None, alias="recentClaimCount")
     error: ErrorDetail | None = None
 
     @classmethod
@@ -153,14 +146,12 @@ class PagedApiResponse(GenericModel, Generic[T]):
         cls,
         data: PagedResponse[T],
         message: str = "Success",
-        recent_claim_count: int | None = None,
     ) -> "PagedApiResponse[T]":
         return cls(
             success=True,
             message=message,
             data=data.data,
             pagination=data.pagination,
-            recent_claim_count=recent_claim_count,
             error=None,
         )
 
