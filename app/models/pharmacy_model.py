@@ -51,8 +51,12 @@ class PharmacyModel(LookupBase):
     directions: Mapped[str | None] = mapped_column(
         "DIRECTIONS", String(50), nullable=True
     )
-    latitude: Mapped[float | None] = mapped_column("LATITUDE", Numeric, nullable=True)
-    longitude: Mapped[float | None] = mapped_column("LONGITUDE", Numeric, nullable=True)
+    latitude: Mapped[float | None] = mapped_column(
+        "LATITUDE", Numeric(precision=9, scale=6), nullable=True
+    )
+    longitude: Mapped[float | None] = mapped_column(
+        "LONGITUDE", Numeric(precision=9, scale=6), nullable=True
+    )
 
     # Mailing address
     mail_addr1: Mapped[str | None] = mapped_column(

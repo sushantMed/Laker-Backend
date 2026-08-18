@@ -119,18 +119,16 @@ def app_exception_handler(request: Request, exc: AppException):
         message=exc.message,
         status_code=exc.status_code,
         exception_message=str(exc),
-        otp_verification_attempts_remaining=getattr(
-            exc, "otp_verification_attempts_remaining", None
-        ),
-        otp_resend_attempts_remaining=getattr(
-            exc, "otp_resend_attempts_remaining", None
-        ),
     )
 
     content = response.model_dump(exclude_none=False)
     # Only strip None fields inside `error`, so unrelated exceptions
     if response.error:
-        content["error"] = response.error.model_dump(exclude_none=True)
+        error_content = response.error.model_dump(exclude_none=True)
+        # Merge exception-specific extra fields (e.g. OTP attempts remaining)
+        # so they only ever appear on the exceptions that define them.
+        error_content.update(exc.extra)
+        content["error"] = error_content
 
     return JSONResponse(status_code=exc.status_code, content=content)
 

@@ -54,7 +54,6 @@ class ClaimModel(Base):
     ndc: Mapped[str] = mapped_column(String(13), index=True)
 
     date_filled: Mapped[date] = mapped_column(Date, index=True)
-    date_written: Mapped[date | None] = mapped_column(Date, nullable=True)
     quantity: Mapped[float | None] = mapped_column(Numeric(10, 3), nullable=True)
     days_supply: Mapped[int | None] = mapped_column(Integer, nullable=True)
     refills_remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)

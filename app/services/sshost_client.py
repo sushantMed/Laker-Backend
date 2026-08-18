@@ -24,9 +24,6 @@ from app.core.exceptions import SSHostError
 
 logger = logging.getLogger("sshost_client")
 
-CONNECT_TIMEOUT = 5.0
-RESPONSE_TIMEOUT = 5.0
-
 
 def _encode(payload: dict) -> bytes:
     body = json.dumps(payload).encode("utf-8")
@@ -58,7 +55,7 @@ async def authenticate_user(username: str, password: str) -> bool:
     try:
         reader, writer = await asyncio.wait_for(
             asyncio.open_connection(settings.sshost_host, settings.sshost_port),
-            timeout=CONNECT_TIMEOUT,
+            timeout=settings.sshost_connect_timeout_seconds,
         )
     except (TimeoutError, OSError) as e:
         logger.error("Could not connect to SSHost: %s", e)
@@ -68,7 +65,9 @@ async def authenticate_user(username: str, password: str) -> bool:
         writer.write(_encode(request))
         await writer.drain()
 
-        response = await asyncio.wait_for(_decode(reader), timeout=RESPONSE_TIMEOUT)
+        response = await asyncio.wait_for(
+            _decode(reader), timeout=settings.sshost_response_timeout_seconds
+        )
 
     except (TimeoutError, OSError, json.JSONDecodeError) as e:
         logger.error("SSHost communication error: %s", e)

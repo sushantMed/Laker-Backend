@@ -37,6 +37,8 @@ class Settings(BaseSettings):
         "<docker service name>"  # docker service name for dummy sshost server
     )
     sshost_port: int = 9000
+    sshost_connect_timeout_seconds: float = 5.0
+    sshost_response_timeout_seconds: float = 5.0
 
     # ── Security ──────────────────────────────────────────────────
     jwt_secret_key: str
