@@ -12,6 +12,10 @@ from app.utils.pagination import PaginationRequest
 
 _CAMEL = {"populate_by_name": True}
 
+# The PA grid lets the user pull the whole result set in one page, so this
+# endpoint allows a far larger pageSize than the shared 100-row default.
+_PA_PAGE_SIZE_MAX = 10_000
+
 _DRUG_NAME_MAX = 70
 _PROVIDER_MAX = 50
 _REASON_CODE_MAX = 20
@@ -20,6 +24,11 @@ _DIAGNOSIS_MAX = 100
 
 _NDC_PATTERN = r"^\d{11}$"
 _GPI_PATTERN = r"^[A-Za-z0-9]{14}$"
+
+# NDCs are stored 11 wide. The grid lets the user key a short one, which is
+# left-padded with zeros before it hits the query.
+_NDC_LENGTH = 11
+_NDC_SEARCH_MIN = 9
 
 
 def _blank_to_none(value: str | None) -> str | None:
@@ -42,6 +51,30 @@ class PASearchResult(BaseModel):
     eff_date: date | None = Field(None, alias="effDate")
     term_date: date | None = Field(None, alias="termDate")
     status: PAStatus
+
+
+class PAMemberSearchResult(BaseModel):
+    """
+    Row shape for /members/{memberId}/prior-auth/search.
+
+    The member grid wants the PA's own columns, not the resolved member/drug
+    details that PASearchResult carries -- the member is already known from the
+    path.
+    """
+
+    model_config = _CAMEL
+
+    auth_num: str = Field(alias="authNum")
+    ndc: str | None = None
+    gpi: str | None = None
+    drug_name_ndc: str | None = Field(None, alias="drugNameNdc")
+    drug_name_gpi: str | None = Field(None, alias="drugNameGpi")
+    action: str | None = None
+    eff_date: date | None = Field(None, alias="effDate")
+    term_date: date | None = Field(None, alias="termDate")
+    last_user: str | None = Field(None, alias="lastUser")
+    subscriber_num: str | None = Field(None, alias="subscriberNum")
+    person_codes: str | None = Field(None, alias="personCodes")
 
 
 class PADetail(PASearchResult):
@@ -129,37 +162,58 @@ class PASearch(BaseModel):
 
 
 class PASearchByMemberPath(BaseModel):
+    """
+    Criteria for /members/{memberId}/prior-auth/search.
+
+    Only ndc, effDate and termDate are filters; effDate is a lower bound on the
+    PA's effdate and termDate an upper bound on its termdate. Every other key in
+    the body is ignored, memberId included: the search is already scoped by the
+    path.
+
+    ndc must be 9-11 characters and is left-padded with zeros to the stored
+    11-character width; blank or absent drops the filter.
+    """
+
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
         json_schema_extra={
             "example": {
-                "paId": None,
-                "drugName": None,
                 "ndc": None,
-                "status": None,
-                "effDateFrom": None,
-                "effDateTo": None,
+                "effDate": None,
+                "termDate": None,
             }
         },
     )
 
-    pa_id: str | None = None
-    drug_name: str | None = None
-    ndc: str | None = None
-    status: PAStatus | None = None
-    eff_date_from: date | None = None
-    eff_date_to: date | None = None
+    ndc: str | None = Field(None, min_length=_NDC_SEARCH_MIN, max_length=_NDC_LENGTH)
+    eff_date: date | None = None
+    term_date: date | None = None
 
-    @field_validator("pa_id", "drug_name", "ndc", mode="before")
+    @field_validator("ndc", mode="before")
     @classmethod
     def strip_and_blank_to_none(cls, v: str | None) -> str | None:
         return _blank_to_none(v)
 
-    @model_validator(mode="after")
-    def validate_eff_date_range(self) -> PASearchByMemberPath:
-        _require_ordered_dates(self.eff_date_from, self.eff_date_to)
-        return self
+    @field_validator("ndc", mode="after")
+    @classmethod
+    def pad_ndc(cls, v: str | None) -> str | None:
+        """A short NDC (e.g. 9 digits) is stored 11 wide -- pad zeros in front."""
+        return v.zfill(_NDC_LENGTH) if v else v
+
+    @field_validator("eff_date", "term_date", mode="before")
+    @classmethod
+    def blank_date_to_none(cls, v):
+        """An untouched date box posts "" -- treat it as no filter, not a 422."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+
+class PAPagination(PaginationRequest):
+    """Pagination for the member PA search -- same shape, higher pageSize cap."""
+
+    page_size: int = Field(default=20, ge=1, le=_PA_PAGE_SIZE_MAX, alias="pageSize")
 
 
 class PASearchRequest(BaseModel, SearchRequest[PASearch]):
@@ -173,18 +227,17 @@ class PASearchRequestByMemberPath(BaseModel, SearchRequest[PASearchByMemberPath]
         json_schema_extra={
             "example": {
                 "searchRequest": {
-                    "paId": None,
-                    "drugName": None,
                     "ndc": None,
-                    "status": None,
-                    "effDateFrom": None,
-                    "effDateTo": None,
+                    "effDate": None,
+                    "termDate": None,
                 },
                 "sort": {"sortBy": "effDate", "sortDir": "DESC"},
                 "pagination": {"page": 1, "pageSize": 20},
             }
         },
     )
+
+    pagination: PAPagination = Field(default_factory=PAPagination)
 
 
 class PAByEntityQuery(BaseModel, PaginationRequest):
