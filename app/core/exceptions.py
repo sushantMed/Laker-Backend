@@ -226,7 +226,6 @@ class MissingSearchCriteriaException(AppException):
 class DrugNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
-        self.code = "DRUG_NOT_FOUND"
 
 
 class ClaimNotFoundException(AppException):
@@ -247,28 +246,58 @@ class NoSearchCriteriaException(AppException):
 class PharmacyNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
-        self.code = "PHARMACY_NOT_FOUND"
 
 
 class PrescriberNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
-        self.code = "PRESCRIBER_NOT_FOUND"
 
 
 class PriorAuthNotFoundException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=404)
-        self.code = "PA_NOT_FOUND"
 
 
 class PriorAuthNotEditableException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=403)
-        self.code = "FORBIDDEN"
+
+
+class SubscriberNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)
+
+
+class SubscriberGroupNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)
+
+
+class InvalidEligibilityDataException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=400)
+
+
+class EligibilityDateOverlapException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=409)
+
+
+class SubscriberEligibilityNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)
+
+
+class SubscobNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)
+
+
+class SubsSubgroupNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)
 
 
 class InvalidStatusTransitionException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=422)
-        self.code = "VALIDATION_ERROR"

@@ -1,6 +1,10 @@
 """
-Seed script — loads users.json into the database on first run.
-Called automatically from app/main.py lifespan, or run standalone:
+Seed script — loads users.json into the database, syncing existing users'
+grants to whatever the JSON (and PERNAME_RESOURCES) currently say.
+
+Not called automatically anywhere (app/main.py's lifespan does not invoke
+it, despite what an earlier version of this docstring claimed) -- run it
+manually after editing users.json:
 
     python -m app.scripts.seed_users
 """
@@ -53,43 +57,58 @@ def _grants_for(spec) -> list[UserPermissionModel]:
     ]
 
 
+def _sync_grants(user: UserModel, desired: list[UserPermissionModel]) -> None:
+    """Add missing grants and update changed ones for an existing user.
+
+    Never removes a grant that's absent from ``desired`` -- other seed paths
+    (e.g. alembic data migrations) may have granted screens this user's JSON
+    entry doesn't list, and a sync run shouldn't silently revoke those.
+    """
+    existing = {g.pername.strip().lower(): g for g in user.grants}
+    for grant in desired:
+        current = existing.get(grant.pername.strip().lower())
+        if current is None:
+            user.grants.append(grant)
+        elif current.viewperm != grant.viewperm or current.saveperm != grant.saveperm:
+            current.viewperm = grant.viewperm
+            current.saveperm = grant.saveperm
+
+
 async def seed_users():
     json_path = Path(__file__).parent / "users.json"
 
     users = load_users(json_path)
 
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(UserModel))
-        existing_user = result.first()
-
-        if existing_user:
-            print("Users already exist. Skipping seed.")
-
         for user_data in users:
             email = user_data["email"].lower()
 
             result = await session.execute(
                 select(UserModel).where(UserModel.email == email)
             )
-
             existing_user = result.scalar_one_or_none()
+            desired_grants = _grants_for(user_data.get("permissions", {}))
 
-            if existing_user:
-                print(f"User already exists: {email}")
+            if existing_user is None:
+                user = UserModel(
+                    email=email,
+                    first_name=user_data["first_name"],
+                    last_name=user_data["last_name"],
+                    hashed_password=hash_password(user_data["password"]),
+                    status="ACTIVE",
+                    grants=desired_grants,
+                )
+                session.add(user)
+                print(f"Added user: {email}")
                 continue
 
-            user = UserModel(
-                email=email,
-                first_name=user_data["first_name"],
-                last_name=user_data["last_name"],
-                hashed_password=hash_password(user_data["password"]),
-                status="ACTIVE",
-                grants=_grants_for(user_data.get("permissions", {})),
-            )
-
-            session.add(user)
-
-            print(f"Added user: {email}")
+            # Sync name + grants on every run. Password is intentionally left
+            # alone here so a restart never silently resets someone's password
+            # back to the JSON default.
+            existing_user.first_name = user_data["first_name"]
+            existing_user.last_name = user_data["last_name"]
+            _sync_grants(existing_user, desired_grants)
+            print(f"Synced user: {email}")
 
         await session.commit()
 
