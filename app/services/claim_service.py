@@ -131,18 +131,20 @@ class ClaimService:
     ) -> PagedResponse[ClaimSummary]:
         """
         Search claims by Member ID and / or Auth Num, optionally narrowed
-        by a Date Filled cutoff. Test claims are excluded by default.
+        by a Date Filled range (startDate/endDate). Test claims are
+        excluded by default.
 
-        Search-criteria validation (at least one criterion; dateFilled
-        required if memberId absent) is enforced by ClaimSearch's
-        model_validators.
+        Search-criteria validation (at least one criterion; startDate/
+        endDate required together and required if memberId absent, span
+        capped at 12 months) is enforced by ClaimSearch's model_validators.
         """
         criteria = request.searchRequest
 
         items, total = await self._repo.search(
             member_id=criteria.member_id,
             auth_num=criteria.auth_num,
-            date_filled=criteria.date_filled,
+            date_filled=criteria.end_date,
+            date_filled_from=criteria.start_date,
             exclude_test_claims=criteria.exclude_test_claims,
             page=request.pagination.page,
             page_size=request.pagination.page_size,
