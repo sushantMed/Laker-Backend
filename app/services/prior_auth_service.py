@@ -285,7 +285,7 @@ class PriorAuthService:
         criteria = request.searchRequest
 
         items, total = await self._repo.search(
-            insured_id=member.insured_id,
+            subscriber_num=member.insured_id,
             person_code=member.person_code,
             ndc=criteria.ndc,
             eff_date=criteria.eff_date,

@@ -535,7 +535,10 @@ async def test_search_for_member_scopes_to_that_member(service: PriorAuthService
     )
 
     kwargs = service._repo.search.await_args.kwargs
-    assert kwargs["insured_id"] == "INS001"
+    # Scoped via subscriber_num (a LIKE '%...%' match), not insured_id's exact
+    # match -- see PriorAuthRepository.search.
+    assert kwargs["subscriber_num"] == "INS001"
+    assert "insured_id" not in kwargs
     assert kwargs["person_code"] == "02"
 
 
