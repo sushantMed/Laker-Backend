@@ -7,6 +7,7 @@ import this package to guarantee the full registry is configured.
 """
 
 from app.models.auth_model import RefreshTokenModel, RevokedAccessTokenModel
+from app.models.card_queue_model import CardQueueModel
 from app.models.claim_model import ClaimModel
 from app.models.drug_model import DrugModel
 from app.models.member_address_model import MemberAddressModel
@@ -15,9 +16,11 @@ from app.models.pharmacy_model import PharmacyModel
 from app.models.plan_model import PlanModel
 from app.models.prescriber_model import PrescriberModel
 from app.models.prior_auth_model import PriorAuthModel
+from app.models.upd_tran_model import UpdTranDetailModel, UpdTranModel
 from app.models.user_model import UserModel
 
 __all__ = [
+    "CardQueueModel",
     "ClaimModel",
     "DrugModel",
     "MemberAddressModel",
@@ -28,5 +31,7 @@ __all__ = [
     "PriorAuthModel",
     "RefreshTokenModel",
     "RevokedAccessTokenModel",
+    "UpdTranDetailModel",
+    "UpdTranModel",
     "UserModel",
 ]

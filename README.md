@@ -65,7 +65,7 @@ app/
 ├── main.py               # App factory, middleware registration, lifespan
 ├── api/
 │   ├── router.py         # Mounts every v1 router
-│   └── v1/                # auth, claims, members, pharmacies, prescribers, drugs, prior_auth, users, health
+│   └── v1/                # auth, cards, claims, members, pharmacies, prescribers, drugs, prior_auth, users, health
 ├── core/                  # config (Settings), constants, exceptions + handlers, security (JWT/hashing), rbac, mailer
 ├── database/              # SQLAlchemy base + async session/engine
 ├── dependencies/          # FastAPI DI: auth, mailer
@@ -231,6 +231,7 @@ pytest --cov=app                    # with coverage
 | Prescribers | `/api/v1/prescribers` | Lookup, search |
 | Drugs | `/api/v1/drugs` | Lookup by NDC/GPI, search |
 | Prior Authorizations | `/api/v1/prior-auth`, `/api/v1/members/{id}/prior-auth` | CRUD + search |
+| Card Print | `/api/v1/members/{id}/card-print-history` | ID-card print history (legacy `CARDQ`) + cancelling a queued card request |
 | Health | `/api/v1/health` | Liveness (`/`) and readiness (`/ready`, checks DB + cache) |
 
 Full request/response shapes: Swagger UI at `/docs` (source of truth — this table is intentionally not exhaustive).

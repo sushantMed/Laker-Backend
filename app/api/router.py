@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     auth,
+    cards,
     claims,
     drugs,
     health,
@@ -23,3 +24,4 @@ api_router.include_router(drugs.router)
 api_router.include_router(pharmacies.router)
 api_router.include_router(prescribers.router)
 api_router.include_router(prior_auth.router)
+api_router.include_router(cards.router)

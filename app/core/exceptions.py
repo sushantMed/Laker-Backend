@@ -268,6 +268,18 @@ class PriorAuthNotEditableException(AppException):
         self.code = "FORBIDDEN"
 
 
+class CardRequestNotFoundException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=404)
+        self.code = "CARD_REQUEST_NOT_FOUND"
+
+
+class CardRequestNotCancellableException(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=409)
+        self.code = "CONFLICT"
+
+
 class InvalidStatusTransitionException(AppException):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=422)
