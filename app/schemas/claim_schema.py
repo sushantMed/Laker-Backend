@@ -7,6 +7,7 @@ All validation uses @model_validator(mode="after").
 
 from __future__ import annotations
 
+import calendar
 from datetime import date
 
 from pydantic import Field, field_validator, model_validator  # type:ignore
@@ -94,22 +95,39 @@ class ClaimDetail(BaseModel):
 # ── Search ────────────────────────────────────────────────────────────────────
 
 
+_MAX_DATE_RANGE_MONTHS = 12
+
+
+def _add_months(d: date, months: int) -> date:
+    month_index = d.month - 1 + months
+    year = d.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+
 class ClaimSearch(BaseModel):
     """
     Search criteria for POST /claims/search (and the member-scoped variant).
 
     Business rules (per the C1 spec):
-    - memberId, authNum, and/or dateFilled may be supplied.
-    - If memberId is NOT provided, dateFilled is required — an
+    - memberId, authNum, and/or a startDate/endDate dateFilled range may be
+      supplied.
+    - startDate and endDate must be supplied together (both or neither), and
+      when both are given, endDate must be on/after startDate and the span
+      between them may not exceed 12 months.
+    - If memberId is NOT provided, startDate/endDate are required — an
       auth-num-only search without a member is too expensive to run
       unbounded.
+    - If memberId IS provided, the date range is optional.
     """
 
     model_config = _CAMEL
 
     member_id: str | None = Field(None, alias="memberId")
     auth_num: str | None = Field(None, alias="authNum")
-    date_filled: date | None = Field(None, alias="filledDate")
+    start_date: date | None = Field(None, alias="startDate")
+    end_date: date | None = Field(None, alias="endDate")
 
     # Checked by default in the UI ("Exclude Test Claims")
     exclude_test_claims: bool = Field(True, alias="excludeTestClaims")
@@ -124,21 +142,41 @@ class ClaimSearch(BaseModel):
 
     @model_validator(mode="after")
     def validate_search_criteria(self) -> ClaimSearch:
-        has_any_criteria = any([self.member_id, self.auth_num, self.date_filled])
-        if not has_any_criteria:
-            from app.core.exceptions import NoSearchCriteriaException
+        from app.core.exceptions import (
+            InvalidDateRangeException,
+            NoSearchCriteriaException,
+        )
 
+        has_any_criteria = any(
+            [self.member_id, self.auth_num, self.start_date, self.end_date]
+        )
+        if not has_any_criteria:
             raise NoSearchCriteriaException(
                 "At least one search criterion (memberId, authNum, "
-                "or filledDate) must be provided."
+                "or startDate/endDate) must be provided."
             )
 
-        if not self.member_id and not self.date_filled:
-            from app.core.exceptions import NoSearchCriteriaException
+        if bool(self.start_date) != bool(self.end_date):
+            raise InvalidDateRangeException(
+                "startDate and endDate must be provided together."
+            )
 
+        if not self.member_id and not self.start_date:
             raise NoSearchCriteriaException(
-                "filledDate is required when memberId is not provided."
+                "startDate and endDate are required when memberId is not provided."
             )
+
+        if self.start_date and self.end_date:
+            if self.end_date < self.start_date:
+                raise InvalidDateRangeException(
+                    "endDate must be on or after startDate."
+                )
+            if self.end_date > _add_months(self.start_date, _MAX_DATE_RANGE_MONTHS):
+                raise InvalidDateRangeException(
+                    "The span between start-date and end-date must not "
+                    f"exceed {_MAX_DATE_RANGE_MONTHS} months."
+                )
+
         return self
 
 

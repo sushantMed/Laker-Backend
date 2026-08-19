@@ -94,7 +94,8 @@ class TestSearchClaims:
             json={
                 "searchRequest": {
                     "authNum": "AUTH-SPECIFIC",
-                    "filledDate": "2024-12-31",
+                    "startDate": "2024-01-01",
+                    "endDate": "2024-12-31",
                     "excludeTestClaims": False,
                 }
             },
@@ -151,7 +152,8 @@ class TestSearchClaims:
             self.BASE_URL,
             json={
                 "searchRequest": {
-                    "filledDate": "2024-12-31",
+                    "startDate": "2024-01-01",
+                    "endDate": "2024-12-31",
                     "excludeTestClaims": False,
                 }
             },
@@ -204,6 +206,72 @@ class TestSearchClaims:
             headers=_auth_header(),
         )
         assert resp.status_code in (400, 422)
+
+    async def test_search_with_only_start_date_returns_error(self, client: AsyncClient):
+        resp = await client.post(
+            self.BASE_URL,
+            json={
+                "searchRequest": {
+                    "memberId": "MBR-001",
+                    "startDate": "2024-01-01",
+                    "excludeTestClaims": False,
+                }
+            },
+            headers=_auth_header(),
+        )
+        assert resp.status_code in (400, 422)
+
+    async def test_search_with_end_date_before_start_date_returns_error(
+        self, client: AsyncClient
+    ):
+        resp = await client.post(
+            self.BASE_URL,
+            json={
+                "searchRequest": {
+                    "memberId": "MBR-001",
+                    "startDate": "2024-06-01",
+                    "endDate": "2024-01-01",
+                    "excludeTestClaims": False,
+                }
+            },
+            headers=_auth_header(),
+        )
+        assert resp.status_code in (400, 422)
+
+    async def test_search_with_date_span_over_12_months_returns_error(
+        self, client: AsyncClient
+    ):
+        resp = await client.post(
+            self.BASE_URL,
+            json={
+                "searchRequest": {
+                    "authNum": "AUTH-LONG-SPAN",
+                    "startDate": "2023-01-01",
+                    "endDate": "2024-06-01",
+                    "excludeTestClaims": False,
+                }
+            },
+            headers=_auth_header(),
+        )
+        assert resp.status_code in (400, 422)
+
+    async def test_search_by_member_id_without_date_range_succeeds(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        claim = _make_claim(member_id="MBR-NO-RANGE")
+        await _seed(db_session, claim)
+
+        resp = await client.post(
+            self.BASE_URL,
+            json={
+                "searchRequest": {
+                    "memberId": "MBR-NO-RANGE",
+                    "excludeTestClaims": False,
+                }
+            },
+            headers=_auth_header(),
+        )
+        assert resp.status_code == 200
 
     async def test_search_missing_auth_header_returns_401(self, client: AsyncClient):
         resp = await client.post(
