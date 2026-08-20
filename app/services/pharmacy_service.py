@@ -35,6 +35,8 @@ class PharmacyService:
             address=_compose_address(p),
             phone=p.phone,
             fax=p.fax,
+            city=p.city,
+            state=p.state,
             is24Hour=p.is_24_hour,
             zipCode=p.zip,
             longitude=p.longitude,

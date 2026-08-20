@@ -23,6 +23,8 @@ class PharmacyInfo(BaseModel):
     longitude: float | None = None
     latitude: float | None = None
     zip: str | None = Field(alias="zipCode")
+    city: str | None = None
+    state: str | None = None
     distance_miles: float | None = Field(default=None, alias="distanceMiles")
 
 
