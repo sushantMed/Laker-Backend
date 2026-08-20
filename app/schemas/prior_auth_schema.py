@@ -169,11 +169,12 @@ class PASearchByMemberPath(BaseModel):
     other key in the body is ignored, memberId included: the search is already
     scoped by the path.
 
+    last90Days floors effDate at 90 days before today. It defaults to false, so
+    an unkeyed search returns the member's whole history. A keyed effDate wins:
+    the flag only supplies a floor where there is none.
+
     termDate is accepted and parsed but not currently applied -- the service
     stopped passing it to the repository.
-
-    Leaving effDate out (or blank) does not drop the bound -- it falls back to
-    90 days before today. Key an older effDate to reach further back.
 
     ndc must be 9-11 characters and is left-padded with zeros to the stored
     11-character width; blank or absent drops the filter.
@@ -187,6 +188,7 @@ class PASearchByMemberPath(BaseModel):
                 "ndc": None,
                 "effDate": None,
                 "termDate": None,
+                "last90Days": False,
             }
         },
     )
@@ -194,6 +196,9 @@ class PASearchByMemberPath(BaseModel):
     ndc: str | None = Field(None, min_length=_NDC_SEARCH_MIN, max_length=_NDC_LENGTH)
     eff_date: date | None = None
     term_date: date | None = None
+    # Aliased explicitly: the wire name is fixed by the client, so it must not
+    # ride on whatever the alias generator happens to produce.
+    last_90_days: bool = Field(False, alias="last90Days")
 
     @field_validator("ndc", mode="before")
     @classmethod
@@ -235,6 +240,7 @@ class PASearchRequestByMemberPath(BaseModel, SearchRequest[PASearchByMemberPath]
                     "ndc": None,
                     "effDate": None,
                     "termDate": None,
+                    "last90Days": False,
                 },
                 "sort": {"sortBy": "effDate", "sortDir": "DESC"},
                 "pagination": {"page": 1, "pageSize": 20},

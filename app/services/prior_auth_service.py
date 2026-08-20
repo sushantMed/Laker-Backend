@@ -50,9 +50,8 @@ _ALLOWED_TRANSITIONS: dict[PAStatus, set[PAStatus]] = {
 
 _AUDIT_USER_MAX = 20
 
-# The member PA grid opens on the last quarter's authorisations: with no
-# effDate keyed, the floor is 90 days back from today.
-_DEFAULT_SEARCH_WINDOW_DAYS = 90
+# How far back the member PA grid's last90Days flag reaches.
+_LAST_90_DAYS_WINDOW = 90
 
 # A GPI recorded as a compound stands for no single drug, so no name is bound.
 _COMPOUND_GPI = "COMPOUND"
@@ -352,11 +351,11 @@ class PriorAuthService:
         member = await self._require_member(member_id)
         criteria = request.searchRequest
 
-        # An unkeyed effDate opens the grid on the last 90 days, not on every
-        # PA the subscriber has ever held.
-        eff_date = criteria.eff_date or (
-            date.today() - timedelta(days=_DEFAULT_SEARCH_WINDOW_DAYS)
-        )
+        # last90Days floors the search at 90 days back. A keyed effDate wins:
+        # the flag only supplies a floor where the caller gave none.
+        eff_date = criteria.eff_date
+        if eff_date is None and criteria.last_90_days:
+            eff_date = date.today() - timedelta(days=_LAST_90_DAYS_WINDOW)
 
         items, total = await self._repo.search(
             insured_id=member.insured_id,

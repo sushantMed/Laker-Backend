@@ -77,6 +77,26 @@ def test_member_path_search_allows_no_criteria():
     assert criteria.ndc is None
     assert criteria.eff_date is None
     assert criteria.term_date is None
+    assert criteria.last_90_days is False
+
+
+@pytest.mark.parametrize(
+    ("keyed", "expected"),
+    [(True, True), (False, False), ("true", True), ("false", False), (1, True)],
+)
+def test_member_path_search_parses_last_90_days(keyed, expected):
+    assert PASearchByMemberPath(last90Days=keyed).last_90_days is expected
+
+
+def test_member_path_search_last_90_days_takes_its_wire_name():
+    """The client keys last90Days; the field name is the fallback, not the alias."""
+    assert PASearchByMemberPath(last90Days=True).last_90_days is True
+    assert PASearchByMemberPath(last_90_days=True).last_90_days is True
+
+
+def test_member_path_search_rejects_non_boolean_last_90_days():
+    with pytest.raises(ValidationError):
+        PASearchByMemberPath(last90Days="yesterday")
 
 
 def test_member_path_search_parses_eff_and_term_dates():
@@ -128,11 +148,16 @@ def test_member_path_search_still_rejects_malformed_dates():
     "field", ["memberId", "paId", "drugName", "provider", "status"]
 )
 def test_member_path_search_ignores_unsupported_criteria(field):
-    """Only ndc/effDate/termDate filter; anything else is accepted and dropped."""
+    """Only the four known keys survive; anything else is accepted and dropped."""
     criteria = PASearchByMemberPath(**{field: "x"}, ndc="00088502005")
 
     assert criteria.ndc == "00088502005"
-    assert set(criteria.model_dump()) == {"ndc", "eff_date", "term_date"}
+    assert set(criteria.model_dump()) == {
+        "ndc",
+        "eff_date",
+        "term_date",
+        "last_90_days",
+    }
 
 
 def test_member_path_request_envelope():
