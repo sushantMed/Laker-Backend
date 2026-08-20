@@ -198,7 +198,7 @@ async def test_get_pharmacy_rejects_invalid_us_zip_code(client, seeded_lookups):
 
     assert resp.status_code == 400
     assert resp.json()["error"]["message"] == (
-        "zipCode must be a valid U.S. ZIP code (for example, 62704 or 62704-1234)."
+        "zipCode must be a valid five-digit U.S. ZIP code (for example, 62704)."
     )
 
 

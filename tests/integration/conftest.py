@@ -31,6 +31,7 @@ from app.models.permission_model import UserPermissionModel
 from app.models.pharmacy_model import PharmacyModel
 from app.models.prescriber_model import PrescriberModel
 from app.models.user_model import UserModel
+from app.models.zip_code_model import ZipCodeModel
 from app.utils.enums import BrandGeneric, CoverageType, Gender, Maintenance
 
 # ── Test database ─────────────────────────────────────────────────────────────
@@ -402,6 +403,8 @@ async def seeded_lookups(db_session: AsyncSession):
                 phone=None,
                 fax=None,
             ),
+            ZipCodeModel(zip="62704", latitude=39.7817, longitude=-89.6501),
+            ZipCodeModel(zip="60601", latitude=41.8781, longitude=-87.6298),
         ]
     )
     await db_session.flush()
