@@ -1,0 +1,192 @@
+{
+  "_comment": "Seed data for the legacy SUBSCRIBER/eligibility lookup tables (LookupBase). subscribernum values reuse cardholder member_ids already present in members.json (person_code=01) so eligibility lookups resolve against a real member. clientcode is hardcoded to 'YYY' everywhere, matching DEFAULT_CLIENTCODE in subscriber_group_list_service.py.",
+
+  "subscribers": [
+    {
+      "subscribernum": "MBR001",
+      "personcode": "01",
+      "clientcode": "YYY",
+      "lastname": "Martinez",
+      "firstname": "Carlos",
+      "dob": "1978-04-12",
+      "termination": null,
+      "status": "A",
+      "gender": "M"
+    },
+    {
+      "subscribernum": "MBR005",
+      "personcode": "01",
+      "clientcode": "YYY",
+      "lastname": "Thompson",
+      "firstname": "James",
+      "dob": "1975-06-30",
+      "termination": null,
+      "status": "A",
+      "gender": "M"
+    },
+    {
+      "subscribernum": "MBR007",
+      "personcode": "01",
+      "clientcode": "YYY",
+      "lastname": "Nguyen",
+      "firstname": "Minh",
+      "dob": "1990-02-14",
+      "termination": null,
+      "status": "A",
+      "gender": "M"
+    }
+  ],
+
+  "groups": [
+    { "groupnum": "MLB01MART", "bitflags2": 0 },
+    { "groupnum": "MLB02THOM", "bitflags2": 512 },
+    { "groupnum": "MLB03NGUY", "bitflags2": 0 }
+  ],
+
+  "subscriberGroupList": [
+    {
+      "subscriber": "MBR001",
+      "clientcode": "YYY",
+      "linenum": 1,
+      "groupnum": "MLB01MART",
+      "priority": 1,
+      "startdt": "2022-01-01",
+      "enddt": "2026-12-31",
+      "covtype": "F",
+      "changedt": "2022-01-01"
+    },
+    {
+      "subscriber": "MBR005",
+      "clientcode": "YYY",
+      "linenum": 1,
+      "groupnum": "MLB02THOM",
+      "priority": 1,
+      "startdt": "2024-01-01",
+      "enddt": "2026-12-31",
+      "covtype": "I",
+      "changedt": "2024-01-01"
+    },
+    {
+      "subscriber": "MBR007",
+      "clientcode": "YYY",
+      "linenum": 1,
+      "groupnum": "MLB03NGUY",
+      "priority": 1,
+      "startdt": "2023-06-01",
+      "enddt": null,
+      "covtype": "F",
+      "changedt": "2023-06-01"
+    }
+  ],
+
+  "subscob": [
+    {
+      "subscriber": "MBR001",
+      "pc": "01",
+      "linenum": 1,
+      "ocflag": "N",
+      "startdt": "2022-01-01",
+      "enddt": null,
+      "covnote": null,
+      "primaryinsuranceid": null,
+      "bin": null,
+      "pcn": null,
+      "groupnum": null,
+      "payor": null,
+      "otherid": null,
+      "lastchanged": "2022-01-01"
+    },
+    {
+      "subscriber": "MBR005",
+      "pc": "01",
+      "linenum": 1,
+      "ocflag": "Y",
+      "startdt": "2024-01-01",
+      "enddt": null,
+      "covnote": "Medicare Part D primary",
+      "primaryinsuranceid": "MEDD-778812",
+      "bin": "610014",
+      "pcn": "MEDDPART",
+      "groupnum": "MLB02THOM",
+      "payor": "Medicare",
+      "otherid": "OTH-5521",
+      "lastchanged": "2024-01-01"
+    },
+    {
+      "subscriber": "MBR007",
+      "pc": "01",
+      "linenum": 1,
+      "ocflag": "N",
+      "startdt": "2023-06-01",
+      "enddt": null,
+      "covnote": null,
+      "primaryinsuranceid": null,
+      "bin": null,
+      "pcn": null,
+      "groupnum": null,
+      "payor": null,
+      "otherid": null,
+      "lastchanged": "2023-06-01"
+    }
+  ],
+
+  "subsSubgroups": [
+    {
+      "subscriber": "MBR001",
+      "pc": "01",
+      "linenum": 1,
+      "subgroup": "RETAIL",
+      "startdt": "2022-01-01",
+      "enddt": null,
+      "lastchanged": "2022-01-01"
+    },
+    {
+      "subscriber": "MBR005",
+      "pc": "01",
+      "linenum": 1,
+      "subgroup": "MAIL",
+      "startdt": "2024-01-01",
+      "enddt": null,
+      "lastchanged": "2024-01-01"
+    },
+    {
+      "subscriber": "MBR007",
+      "pc": "01",
+      "linenum": 1,
+      "subgroup": "RETAIL",
+      "startdt": "2023-06-01",
+      "enddt": null,
+      "lastchanged": "2023-06-01"
+    }
+  ],
+
+  "subscriberEligList": [
+    {
+      "subscriber": "MBR001",
+      "personcode": "01",
+      "clientcode": "YYY",
+      "linenum": 1,
+      "startdt": "2022-01-01",
+      "enddt": "2026-12-31",
+      "changedt": "2022-01-01"
+    },
+    {
+      "subscriber": "MBR005",
+      "personcode": "01",
+      "clientcode": "YYY",
+      "linenum": 1,
+      "startdt": "2024-01-01",
+      "enddt": "2026-12-31",
+      "changedt": "2024-01-01"
+    },
+    {
+      "subscriber": "MBR007",
+      "personcode": "01",
+      "clientcode": "YYY",
+      "linenum": 1,
+      "startdt": "2023-06-01",
+      "enddt": null,
+      "changedt": "2023-06-01"
+    }
+  ]
+}

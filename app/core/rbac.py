@@ -45,6 +45,8 @@ class Perm:
     PRICING_SAVE = "pricing:save"
     ACCUM_VIEW = "accum:view"
     ACCUM_SAVE = "accum:save"
+    CARDHOLDERELIGIBILTY_VIEW = "cardholdereligibilty:view"
+    CARDHOLDERELIGIBILTY_SAVE = "cardholdereligibilty:save"
 
 
 ALL_PERMISSIONS: set[str] = {
@@ -72,6 +74,9 @@ PERNAME_RESOURCES: dict[str, str] = {
     "drug lookup screen": "drug",
     "groups screen": "groups",
     "user admin": "useradmin",
+    # Best-effort guess -- the exact pername spelling in sql.userperm for this
+    # screen hasn't been confirmed. Update this key if grants don't resolve.
+    "cardholder eligibilty": "cardholdereligibilty",
 }
 
 # Extra permissions a `viewperm` grant carries beyond `<resource>:view`.

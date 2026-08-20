@@ -54,6 +54,7 @@ python -m app.scripts.seed_users
 python -m app.scripts.seed_members
 python -m app.scripts.seed_lookups
 python -m app.scripts.seed_claims
+python -m app.scripts.seed_eligibility
 ```
 
 Full details and DBeaver/Oracle connection notes: [Setup & running](#setup--running).
@@ -76,7 +77,7 @@ app/
 ├── services/                # Business logic layer, one per domain
 ├── schemas/                 # Pydantic request/response models
 ├── observability/            # Prometheus metrics, /internal/metrics, tracing stubs
-└── scripts/                  # seed_users / seed_members / seed_lookups / seed_claims (run manually, see below)
+└── scripts/                  # seed_users / seed_members / seed_lookups / seed_claims / seed_eligibility (run manually, see below)
 
 alembic/                   # DB migrations (script_location = alembic)
 tests/
@@ -177,13 +178,26 @@ uvicorn app.main:app --reload   # http://localhost:8000
 
 ### Seeding sample data
 
-Seed scripts are idempotent (safe to re-run) but **not** run automatically — invoke them manually after migrations:
+Seed scripts are idempotent (safe to re-run) but **not** run automatically — invoke them manually after migrations.
+
+**With Docker** (run inside the running `api` container):
 
 ```bash
-python -m app.scripts.seed_users     # test users + permission grants
-python -m app.scripts.seed_members   # plans, members, addresses
-python -m app.scripts.seed_lookups   # drugs, pharmacies, prescribers
-python -m app.scripts.seed_claims    # claims (references seeded members)
+docker compose exec api python -m app.scripts.seed_users        # test users + permission grants
+docker compose exec api python -m app.scripts.seed_members      # plans, members, addresses
+docker compose exec api python -m app.scripts.seed_lookups      # drugs, pharmacies, prescribers
+docker compose exec api python -m app.scripts.seed_claims       # claims (references seeded members)
+docker compose exec api python -m app.scripts.seed_eligibility  # SUBSCRIBER + group/COB/subgroup eligibility (references seeded members)
+```
+
+**Without Docker** (from your activated `.venv`):
+
+```bash
+python -m app.scripts.seed_users        # test users + permission grants
+python -m app.scripts.seed_members      # plans, members, addresses
+python -m app.scripts.seed_lookups      # drugs, pharmacies, prescribers
+python -m app.scripts.seed_claims       # claims (references seeded members)
+python -m app.scripts.seed_eligibility  # SUBSCRIBER + group/COB/subgroup eligibility (references seeded members)
 ```
 
 ### Database migrations
