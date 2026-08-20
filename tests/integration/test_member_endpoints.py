@@ -50,6 +50,7 @@ def _make_member(
     start_date: date = date(2020, 1, 1),
     end_date: date = date(2030, 1, 1),
     plan_id: str | None = None,
+    ssn: str | None = None,
 ) -> MemberModel:
     return MemberModel(
         id=uuid.uuid4(),
@@ -68,6 +69,7 @@ def _make_member(
         start_date=start_date,
         end_date=end_date,
         plan_id=plan_id,
+        ssn=ssn,
     )
 
 
@@ -108,6 +110,17 @@ class TestGetMember:
 
         assert resp.status_code == 200
         assert resp.json()["data"]["memberId"] == "MBR777"
+
+    async def test_masked_ssn(self, client: AsyncClient, db_session: AsyncSession):
+        await _seed(
+            db_session,
+            _make_member(member_id="MBR888", ssn="123-45-6789"),
+        )
+
+        resp = await client.get(self._url("MBR888"), headers=_auth_header())
+
+        assert resp.status_code == 200
+        assert resp.json()["data"]["ssn"] == "***-**-6789"
 
 
 class TestSearchMembers:

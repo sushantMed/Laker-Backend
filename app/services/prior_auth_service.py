@@ -348,8 +348,16 @@ class PriorAuthService:
         member = await self._require_member(member_id)
         criteria = request.searchRequest
 
+        if not member.insured_id:
+            return PagedResponse.of(
+                data=[],
+                page=request.pagination.page,
+                page_size=request.pagination.page_size,
+                total=0,
+            )
+
         items, total = await self._repo.search(
-            insured_id=member.insured_id,
+            subscriber_num=member.insured_id,
             person_code=member.person_code,
             ndc=criteria.ndc,
             # effDate is the older name for the lower bound; both are floors, so

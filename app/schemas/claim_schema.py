@@ -7,19 +7,14 @@ All validation uses @model_validator(mode="after").
 
 from __future__ import annotations
 
+import calendar
 from datetime import date
 
-from pydantic import (  # type:ignore
-    ConfigDict,
-    Field,
-    field_validator,
-    model_validator,
-)
-from pydantic.alias_generators import to_camel  # type:ignore
+from pydantic import Field, field_validator, model_validator  # type:ignore
 
 from app.core.base_model import AppBaseModel as BaseModel
 from app.schemas.common_schema import SearchRequest
-from app.utils.pagination import PaginationRequest, SortRequest
+from app.utils.pagination import PaginationRequest
 
 # ── Shared config ────────────────────────────────────────────────────────────
 
@@ -52,8 +47,7 @@ class ClaimSummary(BaseModel):
     model_config = _CAMEL
 
     auth_num: str = Field(alias="authNum")
-    date_filled: date = Field(alias="endDate")
-    date_written: date | None = Field(None, alias="startDate")
+    date_filled: date = Field(alias="filledDate")
     member_id: str = Field(alias="memberId")
     first_name: str | None = Field(None, alias="firstName")
     last_name: str | None = Field(None, alias="lastName")
@@ -81,8 +75,7 @@ class ClaimDetail(BaseModel):
     drug: str
     ndc: str
 
-    date_filled: date = Field(None, alias="endDate")
-    date_written: date | None = Field(None, alias="startDate")
+    date_filled: date = Field(None, alias="filledDate")
     quantity: float | None = None
     days_supply: int | None = Field(None, alias="daysSupply")
     refills_remaining: int | None = Field(None, alias="refillsRemaining")
@@ -102,7 +95,15 @@ class ClaimDetail(BaseModel):
 # ── Search ────────────────────────────────────────────────────────────────────
 
 
-_MAX_DATE_RANGE_DAYS = 366  # ~12 months
+_MAX_DATE_RANGE_MONTHS = 12
+
+
+def _add_months(d: date, months: int) -> date:
+    month_index = d.month - 1 + months
+    year = d.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
 
 
 class ClaimSearch(BaseModel):
@@ -110,19 +111,23 @@ class ClaimSearch(BaseModel):
     Search criteria for POST /claims/search (and the member-scoped variant).
 
     Business rules (per the C1 spec):
-    - memberId, authNum, and/or a dateFilled range may be supplied.
-    - If memberId is NOT provided, a full dateFilled range (start AND end)
-      is required — open-ended or auth-num-only searches without a member
-      are too expensive to run unbounded.
-    - The dateFilled range, when supplied, cannot exceed 12 months.
+    - memberId, authNum, and/or a startDate/endDate dateFilled range may be
+      supplied.
+    - startDate and endDate must be supplied together (both or neither), and
+      when both are given, endDate must be on/after startDate and the span
+      between them may not exceed 12 months.
+    - If memberId is NOT provided, startDate/endDate are required — an
+      auth-num-only search without a member is too expensive to run
+      unbounded.
+    - If memberId IS provided, the date range is optional.
     """
 
     model_config = _CAMEL
 
     member_id: str | None = Field(None, alias="memberId")
     auth_num: str | None = Field(None, alias="authNum")
-    date_filled: date | None = Field(None, alias="endDate")
-    date_written: date | None = Field(None, alias="startDate")
+    start_date: date | None = Field(None, alias="startDate")
+    end_date: date | None = Field(None, alias="endDate")
 
     # Checked by default in the UI ("Exclude Test Claims")
     exclude_test_claims: bool = Field(True, alias="excludeTestClaims")
@@ -137,129 +142,45 @@ class ClaimSearch(BaseModel):
 
     @model_validator(mode="after")
     def validate_search_criteria(self) -> ClaimSearch:
+        from app.core.exceptions import (
+            InvalidDateRangeException,
+            NoSearchCriteriaException,
+        )
+
         has_any_criteria = any(
-            [
-                self.member_id,
-                self.auth_num,
-                self.date_filled,
-                self.date_written,
-            ]
+            [self.member_id, self.auth_num, self.start_date, self.end_date]
         )
         if not has_any_criteria:
-            from app.core.exceptions import NoSearchCriteriaException
-
             raise NoSearchCriteriaException(
                 "At least one search criterion (memberId, authNum, "
-                "startDate, or endDate) must be provided."
+                "or startDate/endDate) must be provided."
             )
 
-        if not self.member_id and not (self.date_filled and self.date_written):
-            from app.core.exceptions import NoSearchCriteriaException
+        if bool(self.start_date) != bool(self.end_date):
+            raise InvalidDateRangeException(
+                "startDate and endDate must be provided together."
+            )
 
+        if not self.member_id and not self.start_date:
             raise NoSearchCriteriaException(
-                "A full dateFilled range (startDate and endDate) "
-                "is required when memberId is not provided."
+                "startDate and endDate are required when memberId is not provided."
             )
+
+        if self.start_date and self.end_date:
+            if self.end_date < self.start_date:
+                raise InvalidDateRangeException(
+                    "endDate must be on or after startDate."
+                )
+            if self.end_date > _add_months(self.start_date, _MAX_DATE_RANGE_MONTHS):
+                raise InvalidDateRangeException(
+                    "The span between start-date and end-date must not "
+                    f"exceed {_MAX_DATE_RANGE_MONTHS} months."
+                )
+
         return self
-
-    @model_validator(mode="after")
-    def validate_date_filled_range(self) -> ClaimSearch:
-        if self.date_filled and self.date_written:
-            if self.date_filled < self.date_written:
-                from app.core.exceptions import InvalidDateRangeException
-
-                raise InvalidDateRangeException(
-                    f"endDate ({self.date_filled}) must be >= "
-                    f"startDate ({self.date_written})."
-                )
-
-            span_days = (self.date_filled - self.date_written).days
-            if span_days > _MAX_DATE_RANGE_DAYS:
-                from app.core.exceptions import InvalidDateRangeException
-
-                raise InvalidDateRangeException(
-                    "Date Filled range cannot exceed 12 months "
-                    f"(endDate={self.date_filled}, "
-                    f"startDate={self.date_written})."
-                )
-        return self
-
-
-class ClaimSearchByMemberPath(BaseModel):
-    """
-    Search criteria for /members/{memberId}/claims/search.
-    memberId comes from path — no validation needed in body.
-    Date range and other filters are all optional.
-    """
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-        json_schema_extra={
-            "example": {
-                "authNum": None,
-                "startDate": None,
-                "endDate": None,
-                "excludeTestClaims": True,
-            }
-        },
-    )
-
-    # memberId intentionally excluded — comes from path param
-    auth_num: str | None = None
-    date_filled: date | None = None
-    date_written: date | None = None
-    exclude_test_claims: bool = True
-
-    @model_validator(mode="after")
-    def validate_date_filled_range(self) -> ClaimSearchByMemberPath:
-        if self.date_filled and self.date_written:
-            if self.date_written > self.date_filled:
-                from app.core.exceptions import InvalidDateRangeException
-
-                raise InvalidDateRangeException(
-                    f"endDate ({self.date_written}) must be >= "
-                    f"startDate ({self.date_filled})."
-                )
-            span_days = (self.date_written - self.date_filled).days
-            if span_days > _MAX_DATE_RANGE_DAYS:
-                from app.core.exceptions import InvalidDateRangeException
-
-                raise InvalidDateRangeException(
-                    "Date Filled range cannot exceed 12 months."
-                )
-        return self
-
-
-class ClaimSearchRequestByMemberPath(BaseModel, SearchRequest[ClaimSearchByMemberPath]):
-    """
-    Full request envelope — /members/{memberId}/claims/search.
-    memberId is taken from path param, not from body.
-    """
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-        json_schema_extra={
-            "example": {
-                "searchRequest": {
-                    "authNum": None,
-                    "startDate": None,
-                    "endDate": None,
-                    "excludeTestClaims": True,
-                },
-                "sort": {"sortBy": "id", "sortDir": "ASC"},
-                "pagination": {"page": 1, "pageSize": 20},
-            }
-        },
-    )
 
 
 class ClaimSearchRequest(BaseModel, SearchRequest[ClaimSearch]):
-    pass
-
-
-class ClaimsByMemberRequest(BaseModel, PaginationRequest, SortRequest):
     pass
 
 
@@ -267,30 +188,56 @@ class ClaimsByEntityQuery(BaseModel, PaginationRequest):
     """
     Shared query-param — claim history scoped to a
     pharmacy (NABP), prescriber (NPI), or drug (NDC), with an optional
-    Date Filled range. No sort fields exposed in the spec for these.
+    Date Filled upper bound. No sort fields exposed in the spec for these.
     """
 
     model_config = _CAMEL
 
-    start_date: date | None = Field(None, alias="startDate")
-    end_date: date | None = Field(None, alias="endDate")
+    end_date: date | None = Field(None, alias="filledDate")
+
+
+class ClaimSearchByMemberRequest(BaseModel):
+    """
+    Request body schema for POST /members/{memberId}/claims/search.
+
+    memberId comes from the path, not from here. All fields are optional
+    and sent as a JSON request body; page/pageSize remain query params.
+
+    Business rules:
+    - If `recent` is True, none of authNum/filledDate may be supplied.
+      Providing both is treated as conflicting intent and rejected with a 422
+      rather than silently ignoring the extra filters. The actual trailing
+      recent-claims window is computed by ClaimService, not here.
+    - filledDate accepts values in a few known formats (not just ISO)
+      because the current frontend sends US-style MM/DD/YYYY and sometimes
+      leaks its own placeholder text (e.g. "mm/dd/yyyy") as the literal
+      value when the field is left unset — see OptionalDateQuery in
+      app/schemas/common_types.py for the normalization/parsing logic.
+    """
+
+    model_config = _CAMEL
+
+    auth_num: str | None = Field(None, alias="authNum")
+    date_filled: date | None = Field(None, alias="filledDate")
+    recent: bool = False
+    exclude_test_claims: bool = Field(True, alias="excludeTestClaims")
+
+    @field_validator("date_filled", "auth_num", mode="before")
+    @classmethod
+    def blank_to_none(cls, v):
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
     @model_validator(mode="after")
-    def validate_date_range(self) -> ClaimsByEntityQuery:
-        if self.start_date and self.end_date:
-            if self.end_date < self.start_date:
-                from app.core.exceptions import InvalidDateRangeException
+    def validate_recent_is_exclusive(self) -> ClaimSearchByMemberRequest:
+        """Reject requests that combine `recent=true` with any explicit filter."""
+        if self.recent and (self.auth_num or self.date_filled):
+            from app.core.exceptions import (
+                InvalidSearchCriteriaException,
+            )
 
-                raise InvalidDateRangeException(
-                    f"endDate ({self.end_date}) must be >= "
-                    f"startDate ({self.start_date})."
-                )
-            span_days = (self.end_date - self.start_date).days
-            if span_days > _MAX_DATE_RANGE_DAYS:
-                from app.core.exceptions import InvalidDateRangeException
-
-                raise InvalidDateRangeException(
-                    "Date range cannot exceed 12 months "
-                    f"(startDate={self.start_date}, endDate={self.end_date})."
-                )
+            raise InvalidSearchCriteriaException(
+                "When recent=true, authNum and filledDate must not be provided."
+            )
         return self

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.core.base_model import AppBaseModel as BaseModel
+from app.core.exceptions import InvalidSearchCriteriaException
 from app.schemas.common_schema import SearchRequest
+from app.utils.pagination import PaginationRequest
 
-_CAMEL = {"populate_by_name": True}
+_CAMEL = {"populate_by_name": True, "from_attributes": True}
 
 
 class PharmacyInfo(BaseModel):
@@ -14,11 +16,16 @@ class PharmacyInfo(BaseModel):
     nabp: str
     npi: str
     pharmacy_name: str = Field(alias="pharmacyName")
-    address: str
-    phone: str
+    address: str | None = None
+    phone: str | None = None
     fax: str | None = None
     is_24_hour: bool = Field(alias="is24Hour")
-    in_network: bool = Field(alias="inNetwork")
+    longitude: float | None = None
+    latitude: float | None = None
+    zip: str | None = Field(alias="zipCode")
+    city: str | None = None
+    state: str | None = None
+    distance_miles: float | None = Field(default=None, alias="distanceMiles")
 
 
 class PharmacySearch(BaseModel):
@@ -31,7 +38,8 @@ class PharmacySearch(BaseModel):
     state: str | None = Field(None, max_length=2)
     zip_code: str | None = Field(None, alias="zipCode")
     is_24_hour: bool | None = Field(None, alias="is24Hour")
-    in_network: bool | None = Field(None, alias="inNetwork")
+    longitude: float | None = None
+    latitude: float | None = None
 
     @model_validator(mode="after")
     def at_least_one_criterion(self) -> PharmacySearch:
@@ -57,3 +65,43 @@ class PharmacySearch(BaseModel):
 
 class PharmacySearchRequest(BaseModel, SearchRequest[PharmacySearch]):
     pass
+
+
+class PharmacyLookupRequest(PaginationRequest):
+    model_config = _CAMEL
+
+    nabp: str | None = None
+    npi: str | None = None
+    zip_code: str | None = Field(
+        None,
+        alias="zipCode",
+        description="A five-digit U.S. ZIP code.",
+    )
+    radius: int | None = Field(10, ge=0)  # in miles
+    is_24_hour: bool | None = Field(None, alias="is24Hour")
+
+    @field_validator("zip_code")
+    @classmethod
+    def validate_us_zip_code(cls, zip_code: str | None) -> str | None:
+        if zip_code is None:
+            return None
+
+        if not (len(zip_code) == 5 and zip_code.isdigit()):
+            raise InvalidSearchCriteriaException(
+                "zipCode must be a valid five-digit U.S. ZIP code (for example, 62704)."
+            )
+        return zip_code
+
+    @model_validator(mode="after")
+    def exactly_one_identifier(self) -> PharmacyLookupRequest:
+        if not self.nabp and not self.npi and not self.zip_code:
+            from app.core.exceptions import MissingSearchCriteriaException
+
+            raise MissingSearchCriteriaException(
+                "Either 'nabp', 'npi', or 'zipCode' must be provided."
+            )
+        if sum(bool(value) for value in (self.nabp, self.npi, self.zip_code)) > 1:
+            raise InvalidSearchCriteriaException(
+                "Provide only one of 'nabp', 'npi', or 'zipCode', not all three."
+            )
+        return self

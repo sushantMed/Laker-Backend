@@ -31,6 +31,7 @@ from app.models.permission_model import UserPermissionModel
 from app.models.pharmacy_model import PharmacyModel
 from app.models.prescriber_model import PrescriberModel
 from app.models.user_model import UserModel
+from app.models.zip_code_model import ZipCodeModel
 from app.utils.enums import BrandGeneric, CoverageType, Gender, Maintenance
 
 # ── Test database ─────────────────────────────────────────────────────────────
@@ -246,7 +247,6 @@ def _make_claim(
     drug_name: str = "Lipitor",
     ndc: str = "00071015423",
     date_filled: date = date(2024, 3, 15),
-    date_written: date | None = date(2024, 3, 10),
     pharmacy_npi: str | None = "1234567890",
     pharmacy_name: str | None = "Health Pharmacy",
     prescriber_npi: str | None = "9876543210",
@@ -268,7 +268,6 @@ def _make_claim(
         drug_name=drug_name,
         ndc=ndc,
         date_filled=date_filled,
-        date_written=date_written,
         pharmacy_npi=pharmacy_npi,
         pharmacy_name=pharmacy_name,
         prescriber_npi=prescriber_npi,
@@ -367,7 +366,6 @@ async def seeded_lookups(db_session: AsyncSession):
                 phone="2175551234",
                 fax="2175555678",
                 is_24_hour=True,
-                in_network=True,
             ),
             PharmacyModel(
                 nabp="7654321",
@@ -380,7 +378,6 @@ async def seeded_lookups(db_session: AsyncSession):
                 phone="3125559876",
                 fax=None,
                 is_24_hour=False,
-                in_network=False,
             ),
             PrescriberModel(
                 npi="1112223334",
@@ -406,6 +403,8 @@ async def seeded_lookups(db_session: AsyncSession):
                 phone=None,
                 fax=None,
             ),
+            ZipCodeModel(zip="62704", latitude=39.7817, longitude=-89.6501),
+            ZipCodeModel(zip="60601", latitude=41.8781, longitude=-87.6298),
         ]
     )
     await db_session.flush()

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_debug: bool = False
     app_version: str = "1.0.0"
+    recent_claims_window_days: int = 90
 
     # ── Database ──────────────────────────────────────────────────
     db_driver: str
@@ -36,6 +37,8 @@ class Settings(BaseSettings):
         "<docker service name>"  # docker service name for dummy sshost server
     )
     sshost_port: int = 9000
+    sshost_connect_timeout_seconds: float = 5.0
+    sshost_response_timeout_seconds: float = 5.0
 
     # ── Security ──────────────────────────────────────────────────
     jwt_secret_key: str

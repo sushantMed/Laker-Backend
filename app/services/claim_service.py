@@ -15,10 +15,12 @@ a search and isn't listed as an error response for those routes.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cache.cache_service import CacheService
+from app.core.config import settings
 from app.core.exceptions import (
     ClaimNotFoundException,
     DrugNotFoundException,
@@ -35,8 +37,8 @@ from app.repositories.prescriber_repository import PrescriberRepository
 from app.schemas.claim_schema import (
     ClaimDetail,
     ClaimsByEntityQuery,
+    ClaimSearchByMemberRequest,
     ClaimSearchRequest,
-    ClaimSearchRequestByMemberPath,
     ClaimSummary,
     PharmacySummary,
     PrescriberSummary,
@@ -48,7 +50,6 @@ def _to_claim_summary(c: ClaimModel) -> ClaimSummary:
     return ClaimSummary(
         auth_num=c.auth_num,
         date_filled=c.date_filled,
-        date_written=c.date_written,
         member_id=c.member_id,
         first_name=c.member.first_name if c.member else None,
         last_name=c.member.last_name if c.member else None,
@@ -70,7 +71,6 @@ def _to_claim_detail(c: ClaimModel) -> ClaimDetail:
         drug=c.drug_name,
         ndc=c.ndc,
         date_filled=c.date_filled,
-        date_written=c.date_written,
         quantity=c.quantity,
         days_supply=c.days_supply,
         refills_remaining=c.refills_remaining,
@@ -131,19 +131,20 @@ class ClaimService:
     ) -> PagedResponse[ClaimSummary]:
         """
         Search claims by Member ID and / or Auth Num, optionally narrowed
-        by a Date Filled range. Test claims are excluded by default.
+        by a Date Filled range (startDate/endDate). Test claims are
+        excluded by default.
 
-        Search-criteria validation (at least one criterion; date range
-        required if memberId absent; max 12-month range) is enforced by
-        ClaimSearch's model_validators.
+        Search-criteria validation (at least one criterion; startDate/
+        endDate required together and required if memberId absent, span
+        capped at 12 months) is enforced by ClaimSearch's model_validators.
         """
         criteria = request.searchRequest
 
         items, total = await self._repo.search(
             member_id=criteria.member_id,
             auth_num=criteria.auth_num,
-            date_filled=criteria.date_filled,
-            date_written=criteria.date_written,
+            date_filled=criteria.end_date,
+            date_filled_from=criteria.start_date,
             exclude_test_claims=criteria.exclude_test_claims,
             page=request.pagination.page,
             page_size=request.pagination.page_size,
@@ -159,35 +160,50 @@ class ClaimService:
         )
 
     async def search_claims_for_member(
-        self, member_id: str, request: ClaimSearchRequestByMemberPath
-    ) -> PagedResponse[ClaimSummary]:
+        self,
+        member_id: str,
+        request: ClaimSearchByMemberRequest,
+        page: int,
+        page_size: int,
+    ) -> PagedResponse[ClaimDetail]:
         """
-        Same underlying query as C1, but memberId is taken from the path
-        and overrides whatever (if anything) was sent in the request body.
+        Same underlying query as C1, but memberId is taken from the path.
         Validates the member exists first -> 404 MemberNotFound.
+
+        When `recent` is true, the trailing `recent_claims_window_days`
+        window is computed here (not exposed as a request field) and used
+        as the lower bound of the dateFilled search.
+
+        Results are sorted by dateFilled descending, most recent first.
         """
         member = await self._member_repo.get_by_member_id(member_id)
         if not member:
             raise MemberNotFoundException(f"Member '{member_id}' not found.")
 
-        criteria = request.searchRequest
+        date_filled = request.date_filled
+        date_filled_from = None
+        if request.recent:
+            date_filled_from = date.today() - timedelta(
+                days=settings.recent_claims_window_days
+            )
+            date_filled = date.today()
 
         items, total = await self._repo.search(
-            member_id=member_id,  # path param takes precedence over body
-            auth_num=criteria.auth_num,
-            date_written=criteria.date_written,
-            date_filled=criteria.date_filled,
-            exclude_test_claims=criteria.exclude_test_claims,
-            page=request.pagination.page,
-            page_size=request.pagination.page_size,
-            sort_by=request.sort.sort_by,
-            sort_dir=request.sort.sort_dir,
+            member_id=member_id,
+            auth_num=request.auth_num,
+            date_filled=date_filled,
+            date_filled_from=date_filled_from,
+            exclude_test_claims=request.exclude_test_claims,
+            page=page,
+            page_size=page_size,
+            sort_by="dateFilled",
+            sort_dir="desc",
         )
 
         return PagedResponse.of(
-            data=[_to_claim_summary(c) for c in items],
-            page=request.pagination.page,
-            page_size=request.pagination.page_size,
+            data=[_to_claim_detail(c) for c in items],
+            page=page,
+            page_size=page_size,
             total=total,
         )
 
@@ -197,6 +213,8 @@ class ClaimService:
         request: ClaimsByEntityQuery,
         transform: Callable[[ClaimModel], T],
         exclude_test_claims: bool = True,
+        sort_by: str | None = None,
+        sort_dir: str = "asc",
     ) -> PagedResponse[T]:
         """
         Return claims for a member.
@@ -212,10 +230,11 @@ class ClaimService:
         items, total = await self._repo.get_claims_by_member_id(
             member_id=member_id,
             exclude_test_claims=exclude_test_claims,
-            date_filled=request.start_date,
-            date_written=request.end_date,
+            date_filled=request.end_date,
             page=request.page,
             page_size=request.page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
 
         return PagedResponse.of(
@@ -223,20 +242,6 @@ class ClaimService:
             page=request.page,
             page_size=request.page_size,
             total=total,
-        )
-
-    async def count_claims_for_member(
-        self,
-        member_id: str,
-        exclude_test_claims: bool = True,
-    ) -> int:
-        member = await self._member_repo.get_by_member_id(member_id)
-        if not member:
-            raise MemberNotFoundException(f"Member '{member_id}' not found.")
-
-        return await self._repo.count_claims_by_member_id(
-            member_id=member_id,
-            exclude_test_claims=exclude_test_claims,
         )
 
     async def get_claims_for_pharmacy(
@@ -248,7 +253,6 @@ class ClaimService:
 
         items, total = await self._repo.get_claims_by_pharmacy_nabp(
             nabp,
-            date_written=query.start_date,
             date_filled=query.end_date,
             page=query.page,
             page_size=query.page_size,
@@ -269,7 +273,6 @@ class ClaimService:
 
         items, total = await self._repo.get_claims_by_prescriber_npi(
             npi,
-            date_written=query.start_date,
             date_filled=query.end_date,
             page=query.page,
             page_size=query.page_size,
@@ -290,7 +293,6 @@ class ClaimService:
 
         items, total = await self._repo.get_claims_by_drug_ndc(
             ndc,
-            date_written=query.start_date,
             date_filled=query.end_date,
             page=query.page,
             page_size=query.page_size,

@@ -3,12 +3,12 @@
 
 set -e
 
-echo "Waiting for PostgreSQL to be ready..."
+echo "Waiting for Oracle DB to be ready..."
 while ! nc -z "$DB_HOST" "$DB_PORT" 2>/dev/null; do
-    echo "  PostgreSQL not ready yet, retrying in 2 seconds..."
+    echo "  Oracle DB not ready yet, retrying in 2 seconds..."
     sleep 2
 done
-echo "PostgreSQL is ready!"
+echo "Oracle DB is ready!"
 
 echo ""
 echo "Running database migrations..."

@@ -52,7 +52,18 @@
       "Memeber Screen": ["view"],
       "Paid claim lookup screen": ["view"],
       "groups screen": ["view"],
-      "drug lookup screen": ["view"]
+      "drug lookup screen": ["view"],
+      "membercob": ["view"],
+      "member prior auth": ["view"],
+      "web member dependents": ["view"],
+      "pricing": ["view"],
+      "memsubgroups": ["view"],
+      "memdenynotes": ["view"],
+      "tran lookup screen": ["view"],
+      "web accum": ["view"],
+      "Claim Search Screen": ["view"],
+      "cardholder eligibilty": ["view"]
+
     }
   }
 ]
