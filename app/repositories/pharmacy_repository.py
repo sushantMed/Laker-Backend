@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import math
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.models.pharmacy_model import PharmacyModel
+from app.models.zip_code_model import ZipCodeModel
 from app.repositories.base_repository import BaseRepository
 from app.schemas.pharmacy_schema import PharmacySearch
 
@@ -90,17 +91,13 @@ class PharmacyRepository(BaseRepository[PharmacyModel]):
     ) -> list[PharmacyModel]:
         radius = 10 if radius is None else radius
 
-        center_stmt = select(
-            func.avg(PharmacyModel.latitude), func.avg(PharmacyModel.longitude)
-        ).where(
-            PharmacyModel.zip == zip_code,
-            PharmacyModel.latitude.is_not(None),
-            PharmacyModel.longitude.is_not(None),
+        center_stmt = select(ZipCodeModel.latitude, ZipCodeModel.longitude).where(
+            ZipCodeModel.zip == zip_code
         )
         center_result = await self.session.execute(center_stmt)
         center_row = center_result.first()
         if center_row is None or center_row[0] is None or center_row[1] is None:
-            return []  # no geocoded pharmacy for this zip to anchor the search
+            return []  # unknown zip code, nothing to anchor the search on
 
         latitude = float(center_row[0])
         longitude = float(center_row[1])

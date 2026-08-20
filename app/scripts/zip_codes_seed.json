@@ -1,0 +1,21 @@
+{
+  "_comment": "Mock seed data for the ZIPCODES reference table. Covers the ZIPs used by pharmacies_seed.json (so pharmacy radius search has a resolvable center point) plus a few extra ZIPs used by prescribers in lookups_seed.json.",
+
+  "zip_codes": [
+    { "zip": "55102", "city": "St Paul", "state": "MN", "statename": "Minnesota", "citytype": "D", "latitude": 44.9440, "longitude": -93.1055 },
+    { "zip": "60607", "city": "Chicago", "state": "IL", "statename": "Illinois", "citytype": "D", "latitude": 41.8716, "longitude": -87.6636 },
+    { "zip": "53224", "city": "Milwaukee", "state": "WI", "statename": "Wisconsin", "citytype": "D", "latitude": 43.1912, "longitude": -87.9776 },
+    { "zip": "14203", "city": "Buffalo", "state": "NY", "statename": "New York", "citytype": "D", "latitude": 42.8768, "longitude": -78.8583 },
+    { "zip": "77098", "city": "Houston", "state": "TX", "statename": "Texas", "citytype": "D", "latitude": 29.7378, "longitude": -95.4267 },
+    { "zip": "63121", "city": "St Louis", "state": "MO", "statename": "Missouri", "citytype": "D", "latitude": 38.7178, "longitude": -90.3020 },
+    { "zip": "32254", "city": "Jacksonville", "state": "FL", "statename": "Florida", "citytype": "D", "latitude": 30.3103, "longitude": -81.7448 },
+    { "zip": "55104", "city": "St Paul", "state": "MN", "statename": "Minnesota", "citytype": "D", "latitude": 44.9578, "longitude": -93.1360 },
+    { "zip": "60611", "city": "Chicago", "state": "IL", "statename": "Illinois", "citytype": "D", "latitude": 41.8952, "longitude": -87.6217 },
+    { "zip": "89109", "city": "Las Vegas", "state": "NV", "statename": "Nevada", "citytype": "D", "latitude": 36.1215, "longitude": -115.1739 },
+    { "zip": "92109", "city": "San Diego", "state": "CA", "statename": "California", "citytype": "D", "latitude": 32.7989, "longitude": -117.2359 },
+    { "zip": "50320", "city": "Des Moines", "state": "IA", "statename": "Iowa", "citytype": "D", "latitude": 41.5505, "longitude": -93.6091 },
+    { "zip": "85013", "city": "Phoenix", "state": "AZ", "statename": "Arizona", "citytype": "D", "latitude": 33.5106, "longitude": -112.0836 },
+    { "zip": "55905", "city": "Rochester", "state": "MN", "statename": "Minnesota", "citytype": "D", "latitude": 44.0225, "longitude": -92.4699 },
+    { "zip": "64106", "city": "Kansas City", "state": "MO", "statename": "Missouri", "citytype": "D", "latitude": 39.1044, "longitude": -94.5686 }
+  ]
+}
