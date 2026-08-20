@@ -11,14 +11,21 @@ from app.schemas.prior_auth_schema import (
     PAByEntityQuery,
     PADetail,
     PASearch,
-    PASearchByMemberPath,
+    PASearchBySubscriber,
     PASearchRequest,
-    PASearchRequestByMemberPath,
+    PASearchRequestBySubscriber,
     PASearchResult,
     PatchPARequest,
     UpdatePARequest,
 )
 from app.utils.enums import PAStatus
+
+
+def subscriber_criteria(**criteria) -> PASearchBySubscriber:
+    """The search criteria, with the two required cardholder keys filled in."""
+    criteria.setdefault("subscriberNum", "INS001")
+    criteria.setdefault("personCodes", "01")
+    return PASearchBySubscriber(**criteria)
 
 
 def test_search_accepts_a_single_criterion():
@@ -71,8 +78,38 @@ def test_search_request_defaults_sort_and_pagination():
     assert request.sort.sort_dir == "ASC"
 
 
-def test_member_path_search_allows_no_criteria():
-    criteria = PASearchByMemberPath()
+@pytest.mark.parametrize(
+    "missing", [{"personCodes": "01"}, {"subscriberNum": "INS001"}, {}]
+)
+def test_subscriber_search_requires_the_cardholder_keys(missing):
+    """subscriberNum and personCodes identify the cardholder -- both are required."""
+    with pytest.raises(ValidationError):
+        PASearchBySubscriber(**missing)
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_subscriber_search_rejects_blank_cardholder_keys(blank):
+    with pytest.raises(ValidationError):
+        PASearchBySubscriber(subscriberNum=blank, personCodes="01")
+    with pytest.raises(ValidationError):
+        PASearchBySubscriber(subscriberNum="INS001", personCodes=blank)
+
+
+def test_subscriber_search_strips_the_cardholder_keys():
+    criteria = PASearchBySubscriber(subscriberNum="  INS001  ", personCodes=" 01 ")
+
+    assert criteria.subscriber_num == "INS001"
+    assert criteria.person_codes == "01"
+
+
+def test_subscriber_search_rejects_a_person_code_wider_than_the_column():
+    """SUBSCRIBER.PERSONCODE is 2 wide, so a comma list is not a person code."""
+    with pytest.raises(ValidationError):
+        PASearchBySubscriber(subscriberNum="INS001", personCodes="01,02")
+
+
+def test_subscriber_search_allows_no_criteria():
+    criteria = subscriber_criteria()
 
     assert criteria.ndc is None
     assert criteria.eff_date is None
@@ -81,46 +118,46 @@ def test_member_path_search_allows_no_criteria():
     assert criteria.eff_date_to is None
 
 
-def test_member_path_search_parses_eff_date_bounds():
-    criteria = PASearchByMemberPath(effDateFrom="05/01/2025", effDateTo="04/30/2026")
+def test_subscriber_search_parses_eff_date_bounds():
+    criteria = subscriber_criteria(effDateFrom="05/01/2025", effDateTo="04/30/2026")
 
     assert criteria.eff_date_from == date(2025, 5, 1)
     assert criteria.eff_date_to == date(2026, 4, 30)
 
 
-def test_member_path_search_accepts_one_eff_date_bound_alone():
-    assert PASearchByMemberPath(effDateFrom="05/01/2025").eff_date_to is None
-    assert PASearchByMemberPath(effDateTo="04/30/2026").eff_date_from is None
+def test_subscriber_search_accepts_one_eff_date_bound_alone():
+    assert subscriber_criteria(effDateFrom="05/01/2025").eff_date_to is None
+    assert subscriber_criteria(effDateTo="04/30/2026").eff_date_from is None
 
 
-def test_member_path_search_allows_an_eff_date_range_of_one_day():
-    criteria = PASearchByMemberPath(effDateFrom="05/01/2025", effDateTo="05/01/2025")
+def test_subscriber_search_allows_an_eff_date_range_of_one_day():
+    criteria = subscriber_criteria(effDateFrom="05/01/2025", effDateTo="05/01/2025")
 
     assert criteria.eff_date_from == criteria.eff_date_to
 
 
-def test_member_path_search_rejects_reversed_eff_date_range():
+def test_subscriber_search_rejects_reversed_eff_date_range():
     with pytest.raises(InvalidDateRangeException):
-        PASearchByMemberPath(effDateFrom="04/30/2026", effDateTo="05/01/2025")
+        subscriber_criteria(effDateFrom="04/30/2026", effDateTo="05/01/2025")
 
 
 @pytest.mark.parametrize("blank", ["", "   ", None])
-def test_member_path_search_treats_blank_eff_date_bounds_as_absent(blank):
-    criteria = PASearchByMemberPath(effDateFrom=blank, effDateTo=blank)
+def test_subscriber_search_treats_blank_eff_date_bounds_as_absent(blank):
+    criteria = subscriber_criteria(effDateFrom=blank, effDateTo=blank)
 
     assert criteria.eff_date_from is None
     assert criteria.eff_date_to is None
 
 
-def test_member_path_search_parses_eff_and_term_dates():
-    criteria = PASearchByMemberPath(effDate="05/01/2025", termDate="04/30/2026")
+def test_subscriber_search_parses_eff_and_term_dates():
+    criteria = subscriber_criteria(effDate="05/01/2025", termDate="04/30/2026")
 
     assert criteria.eff_date == date(2025, 5, 1)
     assert criteria.term_date == date(2026, 4, 30)
 
 
-def test_member_path_search_strips_blanks():
-    assert PASearchByMemberPath(ndc="  ").ndc is None
+def test_subscriber_search_strips_blanks():
+    assert subscriber_criteria(ndc="  ").ndc is None
 
 
 @pytest.mark.parametrize(
@@ -132,40 +169,42 @@ def test_member_path_search_strips_blanks():
         ("  093721410  ", "00093721410"),
     ],
 )
-def test_member_path_search_pads_short_ndc(keyed, expected):
+def test_subscriber_search_pads_short_ndc(keyed, expected):
     """A 9- or 10-char NDC is zero-padded to the stored 11-char width."""
-    assert PASearchByMemberPath(ndc=keyed).ndc == expected
+    assert subscriber_criteria(ndc=keyed).ndc == expected
 
 
 @pytest.mark.parametrize("keyed", ["9372141", "93721410", "000937214100"])
-def test_member_path_search_rejects_out_of_range_ndc(keyed):
+def test_subscriber_search_rejects_out_of_range_ndc(keyed):
     """Under 9 or over 11 characters is a bad NDC, not something to pad."""
     with pytest.raises(ValidationError):
-        PASearchByMemberPath(ndc=keyed)
+        subscriber_criteria(ndc=keyed)
 
 
 @pytest.mark.parametrize("blank", ["", "   ", None])
-def test_member_path_search_treats_blank_dates_as_absent(blank):
-    criteria = PASearchByMemberPath(effDate=blank, termDate=blank)
+def test_subscriber_search_treats_blank_dates_as_absent(blank):
+    criteria = subscriber_criteria(effDate=blank, termDate=blank)
 
     assert criteria.eff_date is None
     assert criteria.term_date is None
 
 
-def test_member_path_search_still_rejects_malformed_dates():
+def test_subscriber_search_still_rejects_malformed_dates():
     with pytest.raises(ValidationError):
-        PASearchByMemberPath(effDate="13/45/2025")
+        subscriber_criteria(effDate="13/45/2025")
 
 
 @pytest.mark.parametrize(
     "field", ["memberId", "paId", "drugName", "provider", "status"]
 )
-def test_member_path_search_ignores_unsupported_criteria(field):
-    """Only the four known keys survive; anything else is accepted and dropped."""
-    criteria = PASearchByMemberPath(**{field: "x"}, ndc="00088502005")
+def test_subscriber_search_ignores_unsupported_criteria(field):
+    """Only the known keys survive; anything else is accepted and dropped."""
+    criteria = subscriber_criteria(**{field: "x"}, ndc="00088502005")
 
     assert criteria.ndc == "00088502005"
     assert set(criteria.model_dump()) == {
+        "subscriber_num",
+        "person_codes",
         "ndc",
         "eff_date",
         "eff_date_from",
@@ -174,27 +213,27 @@ def test_member_path_search_ignores_unsupported_criteria(field):
     }
 
 
-def test_member_path_request_envelope():
-    request = PASearchRequestByMemberPath(searchRequest=PASearchByMemberPath())
+def test_subscriber_request_envelope():
+    request = PASearchRequestBySubscriber(searchRequest=subscriber_criteria())
 
     assert request.pagination.page == 1
     assert request.pagination.page_size == 20
 
 
 @pytest.mark.parametrize("page_size", [10, 25, 50, 100, 10_000])
-def test_member_path_request_allows_large_page_sizes(page_size):
-    request = PASearchRequestByMemberPath(
-        searchRequest=PASearchByMemberPath(),
+def test_subscriber_request_allows_large_page_sizes(page_size):
+    request = PASearchRequestBySubscriber(
+        searchRequest=subscriber_criteria(),
         pagination={"page": 1, "pageSize": page_size},
     )
 
     assert request.pagination.page_size == page_size
 
 
-def test_member_path_request_rejects_page_size_above_cap():
+def test_subscriber_request_rejects_page_size_above_cap():
     with pytest.raises(ValidationError):
-        PASearchRequestByMemberPath(
-            searchRequest=PASearchByMemberPath(),
+        PASearchRequestBySubscriber(
+            searchRequest=subscriber_criteria(),
             pagination={"page": 1, "pageSize": 10_001},
         )
 

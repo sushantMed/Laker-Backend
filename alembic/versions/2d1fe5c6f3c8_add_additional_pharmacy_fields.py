@@ -150,12 +150,25 @@ _RENAMES = [
 
 
 def upgrade() -> None:
+    # A database that already ran this while it sat on a since-deleted branch
+    # carries the new names already; renaming onto one is ORA-00957, and
+    # renaming a column that is no longer there is ORA-00904. Skip those, so a
+    # database that has none of the new names still gets every rename.
+    inspector = sa.inspect(op.get_bind())
+    columns = {c["name"].upper() for c in inspector.get_columns("pharmacies")}
+    indexes = {i["name"].upper() for i in inspector.get_indexes("pharmacies")}
+
     for old_name, new_name in _RENAMES:
+        if new_name.upper() in columns or old_name.upper() not in columns:
+            continue
         op.alter_column("pharmacies", old_name, new_column_name=new_name)
-    op.drop_index("ix_pharmacies_npi", table_name="pharmacies")
-    op.create_index(
-        "APP_PHARMACIES_NPI_IDX", "pharmacies", ["NPI"], unique=True
-    )
+        columns.discard(old_name.upper())
+        columns.add(new_name.upper())
+
+    if "IX_PHARMACIES_NPI" in indexes:
+        op.drop_index("ix_pharmacies_npi", table_name="pharmacies")
+    if "APP_PHARMACIES_NPI_IDX" not in indexes:
+        op.create_index("APP_PHARMACIES_NPI_IDX", "pharmacies", ["NPI"], unique=True)
 
 
 def downgrade() -> None:

@@ -13,6 +13,7 @@ from app.core.exceptions import (
     PrescriberNotFoundException,
     PriorAuthNotEditableException,
     PriorAuthNotFoundException,
+    SubscriberNotFoundException,
 )
 from app.models.drug_model import DrugModel
 from app.models.member_model import MemberModel
@@ -23,9 +24,9 @@ from app.schemas.prior_auth_schema import (
     CreatePARequest,
     PAByEntityQuery,
     PASearch,
-    PASearchByMemberPath,
+    PASearchBySubscriber,
     PASearchRequest,
-    PASearchRequestByMemberPath,
+    PASearchRequestBySubscriber,
     PatchPARequest,
     UpdatePARequest,
 )
@@ -135,8 +136,16 @@ def service() -> PriorAuthService:
     svc._member_repo = AsyncMock()
     svc._drug_repo = AsyncMock()
     svc._prescriber_repo = AsyncMock()
+    svc._subscriber_repo = AsyncMock()
     svc._session = AsyncMock()
     return svc
+
+
+def subscriber_search(**criteria) -> PASearchRequestBySubscriber:
+    """The subscriber PA search envelope, with the two required keys filled in."""
+    criteria.setdefault("subscriberNum", "INS001")
+    criteria.setdefault("personCodes", "02")
+    return PASearchRequestBySubscriber(searchRequest=PASearchBySubscriber(**criteria))
 
 
 @pytest.mark.parametrize(
@@ -525,14 +534,13 @@ async def test_search_passes_filters_through(service: PriorAuthService):
     assert kwargs["eff_date_to"] == date(2026, 12, 31)
 
 
-async def test_search_for_member_scopes_to_that_member(service: PriorAuthService):
-    service._member_repo.get_by_member_id.return_value = make_member(person_code="02")
+async def test_search_for_subscriber_scopes_to_that_cardholder(
+    service: PriorAuthService,
+):
+    service._subscriber_repo.get_by_subscriber_and_person.return_value = object()
     service._repo.search.return_value = ([], 0)
 
-    await service.search_prior_auths_for_member(
-        "MBR002",
-        PASearchRequestByMemberPath(searchRequest=PASearchByMemberPath()),
-    )
+    await service.search_prior_auths_for_subscriber(subscriber_search())
 
     kwargs = service._repo.search.await_args.kwargs
     # Scoped via subscriber_num (a LIKE '%...%' match), not insured_id's exact
@@ -542,14 +550,32 @@ async def test_search_for_member_scopes_to_that_member(service: PriorAuthService
     assert kwargs["person_code"] == "02"
 
 
-async def test_search_for_member_raises_when_member_missing(service: PriorAuthService):
-    service._member_repo.get_by_member_id.return_value = None
+async def test_search_for_subscriber_verifies_against_the_subscriber_table(
+    service: PriorAuthService,
+):
+    """The cardholder is proved against SUBSCRIBER; members is never consulted."""
+    service._subscriber_repo.get_by_subscriber_and_person.return_value = object()
+    service._repo.search.return_value = ([], 0)
 
-    with pytest.raises(MemberNotFoundException):
-        await service.search_prior_auths_for_member(
-            "MBR999",
-            PASearchRequestByMemberPath(searchRequest=PASearchByMemberPath()),
+    await service.search_prior_auths_for_subscriber(subscriber_search())
+
+    service._subscriber_repo.get_by_subscriber_and_person.assert_awaited_once_with(
+        "INS001", "02"
+    )
+    service._member_repo.get_by_member_id.assert_not_awaited()
+
+
+async def test_search_for_subscriber_raises_when_the_pair_is_unknown(
+    service: PriorAuthService,
+):
+    service._subscriber_repo.get_by_subscriber_and_person.return_value = None
+
+    with pytest.raises(SubscriberNotFoundException):
+        await service.search_prior_auths_for_subscriber(
+            subscriber_search(subscriberNum="INS999")
         )
+
+    service._repo.search.assert_not_awaited()
 
 
 async def test_get_prior_auths_for_member(service: PriorAuthService):

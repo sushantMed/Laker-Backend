@@ -12,7 +12,7 @@ from app.models.drug_model import DrugModel
 from app.models.gpi_desc_model import GpiDescModel
 from app.models.gpi_list_model import GpiListModel
 from app.models.master_drug_model import MasterDrugModel
-from app.models.member_model import MemberModel
+from app.models.member_model import MemberModel, Subscriber
 from app.models.plan_model import PlanModel
 from app.models.prescriber_model import PrescriberModel
 from app.models.prior_auth_model import PriorAuthModel
@@ -21,7 +21,7 @@ from tests.integration.conftest import AUTH
 
 BASE = "/api/v1"
 
-# The PA screen ships one route: POST /members/{memberId}/prior-auth/search.
+# The PA screen ships one route: POST /prior-auth/search.
 # Every other PA route is commented out in app/api/v1/prior_auth.py, so the
 # tests covering them would only assert that an unmounted path 404s. Re-enable
 # the route and drop this marker from its tests together.
@@ -57,8 +57,30 @@ def make_pa(authnum: int, **overrides) -> PriorAuthModel:
     return PriorAuthModel(**values)
 
 
+def make_subscriber(subscribernum: str, personcode: str, **overrides) -> Subscriber:
+    values = {
+        "subscribernum": subscribernum,
+        "personcode": personcode,
+        "clientcode": "CLI001",
+        "lastname": "MARTINEZ",
+        "firstname": "CARLOS",
+        "status": "A",
+    }
+    values.update(overrides)
+    return Subscriber(**values)
+
+
 @pytest_asyncio.fixture()
 async def seeded_pa(db_session: AsyncSession, seeded_lookups):
+    # The PA search proves the cardholder against SUBSCRIBER, not members.
+    db_session.add_all(
+        [
+            make_subscriber("INS001", "01"),
+            make_subscriber("INS001", "02", firstname="SOFIA"),
+            make_subscriber("INS003", "01", firstname="MINH", lastname="NGUYEN"),
+        ]
+    )
+
     plan = PlanModel(
         plan_id="PLN001",
         carrier="BlueCross",
@@ -655,21 +677,40 @@ async def test_member_prior_auth_list_unknown_member(client, seeded_pa):
 
 
 @pytest.mark.asyncio
-async def test_member_prior_auth_search_unknown_member(client, seeded_pa):
+@pytest.mark.parametrize(
+    "cardholder",
+    [
+        {"subscriberNum": "INS999", "personCodes": "01"},
+        {"subscriberNum": "INS001", "personCodes": "99"},
+    ],
+)
+async def test_member_prior_auth_search_unknown_subscriber(
+    client, seeded_pa, cardholder
+):
+    """Both keys are checked against SUBSCRIBER; either one wrong is a 404."""
     resp = await search(
-        client,
-        {"searchRequest": {}},
-        path="/members/MBR999/prior-auth/search",
+        client, {"searchRequest": cardholder}, path="/prior-auth/search"
     )
 
     assert resp.status_code == 404
+    # The handler renders AppException.message, not its code.
+    assert "not found" in resp.json()["error"]["message"].lower()
 
 
-MEMBER_SEARCH_PATH = "/members/MBR001/prior-auth/search"
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_requires_the_cardholder_keys(client, seeded_pa):
+    resp = await search(client, {"searchRequest": {}}, path="/prior-auth/search")
+
+    assert resp.status_code == 422
+
+
+MEMBER_SEARCH_PATH = "/prior-auth/search"
 EFF = (TODAY - timedelta(days=30)).strftime("%m/%d/%Y")
 
 
 async def member_search(client, criteria: dict, **envelope):
+    """The subscriber search, defaulting to the cardholder the PAs hang off."""
+    criteria = {"subscriberNum": "INS001", "personCodes": "01", **criteria}
     return await search(
         client,
         {"searchRequest": criteria, **envelope},
@@ -730,11 +771,7 @@ async def test_member_prior_auth_search_row_returns_pa_columns(client, seeded_pa
 @pytest.mark.asyncio
 async def test_member_prior_auth_search_row_names_a_manual_drug(client, seeded_pa):
     """With no NDC on the PA, only the GPI-side name is filled in."""
-    resp = await search(
-        client,
-        {"searchRequest": {}},
-        path="/members/MBR003/prior-auth/search",
-    )
+    resp = await member_search(client, {"subscriberNum": "INS003", "personCodes": "01"})
 
     row = resp.json()["data"][0]
     assert row["authNum"] == "2006"
@@ -770,7 +807,7 @@ async def test_member_prior_auth_search_accepts_but_ignores_term_date(
 ):
     """termDate is accepted and dropped.
 
-    PriorAuthService.search_prior_auths_for_member no longer passes it to the
+    PriorAuthService.search_prior_auths_for_subscriber no longer passes it to the
     repository, so a ceiling that would once have left only the ended PA now
     changes nothing. Restore the kwarg and this test goes back to asserting a
     ceiling.
@@ -892,6 +929,8 @@ async def test_member_prior_auth_search_accepts_full_spec_payload(client, seeded
         {
             "pagination": {"page": 1, "pageSize": 10000},
             "searchRequest": {
+                "subscriberNum": "INS001",
+                "personCodes": "01",
                 "paId": "1003",
                 "memberId": "MBR005",
                 "drugName": "LANTUS SOLN 100UNIT/ML",
@@ -1053,14 +1092,18 @@ async def test_member_prior_auth_search_eff_date_and_from_both_apply(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("keyed", ["%20MBR001", "MBR001%20", "%20%20MBR001%20"])
-async def test_member_prior_auth_search_trims_member_id(client, seeded_pa, keyed):
-    """A member id keyed with surrounding spaces still resolves."""
-    resp = await search(
-        client,
-        {"searchRequest": {}},
-        path=f"/members/{keyed}/prior-auth/search",
-    )
+@pytest.mark.parametrize("keyed", [" INS001", "INS001 ", "  INS001  "])
+async def test_member_prior_auth_search_trims_subscriber_num(client, seeded_pa, keyed):
+    """A subscriber number keyed with surrounding spaces still resolves."""
+    resp = await member_search(client, {"subscriberNum": keyed})
+
+    assert resp.status_code == 200
+    assert resp.json()["pagination"]["total"] == 5
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_trims_person_codes(client, seeded_pa):
+    resp = await member_search(client, {"personCodes": " 01 "})
 
     assert resp.status_code == 200
     assert resp.json()["pagination"]["total"] == 5

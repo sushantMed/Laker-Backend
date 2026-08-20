@@ -15,7 +15,7 @@ from app.schemas.prior_auth_schema import (
     # PADetail,
     PAMemberSearchResult,
     # PASearchRequest,
-    PASearchRequestByMemberPath,
+    PASearchRequestBySubscriber,
     # PASearchResult,
     # PatchPARequest,
     # UpdatePARequest,
@@ -118,16 +118,17 @@ PA_DETAIL_SUCCESS_MESSAGE = "Prior authorization retrieved successfully."
 #     return PagedApiResponse.ok(data=data, message=PA_RETRIEVAL_SUCCESS_MESSAGE)
 
 
-@router.post("/members/{memberId}/prior-auth/search")
-async def search_prior_auths_for_member(
-    memberId: str,
-    request: PASearchRequestByMemberPath,
+# NOTE: the commented-out search_prior_auths above claims this same path. Only
+# one of the two can be mounted -- FastAPI would silently route every request to
+# whichever is registered first.
+@router.post("/prior-auth/search")
+async def search_prior_auths_for_subscriber(
+    request: PASearchRequestBySubscriber,
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: RequireUser(Perm.MEMBERPRIORAUTH_VIEW),
 ) -> PagedApiResponse[PAMemberSearchResult]:
-    data = await PriorAuthService(session).search_prior_auths_for_member(
-        memberId, request
-    )
+    """Prior auths for one cardholder, keyed by subscriberNum + personCodes."""
+    data = await PriorAuthService(session).search_prior_auths_for_subscriber(request)
     return PagedApiResponse.ok(data=data, message=PA_RETRIEVAL_SUCCESS_MESSAGE)
 
 

@@ -13,9 +13,10 @@ from app.core.exceptions import (
     PrescriberNotFoundException,
     PriorAuthNotEditableException,
     PriorAuthNotFoundException,
+    SubscriberNotFoundException,
 )
 from app.models.drug_model import DrugModel
-from app.models.member_model import MemberModel
+from app.models.member_model import MemberModel, Subscriber
 from app.models.prescriber_model import PrescriberModel
 from app.models.prior_auth_model import PriorAuthModel
 from app.repositories.drug_repository import DrugRepository
@@ -27,13 +28,14 @@ from app.repositories.master_drug_repository import (
 from app.repositories.member_repository import MemberRepository
 from app.repositories.prescriber_repository import PrescriberRepository
 from app.repositories.prior_auth_repository import PriorAuthRepository
+from app.repositories.subscriber_repository import SubscriberRepository
 from app.schemas.prior_auth_schema import (
     CreatePARequest,
     PAByEntityQuery,
     PADetail,
     PAMemberSearchResult,
     PASearchRequest,
-    PASearchRequestByMemberPath,
+    PASearchRequestBySubscriber,
     PASearchResult,
     PatchPARequest,
     UpdatePARequest,
@@ -299,6 +301,7 @@ class PriorAuthService:
         self._master_drug_repo = MasterDrugRepository(session)
         self._gpi_repo = GpiRepository(session)
         self._prescriber_repo = PrescriberRepository(session)
+        self._subscriber_repo = SubscriberRepository(session)
         self._session = session
 
     async def get_prior_auth(self, pa_id: str) -> PADetail:
@@ -342,23 +345,17 @@ class PriorAuthService:
             items, total, request.pagination.page, request.pagination.page_size
         )
 
-    async def search_prior_auths_for_member(
-        self, member_id: str, request: PASearchRequestByMemberPath
+    async def search_prior_auths_for_subscriber(
+        self, request: PASearchRequestBySubscriber
     ) -> PagedResponse[PAMemberSearchResult]:
-        member = await self._require_member(member_id)
         criteria = request.searchRequest
 
-        if not member.insured_id:
-            return PagedResponse.of(
-                data=[],
-                page=request.pagination.page,
-                page_size=request.pagination.page_size,
-                total=0,
-            )
+        # The cardholder is proved against SUBSCRIBER, not the members table.
+        await self._require_subscriber(criteria.subscriber_num, criteria.person_codes)
 
         items, total = await self._repo.search(
-            subscriber_num=member.insured_id,
-            person_code=member.person_code,
+            subscriber_num=criteria.subscriber_num,
+            person_code=criteria.person_codes,
             ndc=criteria.ndc,
             # effDate is the older name for the lower bound; both are floors, so
             # passing both simply ANDs them and the later one wins.
@@ -372,7 +369,7 @@ class PriorAuthService:
             sort_dir=request.sort.sort_dir,
         )
 
-        # The member is already known from the path, so only the drug names are
+        # The cardholder came in on the request, so only the drug names are
         # looked up -- no member or prescriber resolution.
         names = await self._load_drug_names(items)
         return PagedResponse.of(
@@ -535,6 +532,19 @@ class PriorAuthService:
 
         refs = await self._load_references([prior_auth])
         return _to_detail(prior_auth, refs, today)
+
+    async def _require_subscriber(
+        self, subscriber_num: str, person_code: str
+    ) -> Subscriber:
+        subscriber = await self._subscriber_repo.get_by_subscriber_and_person(
+            subscriber_num, person_code
+        )
+        if not subscriber:
+            raise SubscriberNotFoundException(
+                f"Subscriber '{subscriber_num}' with person code "
+                f"'{person_code}' not found."
+            )
+        return subscriber
 
     async def _require_member(
         self, member_id: str, status_code: int = 404

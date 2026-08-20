@@ -22,6 +22,10 @@ _REASON_CODE_MAX = 20
 _NOTES_MAX = 2000
 _DIAGNOSIS_MAX = 100
 
+# Widths of the SUBSCRIBER columns the search is verified against.
+_SUBSCRIBER_NUM_MAX = 45
+_PERSON_CODE_MAX = 2
+
 _NDC_PATTERN = r"^\d{11}$"
 _GPI_PATTERN = r"^[A-Za-z0-9]{14}$"
 
@@ -161,16 +165,20 @@ class PASearch(BaseModel):
         return self
 
 
-class PASearchByMemberPath(BaseModel):
+class PASearchBySubscriber(BaseModel):
     """
-    Criteria for /members/{memberId}/prior-auth/search.
+    Criteria for /prior-auth/search.
+
+    subscriberNum and personCodes are required and identify the cardholder --
+    they are checked against the SUBSCRIBER table, and a pair with no row there
+    is a 404. No members table is consulted.
 
     ndc, effDateFrom and effDateTo filter. Every other key in the body is
-    ignored, memberId included: the search is already scoped by the path.
+    ignored.
 
     effDateFrom and effDateTo bound the PA's effdate, inclusive at both ends,
     and each stands on its own -- key either, both, or neither. An unbounded
-    search returns the member's whole history.
+    search returns the subscriber's whole history.
 
     effDate is the older name for the lower bound and still works. Keyed
     alongside effDateFrom it does not override it: both apply, so the later of
@@ -190,6 +198,8 @@ class PASearchByMemberPath(BaseModel):
             # Nulls are stripped from a rendered example, so the keys carry
             # real values -- an example of {} helps nobody.
             "example": {
+                "subscriberNum": "INS001",
+                "personCodes": "01",
                 "ndc": "00074580302",
                 "effDateFrom": "01/01/2026",
                 "effDateTo": "12/31/2026",
@@ -197,11 +207,25 @@ class PASearchByMemberPath(BaseModel):
         },
     )
 
+    subscriber_num: str = Field(
+        alias="subscriberNum", min_length=1, max_length=_SUBSCRIBER_NUM_MAX
+    )
+    # SUBSCRIBER keys one person code per row, so this carries a single code
+    # despite the plural name the client sends.
+    person_codes: str = Field(
+        alias="personCodes", min_length=1, max_length=_PERSON_CODE_MAX
+    )
     ndc: str | None = Field(None, min_length=_NDC_SEARCH_MIN, max_length=_NDC_LENGTH)
     eff_date_from: date | None = Field(None, alias="effDateFrom")
     eff_date_to: date | None = Field(None, alias="effDateTo")
     eff_date: date | None = None
     term_date: date | None = None
+
+    @field_validator("subscriber_num", "person_codes", mode="before")
+    @classmethod
+    def strip_identifier(cls, v):
+        """Keyed with surrounding whitespace is the same cardholder."""
+        return v.strip() if isinstance(v, str) else v
 
     @field_validator("ndc", mode="before")
     @classmethod
@@ -225,13 +249,13 @@ class PASearchByMemberPath(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_eff_date_range(self) -> PASearchByMemberPath:
+    def validate_eff_date_range(self) -> PASearchBySubscriber:
         _require_ordered_dates(self.eff_date_from, self.eff_date_to)
         return self
 
 
 class PAPagination(PaginationRequest):
-    """Pagination for the member PA search -- same shape, higher pageSize cap."""
+    """Pagination for the subscriber PA search -- same shape, higher pageSize cap."""
 
     page_size: int = Field(default=20, ge=1, le=_PA_PAGE_SIZE_MAX, alias="pageSize")
 
@@ -240,13 +264,15 @@ class PASearchRequest(BaseModel, SearchRequest[PASearch]):
     """Envelope for PA1 -- criteria plus sort and pagination."""
 
 
-class PASearchRequestByMemberPath(BaseModel, SearchRequest[PASearchByMemberPath]):
+class PASearchRequestBySubscriber(BaseModel, SearchRequest[PASearchBySubscriber]):
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
         json_schema_extra={
             "example": {
                 "searchRequest": {
+                    "subscriberNum": "INS001",
+                    "personCodes": "01",
                     "ndc": "00074580302",
                     "effDateFrom": "01/01/2026",
                     "effDateTo": "12/31/2026",
