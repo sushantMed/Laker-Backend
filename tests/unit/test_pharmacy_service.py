@@ -17,7 +17,6 @@ from app.schemas.pharmacy_schema import (
 )
 from app.services.pharmacy_service import (
     PharmacyService,
-    _compose_address,
     _resolve_sort,
 )
 
@@ -55,11 +54,6 @@ def service() -> PharmacyService:
     return svc
 
 
-def test_compose_address_formats_full_line():
-    pharmacy = make_pharmacy()
-    assert _compose_address(pharmacy) == "100 Main St, Springfield, IL 62704"
-
-
 def test_to_pharmacy_info_maps_all_fields(service: PharmacyService):
     pharmacy = make_pharmacy(is_24_hour=True, fax=None)
     info = service._to_pharmacy_info(pharmacy)
@@ -68,7 +62,7 @@ def test_to_pharmacy_info_maps_all_fields(service: PharmacyService):
     assert info.nabp == pharmacy.nabp
     assert info.npi == pharmacy.npi
     assert info.pharmacy_name == pharmacy.pharmacy_name
-    assert info.address == "100 Main St, Springfield, IL 62704"
+    assert info.address == "100 Main St"
     assert info.phone == pharmacy.phone
     assert info.fax is None
     assert info.is_24_hour is True

@@ -15,10 +15,6 @@ from app.utils.pagination import PagedResponse
 _DEFAULT_SORT = "pharmacy_name"
 
 
-def _compose_address(p: PharmacyModel) -> str:
-    return f"{p.address_line1}, {p.city}, {p.state} {p.zip}"
-
-
 def _resolve_sort(sort_by: str) -> str:
     return _DEFAULT_SORT if sort_by == "id" else sort_by
 
@@ -32,7 +28,7 @@ class PharmacyService:
             nabp=p.nabp,
             npi=p.npi,
             pharmacyName=p.pharmacy_name,
-            address=_compose_address(p),
+            address=p.address_line1,
             phone=p.phone,
             fax=p.fax,
             city=p.city,
