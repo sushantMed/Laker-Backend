@@ -143,20 +143,14 @@ def test_lookup_request_rejects_both_identifiers():
         PharmacyLookupRequest(nabp="1234567", npi="1023456789")
 
 
-@pytest.mark.parametrize("zip_code", ["6270", "62704-123", "6270A"])
+@pytest.mark.parametrize("zip_code", ["6270", "62704-1234", "62704-123", "6270A"])
 def test_lookup_request_rejects_invalid_us_zip_code(zip_code: str):
     with pytest.raises(InvalidSearchCriteriaException) as exc:
         PharmacyLookupRequest(zipCode=zip_code)
 
     assert exc.value.message == (
-        "zipCode must be a valid U.S. ZIP code (for example, 62704 or 62704-1234)."
+        "zipCode must be a valid five-digit U.S. ZIP code (for example, 62704)."
     )
-
-
-def test_lookup_request_accepts_us_zip_plus_four():
-    request = PharmacyLookupRequest(zipCode="62704-1234")
-
-    assert request.zip_code == "62704-1234"
 
 
 async def test_search_pharmacies_returns_paged_response(service: PharmacyService):
