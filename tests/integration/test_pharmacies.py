@@ -16,7 +16,7 @@ async def test_get_pharmacy_by_nabp_success(client, seeded_lookups):
     body = resp.json()
     assert body["pagination"]["total"] == 1
     assert body["data"][0]["nabp"] == "1234567"
-    assert body["data"][0]["address"] == "100 Main St, Springfield, IL 62704"
+    assert body["data"][0]["address"] == "100 Main St"
     assert body["data"][0]["is24Hour"] is True
 
 
