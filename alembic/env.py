@@ -5,16 +5,9 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-import app.models.auth_model
-import app.models.claim_model
-import app.models.drug_model
-import app.models.member_address_model
-import app.models.member_model
-import app.models.pharmacy_model
-import app.models.plan_model
-import app.models.prescriber_model
-import app.models.prior_auth_model
-import app.models.user_model  # noqa: F401
+# Import the package, not the modules one by one: target_metadata must hold
+# every table, or autogenerate reads a missing model as a table to drop.
+import app.models  # noqa: F401
 from alembic import context
 from app.core.config import settings
 from app.database.base import Base
@@ -30,6 +23,18 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def include_object(_object, name, type_, _reflected, _compare_to) -> bool:
+    """Keep autogenerate to the tables the models declare.
+
+    The app shares its Oracle schema with tables it does not own -- Oracle's
+    own HELP and SCHEDULER_* among them. Without this filter every one of them
+    reflects as a table no model declares, i.e. as a table to drop.
+    """
+    if type_ == "table":
+        return name in target_metadata.tables
+    return True
+
+
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -38,6 +43,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -48,16 +54,25 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 async def run_async_migrations() -> None:
+    engine_args: dict = {"poolclass": pool.NullPool}
+    # The app's tables sit in the SYSTEM tablespace, which the Oracle dialect
+    # hides from reflection by default -- autogenerate would then read every
+    # table that already exists as one still to be created. Oracle-only
+    # argument, so it is passed only for an Oracle URL.
+    if config.get_main_option("sqlalchemy.url").startswith("oracle"):
+        engine_args["exclude_tablespaces"] = []
+
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
+        **engine_args,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

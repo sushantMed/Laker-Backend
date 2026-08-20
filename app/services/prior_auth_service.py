@@ -19,6 +19,11 @@ from app.models.member_model import MemberModel
 from app.models.prescriber_model import PrescriberModel
 from app.models.prior_auth_model import PriorAuthModel
 from app.repositories.drug_repository import DrugRepository
+from app.repositories.gpi_repository import GpiRepository
+from app.repositories.master_drug_repository import (
+    NDC_PREFIX_LENGTH,
+    MasterDrugRepository,
+)
 from app.repositories.member_repository import MemberRepository
 from app.repositories.prescriber_repository import PrescriberRepository
 from app.repositories.prior_auth_repository import PriorAuthRepository
@@ -44,6 +49,14 @@ _ALLOWED_TRANSITIONS: dict[PAStatus, set[PAStatus]] = {
 }
 
 _AUDIT_USER_MAX = 20
+
+# The member PA grid opens on the last quarter's authorisations: with no
+# effDate keyed, the floor is 90 days back from today.
+_DEFAULT_SEARCH_WINDOW_DAYS = 90
+
+# A GPI recorded as a compound stands for no single drug, so no name is bound.
+_COMPOUND_GPI = "COMPOUND"
+_FULL_GPI_LENGTH = 14
 
 
 class _References:
@@ -90,6 +103,57 @@ class _References:
         if not prior_auth.prescriberid:
             return None
         return self._prescribers_by_npi.get(prior_auth.prescriberid)
+
+
+def _clean(value: str | None) -> str | None:
+    """Legacy columns are fixed-width, so a keyed value can arrive padded."""
+    if value is None:
+        return None
+    return value.strip() or None
+
+
+def _is_compound_gpi(gpi: str) -> bool:
+    return gpi.upper() == _COMPOUND_GPI
+
+
+class _DrugNames:
+    """Drug names for one page of PAs, resolved from the reference tables.
+
+    Where a reference table holds nothing for the PA's NDC or GPI, the name the
+    PA itself carries stands in -- the grid keeps showing what it showed before
+    MASTERDRUG was in the picture.
+    """
+
+    def __init__(
+        self,
+        ndc_prefix_names: dict[str, str],
+        ndc_names: dict[str, str],
+        gpi_names: dict[str, str],
+    ) -> None:
+        self._ndc_prefix_names = ndc_prefix_names
+        self._ndc_names = ndc_names
+        self._gpi_names = gpi_names
+
+    @classmethod
+    def empty(cls) -> _DrugNames:
+        return cls({}, {}, {})
+
+    def for_ndc(self, prior_auth: PriorAuthModel) -> str | None:
+        ndc = _clean(prior_auth.ndc)
+        if not ndc:
+            return None
+
+        if len(ndc) == NDC_PREFIX_LENGTH:
+            name = self._ndc_prefix_names.get(ndc)
+        else:
+            name = self._ndc_names.get(ndc)
+        return name or _drug_name_for_ndc(prior_auth)
+
+    def for_gpi(self, prior_auth: PriorAuthModel) -> str | None:
+        gpi = _clean(prior_auth.gpi)
+        if not gpi or _is_compound_gpi(gpi):
+            return None
+        return self._gpi_names.get(gpi) or _drug_name_for_gpi(prior_auth)
 
 
 def _person_codes(personcodes: str | None) -> set[str]:
@@ -163,13 +227,15 @@ def _to_search_result(
     )
 
 
-def _to_member_search_result(prior_auth: PriorAuthModel) -> PAMemberSearchResult:
+def _to_member_search_result(
+    prior_auth: PriorAuthModel, names: _DrugNames
+) -> PAMemberSearchResult:
     return PAMemberSearchResult(
         auth_num=_format_pa_id(prior_auth.authnum),
         ndc=prior_auth.ndc,
         gpi=prior_auth.gpi,
-        drug_name_ndc=_drug_name_for_ndc(prior_auth),
-        drug_name_gpi=_drug_name_for_gpi(prior_auth),
+        drug_name_ndc=names.for_ndc(prior_auth),
+        drug_name_gpi=names.for_gpi(prior_auth),
         action=prior_auth.action,
         eff_date=prior_auth.effdate,
         term_date=prior_auth.termdate,
@@ -234,6 +300,8 @@ class PriorAuthService:
         self._repo = PriorAuthRepository(session)
         self._member_repo = MemberRepository(session)
         self._drug_repo = DrugRepository(session)
+        self._master_drug_repo = MasterDrugRepository(session)
+        self._gpi_repo = GpiRepository(session)
         self._prescriber_repo = PrescriberRepository(session)
         self._session = session
 
@@ -284,22 +352,29 @@ class PriorAuthService:
         member = await self._require_member(member_id)
         criteria = request.searchRequest
 
+        # An unkeyed effDate opens the grid on the last 90 days, not on every
+        # PA the subscriber has ever held.
+        eff_date = criteria.eff_date or (
+            date.today() - timedelta(days=_DEFAULT_SEARCH_WINDOW_DAYS)
+        )
+
         items, total = await self._repo.search(
             insured_id=member.insured_id,
             person_code=member.person_code,
             ndc=criteria.ndc,
-            eff_date=criteria.eff_date,
-            term_date=criteria.term_date,
+            eff_date=eff_date,
+            # term_date=criteria.term_date,
             page=request.pagination.page,
             page_size=request.pagination.page_size,
             sort_by=request.sort.sort_by,
             sort_dir=request.sort.sort_dir,
         )
 
-        # Rows are built from the PA columns alone, so no member/drug/prescriber
-        # lookups are needed here.
+        # The member is already known from the path, so only the drug names are
+        # looked up -- no member or prescriber resolution.
+        names = await self._load_drug_names(items)
         return PagedResponse.of(
-            data=[_to_member_search_result(pa) for pa in items],
+            data=[_to_member_search_result(pa, names) for pa in items],
             page=request.pagination.page,
             page_size=request.pagination.page_size,
             total=total,
@@ -462,6 +537,8 @@ class PriorAuthService:
     async def _require_member(
         self, member_id: str, status_code: int = 404
     ) -> MemberModel:
+        # A member id keyed with surrounding whitespace is the same member.
+        member_id = _clean(member_id) or ""
         member = await self._member_repo.get_by_member_id(member_id)
         if not member:
             exc = MemberNotFoundException(f"Member '{member_id}' not found.")
@@ -497,6 +574,38 @@ class PriorAuthService:
             members=await self._member_repo.get_by_insured_ids(sorted(insured_ids)),
             drugs=await self._drug_repo.get_by_ndcs(sorted(ndcs)),
             prescribers=await self._prescriber_repo.get_by_npis(sorted(npis)),
+        )
+
+    async def _load_drug_names(
+        self, prior_auths: Sequence[PriorAuthModel]
+    ) -> _DrugNames:
+        """Resolve every NDC and GPI on the page in a handful of queries."""
+        if not prior_auths:
+            return _DrugNames.empty()
+
+        ndcs = {ndc for pa in prior_auths if (ndc := _clean(pa.ndc))}
+        prefixes = {ndc for ndc in ndcs if len(ndc) == NDC_PREFIX_LENGTH}
+
+        gpis = {
+            gpi
+            for pa in prior_auths
+            if (gpi := _clean(pa.gpi)) and not _is_compound_gpi(gpi)
+        }
+        full_gpis = {gpi for gpi in gpis if len(gpi) == _FULL_GPI_LENGTH}
+
+        gpi_names = await self._gpi_repo.gen_names_by_gpi(sorted(full_gpis))
+        gpi_names.update(
+            await self._gpi_repo.names_by_partial_gpi(sorted(gpis - full_gpis))
+        )
+
+        return _DrugNames(
+            ndc_prefix_names=await self._master_drug_repo.top_gpi_gen_name_by_ndc_prefix(
+                sorted(prefixes)
+            ),
+            ndc_names=await self._master_drug_repo.prod_desc_by_ndc(
+                sorted(ndcs - prefixes)
+            ),
+            gpi_names=gpi_names,
         )
 
     async def _to_page(

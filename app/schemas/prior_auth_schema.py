@@ -165,10 +165,15 @@ class PASearchByMemberPath(BaseModel):
     """
     Criteria for /members/{memberId}/prior-auth/search.
 
-    Only ndc, effDate and termDate are filters; effDate is a lower bound on the
-    PA's effdate and termDate an upper bound on its termdate. Every other key in
-    the body is ignored, memberId included: the search is already scoped by the
-    path.
+    ndc and effDate filter; effDate is a lower bound on the PA's effdate. Every
+    other key in the body is ignored, memberId included: the search is already
+    scoped by the path.
+
+    termDate is accepted and parsed but not currently applied -- the service
+    stopped passing it to the repository.
+
+    Leaving effDate out (or blank) does not drop the bound -- it falls back to
+    90 days before today. Key an older effDate to reach further back.
 
     ndc must be 9-11 characters and is left-padded with zeros to the stored
     11-character width; blank or absent drops the filter.

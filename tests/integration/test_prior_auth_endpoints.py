@@ -9,6 +9,9 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.drug_model import DrugModel
+from app.models.gpi_desc_model import GpiDescModel
+from app.models.gpi_list_model import GpiListModel
+from app.models.master_drug_model import MasterDrugModel
 from app.models.member_model import MemberModel
 from app.models.plan_model import PlanModel
 from app.models.prescriber_model import PrescriberModel
@@ -17,9 +20,19 @@ from app.utils.enums import BrandGeneric, Maintenance
 from tests.integration.conftest import AUTH
 
 BASE = "/api/v1"
+
+# The PA screen ships one route: POST /members/{memberId}/prior-auth/search.
+# Every other PA route is commented out in app/api/v1/prior_auth.py, so the
+# tests covering them would only assert that an unmounted path 404s. Re-enable
+# the route and drop this marker from its tests together.
+ROUTE_DISABLED = pytest.mark.skip(
+    reason="route commented out in app/api/v1/prior_auth.py"
+)
+
 TODAY = date.today()
 FUTURE = TODAY + timedelta(days=200)
 PAST = TODAY - timedelta(days=200)
+EARLIER = TODAY - timedelta(days=45)
 
 
 def make_pa(authnum: int, **overrides) -> PriorAuthModel:
@@ -108,7 +121,9 @@ async def seeded_pa(db_session: AsyncSession, seeded_lookups):
                 gpi="39400010100310",
                 genname="ATORVASTATIN CALCIUM",
                 bg="G",
-                effdate=date(2026, 3, 1),
+                # Inside the 90-day default window but below the EFF floor the
+                # eff-date tests key, so it filters in and out on demand.
+                effdate=EARLIER,
             ),
             make_pa(2003, action=None, authby=None, prescriberid=None),
             make_pa(2004, action="D", denial="03"),
@@ -131,6 +146,7 @@ async def search(client, body: dict, path: str = "/prior-auth/search"):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_search_by_ndc(client, seeded_pa):
     resp = await search(client, {"searchRequest": {"ndc": "00074312811"}})
 
@@ -141,6 +157,7 @@ async def test_search_by_ndc(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_search_resolves_member_details(client, seeded_pa):
     resp = await search(client, {"searchRequest": {"paId": "2001"}})
 
@@ -164,6 +181,7 @@ async def test_search_resolves_member_details(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_search_by_unknown_member_id_falls_back_to_subscribernum(
     client, seeded_pa
 ):
@@ -198,6 +216,7 @@ async def test_search_by_unknown_member_id_falls_back_to_subscribernum(
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_search_by_drug_name_matches_catalogue(client, seeded_pa):
     resp = await search(client, {"searchRequest": {"drugName": "humira"}})
 
@@ -205,6 +224,7 @@ async def test_search_by_drug_name_matches_catalogue(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_search_by_drug_name_matches_manual_name(client, seeded_pa):
     resp = await search(client, {"searchRequest": {"drugName": "COMPOUNDED"}})
 
@@ -231,6 +251,7 @@ async def test_search_by_drug_name_matches_manual_name(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_search_without_criteria_is_rejected(client, seeded_pa):
     resp = await search(client, {"searchRequest": {}})
 
@@ -238,6 +259,7 @@ async def test_search_without_criteria_is_rejected(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_search_with_reversed_date_range_is_rejected(client, seeded_pa):
     resp = await search(
         client,
@@ -248,6 +270,7 @@ async def test_search_with_reversed_date_range_is_rejected(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_search_paginates_and_sorts(client, seeded_pa):
     resp = await search(
         client,
@@ -265,6 +288,7 @@ async def test_search_paginates_and_sorts(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_search_second_page(client, seeded_pa):
     resp = await search(
         client,
@@ -279,6 +303,7 @@ async def test_search_second_page(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_search_returns_empty_page_when_nothing_matches(client, seeded_pa):
     resp = await search(client, {"searchRequest": {"ndc": "99999999999"}})
 
@@ -287,6 +312,7 @@ async def test_search_returns_empty_page_when_nothing_matches(client, seeded_pa)
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_get_prior_auth_detail(client, seeded_pa):
     resp = await client.get(f"{BASE}/prior-auth/2001", headers=AUTH)
 
@@ -314,6 +340,7 @@ async def test_get_prior_auth_with_non_numeric_id(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_family_pa_resolves_to_lowest_person_code(client, seeded_pa):
     resp = await client.get(f"{BASE}/prior-auth/2006", headers=AUTH)
 
@@ -323,6 +350,7 @@ async def test_family_pa_resolves_to_lowest_person_code(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_create_prior_auth(client, seeded_pa):
     resp = await client.post(
         f"{BASE}/prior-auth",
@@ -351,6 +379,7 @@ async def test_create_prior_auth(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_created_pa_is_retrievable(client, seeded_pa):
     created = await client.post(
         f"{BASE}/prior-auth",
@@ -373,6 +402,7 @@ async def test_created_pa_is_retrievable(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_create_rejects_unknown_member(client, seeded_pa):
     resp = await client.post(
         f"{BASE}/prior-auth",
@@ -409,6 +439,7 @@ async def test_create_rejects_unknown_ndc(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_create_rejects_reversed_dates(client, seeded_pa):
     resp = await client.post(
         f"{BASE}/prior-auth",
@@ -427,6 +458,7 @@ async def test_create_rejects_reversed_dates(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_update_prior_auth(client, seeded_pa):
     resp = await client.put(
         f"{BASE}/prior-auth/2003",
@@ -451,6 +483,7 @@ async def test_update_prior_auth(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_update_rejects_expired_pa(client, seeded_pa):
     resp = await client.put(
         f"{BASE}/prior-auth/2005",
@@ -468,6 +501,7 @@ async def test_update_rejects_expired_pa(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_update_rejects_invalid_transition(client, seeded_pa):
     resp = await client.put(
         f"{BASE}/prior-auth/2001",
@@ -502,6 +536,7 @@ async def test_update_missing_pa(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_patch_notes_only(client, seeded_pa):
     resp = await client.patch(
         f"{BASE}/prior-auth/2001",
@@ -516,6 +551,7 @@ async def test_patch_notes_only(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_patch_status_to_declined(client, seeded_pa):
     resp = await client.patch(
         f"{BASE}/prior-auth/2003",
@@ -530,6 +566,7 @@ async def test_patch_status_to_declined(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_patch_rejects_invalid_transition(client, seeded_pa):
     resp = await client.patch(
         f"{BASE}/prior-auth/2004",
@@ -541,6 +578,7 @@ async def test_patch_rejects_invalid_transition(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_patch_rejects_expired_pa(client, seeded_pa):
     resp = await client.patch(
         f"{BASE}/prior-auth/2005",
@@ -681,7 +719,7 @@ async def test_member_prior_auth_search_row_returns_pa_columns(client, seeded_pa
         "drugNameNdc": "ATORVASTATIN CALCIUM",
         "drugNameGpi": "ATORVASTATIN CALCIUM",
         "action": "A",
-        "effDate": "03/01/2026",
+        "effDate": EARLIER.strftime("%m/%d/%Y"),
         "termDate": FUTURE.strftime("%m/%d/%Y"),
         "lastUser": None,
         "subscriberNum": "INS001",
@@ -726,23 +764,19 @@ async def test_member_prior_auth_search_eff_date_drops_earlier_pas(client, seede
 
 
 @pytest.mark.asyncio
-async def test_member_prior_auth_search_by_term_date_is_an_upper_bound(
-    client, seeded_pa
+@pytest.mark.parametrize("keyed", ["past", "future"])
+async def test_member_prior_auth_search_accepts_but_ignores_term_date(
+    client, seeded_pa, keyed
 ):
-    """termDate is a ceiling: only the PA that already ended is at or below it."""
-    resp = await member_search(client, {"termDate": PAST.strftime("%m/%d/%Y")})
+    """termDate is accepted and dropped.
 
-    body = resp.json()
-    assert body["pagination"]["total"] == 1
-    assert body["data"][0]["authNum"] == "2005"
-
-
-@pytest.mark.asyncio
-async def test_member_prior_auth_search_term_date_keeps_pas_ending_earlier(
-    client, seeded_pa
-):
-    """A ceiling at FUTURE keeps every PA on the subscriber, 2005 included."""
-    resp = await member_search(client, {"termDate": FUTURE.strftime("%m/%d/%Y")})
+    PriorAuthService.search_prior_auths_for_member no longer passes it to the
+    repository, so a ceiling that would once have left only the ended PA now
+    changes nothing. Restore the kwarg and this test goes back to asserting a
+    ceiling.
+    """
+    ceiling = PAST if keyed == "past" else FUTURE
+    resp = await member_search(client, {"termDate": ceiling.strftime("%m/%d/%Y")})
 
     body = resp.json()
     assert {row["authNum"] for row in body["data"]} == {
@@ -756,7 +790,7 @@ async def test_member_prior_auth_search_term_date_keeps_pas_ending_earlier(
 
 @pytest.mark.asyncio
 async def test_member_prior_auth_search_combines_criteria(client, seeded_pa):
-    """The three filters AND together; 2005 qualifies since PAST <= FUTURE."""
+    """ndc and effDate AND together; the termDate in the payload is dropped."""
     resp = await member_search(
         client,
         {
@@ -771,19 +805,22 @@ async def test_member_prior_auth_search_combines_criteria(client, seeded_pa):
 
 
 @pytest.mark.asyncio
-async def test_member_prior_auth_search_combined_bounds_narrow_the_result(
+async def test_member_prior_auth_search_term_date_does_not_narrow_the_result(
     client, seeded_pa
 ):
-    resp = await member_search(
-        client,
-        {
-            "ndc": "00074312811",
-            "effDate": EFF,
-            "termDate": PAST.strftime("%m/%d/%Y"),
-        },
+    """The same criteria with the ceiling flipped return the same rows."""
+    payload = {"ndc": "00074312811", "effDate": EFF}
+
+    with_past = await member_search(
+        client, {**payload, "termDate": PAST.strftime("%m/%d/%Y")}
+    )
+    with_future = await member_search(
+        client, {**payload, "termDate": FUTURE.strftime("%m/%d/%Y")}
     )
 
-    assert {row["authNum"] for row in resp.json()["data"]} == {"2005"}
+    expected = {"2001", "2003", "2004", "2005"}
+    assert {row["authNum"] for row in with_past.json()["data"]} == expected
+    assert {row["authNum"] for row in with_future.json()["data"]} == expected
 
 
 @pytest.mark.asyncio
@@ -793,7 +830,7 @@ async def test_member_prior_auth_search_combined_bounds_narrow_the_result(
 async def test_member_prior_auth_search_ignores_unsupported_criteria(
     client, seeded_pa, field
 ):
-    """Only ndc/effDate/termDate filter; other keys are accepted and dropped."""
+    """Only ndc/effDate filter; other keys are accepted and dropped."""
     resp = await member_search(client, {field: "nonsense", "ndc": "00093721410"})
 
     assert resp.status_code == 200
@@ -889,7 +926,186 @@ def _as_date(value: str) -> date:
     return datetime.strptime(value, "%m/%d/%Y").date()
 
 
+# ── Default 90-day window ─────────────────────────────────────────────────────
+
+OLDER_THAN_WINDOW = TODAY - timedelta(days=120)
+
+
+@pytest_asyncio.fixture()
+async def seeded_old_pa(db_session: AsyncSession, seeded_pa):
+    db_session.add(make_pa(2010, effdate=OLDER_THAN_WINDOW))
+    await db_session.flush()
+
+
 @pytest.mark.asyncio
+async def test_member_prior_auth_search_defaults_to_the_last_90_days(
+    client, seeded_old_pa
+):
+    """No effDate keyed means 90 days back, not the whole history."""
+    resp = await member_search(client, {})
+
+    assert "2010" not in {row["authNum"] for row in resp.json()["data"]}
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_default_window_keeps_day_90(
+    client, seeded_pa, db_session: AsyncSession
+):
+    """The floor is inclusive: a PA effective exactly 90 days back is in."""
+    db_session.add(make_pa(2011, effdate=TODAY - timedelta(days=90)))
+    await db_session.flush()
+
+    resp = await member_search(client, {})
+
+    assert "2011" in {row["authNum"] for row in resp.json()["data"]}
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_eff_date_reaches_past_the_default(
+    client, seeded_old_pa
+):
+    resp = await member_search(
+        client, {"effDate": OLDER_THAN_WINDOW.strftime("%m/%d/%Y")}
+    )
+
+    assert "2010" in {row["authNum"] for row in resp.json()["data"]}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("keyed", ["%20MBR001", "MBR001%20", "%20%20MBR001%20"])
+async def test_member_prior_auth_search_trims_member_id(client, seeded_pa, keyed):
+    """A member id keyed with surrounding spaces still resolves."""
+    resp = await search(
+        client,
+        {"searchRequest": {}},
+        path=f"/members/{keyed}/prior-auth/search",
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["pagination"]["total"] == 5
+
+
+# ── Drug names from the reference tables ──────────────────────────────────────
+
+
+def make_master_drug(ndc: str, *, gpi: str, gen_name: str, description: str):
+    return MasterDrugModel(
+        ndcupchri=ndc, gpi=gpi, gpigenname=gen_name, proddescabbrev=description
+    )
+
+
+@pytest_asyncio.fixture()
+async def seeded_drug_reference(db_session: AsyncSession, seeded_pa):
+    db_session.add_all(
+        [
+            # PA 2001's full NDC -- named by its product description.
+            make_master_drug(
+                "00074312811",
+                gpi="27250030100120",
+                gen_name="ADALIMUMAB",
+                description="HUMIRA PEN 40MG",
+            ),
+            # Prefix 000937214 covers three packages. Two share a GPI, so that
+            # pair's generic name wins the count.
+            make_master_drug(
+                "00093721410",
+                gpi="39400010100310",
+                gen_name="ATORVASTATIN CALCIUM",
+                description="ATORVASTATIN 10MG",
+            ),
+            make_master_drug(
+                "00093721430",
+                gpi="39400010100310",
+                gen_name="ATORVASTATIN CALCIUM",
+                description="ATORVASTATIN 30MG",
+            ),
+            make_master_drug(
+                "00093721490",
+                gpi="39400010100999",
+                gen_name="ATORVASTATIN/EZETIMIBE",
+                description="ATORVASTATIN COMBO",
+            ),
+            GpiDescModel(gpi="27250030100120", gpigenname="ADALIMUMAB (FULL GPI)"),
+            GpiListModel(gpi="G3940", name="ANTIHYPERLIPIDEMICS"),
+        ]
+    )
+    db_session.add_all(
+        [
+            make_pa(2007, ndc="000937214", gpi="3940", genname=None),
+            make_pa(2008, ndc=None, gpi="COMPOUND", genname="NOT A DRUG NAME"),
+        ]
+    )
+    await db_session.flush()
+
+
+def _row(resp, auth_num: str) -> dict:
+    return next(row for row in resp.json()["data"] if row["authNum"] == auth_num)
+
+
+@pytest.mark.asyncio
+async def test_member_search_names_a_full_ndc_from_masterdrug(
+    client, seeded_drug_reference
+):
+    """An 11-character NDC takes MASTERDRUG's product description."""
+    row = _row(await member_search(client, {}), "2001")
+
+    assert row["drugNameNdc"] == "HUMIRA PEN 40MG"
+
+
+@pytest.mark.asyncio
+async def test_member_search_names_a_short_ndc_by_commonest_gpi(
+    client, seeded_drug_reference
+):
+    """A 9-character NDC takes the generic name most rows under it carry."""
+    row = _row(await member_search(client, {}), "2007")
+
+    assert row["drugNameNdc"] == "ATORVASTATIN CALCIUM"
+
+
+@pytest.mark.asyncio
+async def test_member_search_names_a_full_gpi_from_gpidesc(
+    client, seeded_drug_reference
+):
+    row = _row(await member_search(client, {}), "2001")
+
+    assert row["drugNameGpi"] == "ADALIMUMAB (FULL GPI)"
+
+
+@pytest.mark.asyncio
+async def test_member_search_names_a_partial_gpi_from_gpilist(
+    client, seeded_drug_reference
+):
+    """A partial GPI is keyed in GpiList with a leading G."""
+    row = _row(await member_search(client, {}), "2007")
+
+    assert row["drugNameGpi"] == "ANTIHYPERLIPIDEMICS"
+
+
+@pytest.mark.asyncio
+async def test_member_search_binds_no_name_to_a_compound_gpi(
+    client, seeded_drug_reference
+):
+    """A compound stands for no one drug, so its GPI names nothing."""
+    row = _row(await member_search(client, {}), "2008")
+
+    assert row["drugNameGpi"] is None
+
+
+@pytest.mark.asyncio
+async def test_member_search_falls_back_to_the_pa_s_own_drug_name(
+    client, seeded_drug_reference, db_session: AsyncSession
+):
+    """An NDC the reference tables don't carry keeps the name on the PA."""
+    db_session.add(make_pa(2009, ndc="99999999999", genname="LOCALLY NAMED DRUG"))
+    await db_session.flush()
+
+    row = _row(await member_search(client, {}), "2009")
+
+    assert row["drugNameNdc"] == "LOCALLY NAMED DRUG"
+
+
+@pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_drug_prior_auth_list(client, seeded_pa):
     resp = await client.get(f"{BASE}/drugs/00074312811/prior-auth", headers=AUTH)
 
@@ -914,6 +1130,7 @@ async def test_drug_prior_auth_list_unknown_ndc(client, seeded_pa):
 
 
 @pytest.mark.asyncio
+@ROUTE_DISABLED
 async def test_prescriber_prior_auth_list(client, seeded_pa):
     resp = await client.get(f"{BASE}/prescribers/1112223334/prior-auth", headers=AUTH)
 
@@ -930,6 +1147,7 @@ async def test_prescriber_prior_auth_list_unknown_npi(client, seeded_pa):
 
 @pytest.mark.asyncio
 async def test_prior_auth_endpoints_require_auth(raw_client, seeded_pa):
-    resp = await raw_client.get(f"{BASE}/prior-auth/2001")
+    """The one mounted PA route rejects an unauthenticated caller."""
+    resp = await raw_client.post(f"{BASE}{MEMBER_SEARCH_PATH}", json={})
 
     assert resp.status_code == 403

@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, DateTime, Index, Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
+
+if TYPE_CHECKING:
+    from app.models.master_drug_model import MasterDrugModel
 
 
 class PriorAuthModel(Base):
@@ -123,3 +127,14 @@ class PriorAuthModel(Base):
     proffeehandler: Mapped[str | None] = mapped_column(String(20), nullable=True)
     displimitshandler: Mapped[str | None] = mapped_column(String(20), nullable=True)
     seconddiagnosis: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # ── Relationships ─────────────────────────────────────────────────────────
+    # Only resolves a PA holding a full 11-character NDC. A PA may instead hold
+    # a 9-character one standing for a run of packages, which is a name to
+    # derive rather than a row to reach -- PriorAuthService does that.
+    master_drug: Mapped[MasterDrugModel | None] = relationship(
+        "MasterDrugModel",
+        primaryjoin="foreign(PriorAuthModel.ndc) == MasterDrugModel.ndcupchri",
+        viewonly=True,
+        lazy="noload",
+    )
