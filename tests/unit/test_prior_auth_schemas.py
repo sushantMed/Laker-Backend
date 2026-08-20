@@ -77,26 +77,39 @@ def test_member_path_search_allows_no_criteria():
     assert criteria.ndc is None
     assert criteria.eff_date is None
     assert criteria.term_date is None
-    assert criteria.last_90_days is False
+    assert criteria.eff_date_from is None
+    assert criteria.eff_date_to is None
 
 
-@pytest.mark.parametrize(
-    ("keyed", "expected"),
-    [(True, True), (False, False), ("true", True), ("false", False), (1, True)],
-)
-def test_member_path_search_parses_last_90_days(keyed, expected):
-    assert PASearchByMemberPath(last90Days=keyed).last_90_days is expected
+def test_member_path_search_parses_eff_date_bounds():
+    criteria = PASearchByMemberPath(effDateFrom="05/01/2025", effDateTo="04/30/2026")
+
+    assert criteria.eff_date_from == date(2025, 5, 1)
+    assert criteria.eff_date_to == date(2026, 4, 30)
 
 
-def test_member_path_search_last_90_days_takes_its_wire_name():
-    """The client keys last90Days; the field name is the fallback, not the alias."""
-    assert PASearchByMemberPath(last90Days=True).last_90_days is True
-    assert PASearchByMemberPath(last_90_days=True).last_90_days is True
+def test_member_path_search_accepts_one_eff_date_bound_alone():
+    assert PASearchByMemberPath(effDateFrom="05/01/2025").eff_date_to is None
+    assert PASearchByMemberPath(effDateTo="04/30/2026").eff_date_from is None
 
 
-def test_member_path_search_rejects_non_boolean_last_90_days():
-    with pytest.raises(ValidationError):
-        PASearchByMemberPath(last90Days="yesterday")
+def test_member_path_search_allows_an_eff_date_range_of_one_day():
+    criteria = PASearchByMemberPath(effDateFrom="05/01/2025", effDateTo="05/01/2025")
+
+    assert criteria.eff_date_from == criteria.eff_date_to
+
+
+def test_member_path_search_rejects_reversed_eff_date_range():
+    with pytest.raises(InvalidDateRangeException):
+        PASearchByMemberPath(effDateFrom="04/30/2026", effDateTo="05/01/2025")
+
+
+@pytest.mark.parametrize("blank", ["", "   ", None])
+def test_member_path_search_treats_blank_eff_date_bounds_as_absent(blank):
+    criteria = PASearchByMemberPath(effDateFrom=blank, effDateTo=blank)
+
+    assert criteria.eff_date_from is None
+    assert criteria.eff_date_to is None
 
 
 def test_member_path_search_parses_eff_and_term_dates():
@@ -155,8 +168,9 @@ def test_member_path_search_ignores_unsupported_criteria(field):
     assert set(criteria.model_dump()) == {
         "ndc",
         "eff_date",
+        "eff_date_from",
+        "eff_date_to",
         "term_date",
-        "last_90_days",
     }
 
 

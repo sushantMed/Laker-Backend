@@ -121,8 +121,8 @@ async def seeded_pa(db_session: AsyncSession, seeded_lookups):
                 gpi="39400010100310",
                 genname="ATORVASTATIN CALCIUM",
                 bg="G",
-                # Inside the 90-day default window but below the EFF floor the
-                # eff-date tests key, so it filters in and out on demand.
+                # Below the EFF floor the eff-date tests key, so it filters in
+                # and out on demand.
                 effdate=EARLIER,
             ),
             make_pa(2003, action=None, authby=None, prescriberid=None),
@@ -926,92 +926,130 @@ def _as_date(value: str) -> date:
     return datetime.strptime(value, "%m/%d/%Y").date()
 
 
-# ── last90Days ────────────────────────────────────────────────────────────────
+# ── effDateFrom / effDateTo ───────────────────────────────────────────────────
 
-OLDER_THAN_WINDOW = TODAY - timedelta(days=120)
+OLDER = TODAY - timedelta(days=120)
+
+
+def _fmt(value: date) -> str:
+    return value.strftime("%m/%d/%Y")
 
 
 @pytest_asyncio.fixture()
 async def seeded_old_pa(db_session: AsyncSession, seeded_pa):
-    db_session.add(make_pa(2010, effdate=OLDER_THAN_WINDOW))
+    """Adds 2010 at 120 days back -- the seeded PAs sit at 30 and 45."""
+    db_session.add(make_pa(2010, effdate=OLDER))
     await db_session.flush()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("criteria", [{}, {"last90Days": False}])
-async def test_member_prior_auth_search_returns_full_history_by_default(
-    client, seeded_old_pa, criteria
-):
-    """last90Days defaults to false: a 120-day-old PA still comes back."""
-    resp = await member_search(client, criteria)
-
-    assert "2010" in {row["authNum"] for row in resp.json()["data"]}
-
-
-@pytest.mark.asyncio
-async def test_member_prior_auth_search_last_90_days_drops_older_pas(
+async def test_member_prior_auth_search_unbounded_returns_full_history(
     client, seeded_old_pa
 ):
-    resp = await member_search(client, {"last90Days": True})
+    """Neither bound keyed means the member's whole history."""
+    resp = await member_search(client, {})
 
-    assert "2010" not in {row["authNum"] for row in resp.json()["data"]}
-
-
-@pytest.mark.asyncio
-async def test_member_prior_auth_search_last_90_days_keeps_day_90(
-    client, seeded_pa, db_session: AsyncSession
-):
-    """The floor is inclusive: a PA effective exactly 90 days back is in."""
-    db_session.add(make_pa(2011, effdate=TODAY - timedelta(days=90)))
-    await db_session.flush()
-
-    resp = await member_search(client, {"last90Days": True})
-
-    assert "2011" in {row["authNum"] for row in resp.json()["data"]}
+    assert {row["authNum"] for row in resp.json()["data"]} == {
+        "2001",
+        "2002",
+        "2003",
+        "2004",
+        "2005",
+        "2010",
+    }
 
 
 @pytest.mark.asyncio
-async def test_member_prior_auth_search_eff_date_beats_last_90_days(
-    client, seeded_old_pa
-):
-    """A keyed effDate wins -- the flag only floors an unkeyed search."""
+async def test_member_prior_auth_search_eff_date_from_is_a_floor(client, seeded_old_pa):
     resp = await member_search(
-        client,
-        {"effDate": OLDER_THAN_WINDOW.strftime("%m/%d/%Y"), "last90Days": True},
+        client, {"effDateFrom": _fmt(TODAY - timedelta(days=90))}
     )
 
+    assert "2010" not in {row["authNum"] for row in resp.json()["data"]}
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_eff_date_to_is_a_ceiling(client, seeded_old_pa):
+    """Only the oldest PA sits at or below a ceiling 90 days back."""
+    resp = await member_search(client, {"effDateTo": _fmt(TODAY - timedelta(days=90))})
+
+    assert {row["authNum"] for row in resp.json()["data"]} == {"2010"}
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_eff_date_range_brackets_the_result(
+    client, seeded_old_pa
+):
+    """2002 sits at 45 days back, alone inside a 40-to-50-day bracket."""
+    resp = await member_search(
+        client,
+        {
+            "effDateFrom": _fmt(TODAY - timedelta(days=50)),
+            "effDateTo": _fmt(TODAY - timedelta(days=40)),
+        },
+    )
+
+    assert {row["authNum"] for row in resp.json()["data"]} == {"2002"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bound", ["effDateFrom", "effDateTo"])
+async def test_member_prior_auth_search_eff_date_bounds_are_inclusive(
+    client, seeded_old_pa, bound
+):
+    """A PA effective exactly on either bound is inside it."""
+    resp = await member_search(client, {bound: _fmt(OLDER)})
+
     assert "2010" in {row["authNum"] for row in resp.json()["data"]}
 
 
 @pytest.mark.asyncio
-async def test_member_prior_auth_search_last_90_days_narrows_a_blank_eff_date(
-    client, seeded_old_pa
-):
-    """A blank effDate box is an unkeyed one, so the flag still floors it."""
-    resp = await member_search(client, {"effDate": "", "last90Days": True})
-
-    assert "2010" not in {row["authNum"] for row in resp.json()["data"]}
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("keyed", ["true", "TRUE", 1])
-async def test_member_prior_auth_search_last_90_days_accepts_truthy_values(
-    client, seeded_old_pa, keyed
-):
-    """The flag arrives from a form as a string as often as a JSON bool."""
-    resp = await member_search(client, {"last90Days": keyed})
-
-    assert resp.status_code == 200
-    assert "2010" not in {row["authNum"] for row in resp.json()["data"]}
-
-
-@pytest.mark.asyncio
-async def test_member_prior_auth_search_rejects_a_non_boolean_last_90_days(
+async def test_member_prior_auth_search_rejects_reversed_eff_date_range(
     client, seeded_pa
 ):
-    resp = await member_search(client, {"last90Days": "yesterday"})
+    resp = await member_search(
+        client, {"effDateFrom": _fmt(TODAY), "effDateTo": _fmt(OLDER)}
+    )
 
     assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("blank", ["", "   ", None])
+async def test_member_prior_auth_search_ignores_blank_eff_date_bounds(
+    client, seeded_old_pa, blank
+):
+    resp = await member_search(client, {"effDateFrom": blank, "effDateTo": blank})
+
+    assert resp.status_code == 200
+    assert resp.json()["pagination"]["total"] == 6
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_eff_date_still_floors(client, seeded_old_pa):
+    """effDate is the older name for the floor and keeps working."""
+    resp = await member_search(client, {"effDate": _fmt(TODAY - timedelta(days=90))})
+
+    assert "2010" not in {row["authNum"] for row in resp.json()["data"]}
+
+
+@pytest.mark.asyncio
+async def test_member_prior_auth_search_eff_date_and_from_both_apply(
+    client, seeded_old_pa
+):
+    """Two floors AND together, so the later of the two is what bites."""
+    resp = await member_search(
+        client,
+        {
+            "effDate": _fmt(OLDER),
+            "effDateFrom": _fmt(TODAY - timedelta(days=40)),
+        },
+    )
+
+    # 2002 sits at 45 days back, below the tighter floor; 2010 at 120.
+    auths = {row["authNum"] for row in resp.json()["data"]}
+    assert "2002" not in auths
+    assert "2010" not in auths
 
 
 @pytest.mark.asyncio

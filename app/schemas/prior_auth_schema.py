@@ -165,13 +165,16 @@ class PASearchByMemberPath(BaseModel):
     """
     Criteria for /members/{memberId}/prior-auth/search.
 
-    ndc and effDate filter; effDate is a lower bound on the PA's effdate. Every
-    other key in the body is ignored, memberId included: the search is already
-    scoped by the path.
+    ndc, effDateFrom and effDateTo filter. Every other key in the body is
+    ignored, memberId included: the search is already scoped by the path.
 
-    last90Days floors effDate at 90 days before today. It defaults to false, so
-    an unkeyed search returns the member's whole history. A keyed effDate wins:
-    the flag only supplies a floor where there is none.
+    effDateFrom and effDateTo bound the PA's effdate, inclusive at both ends,
+    and each stands on its own -- key either, both, or neither. An unbounded
+    search returns the member's whole history.
+
+    effDate is the older name for the lower bound and still works. Keyed
+    alongside effDateFrom it does not override it: both apply, so the later of
+    the two floors wins.
 
     termDate is accepted and parsed but not currently applied -- the service
     stopped passing it to the repository.
@@ -184,21 +187,21 @@ class PASearchByMemberPath(BaseModel):
         alias_generator=to_camel,
         populate_by_name=True,
         json_schema_extra={
+            # Nulls are stripped from a rendered example, so the keys carry
+            # real values -- an example of {} helps nobody.
             "example": {
-                "ndc": None,
-                "effDate": None,
-                "termDate": None,
-                "last90Days": False,
+                "ndc": "00074580302",
+                "effDateFrom": "01/01/2026",
+                "effDateTo": "12/31/2026",
             }
         },
     )
 
     ndc: str | None = Field(None, min_length=_NDC_SEARCH_MIN, max_length=_NDC_LENGTH)
+    eff_date_from: date | None = Field(None, alias="effDateFrom")
+    eff_date_to: date | None = Field(None, alias="effDateTo")
     eff_date: date | None = None
     term_date: date | None = None
-    # Aliased explicitly: the wire name is fixed by the client, so it must not
-    # ride on whatever the alias generator happens to produce.
-    last_90_days: bool = Field(False, alias="last90Days")
 
     @field_validator("ndc", mode="before")
     @classmethod
@@ -211,13 +214,20 @@ class PASearchByMemberPath(BaseModel):
         """A short NDC (e.g. 9 digits) is stored 11 wide -- pad zeros in front."""
         return v.zfill(_NDC_LENGTH) if v else v
 
-    @field_validator("eff_date", "term_date", mode="before")
+    @field_validator(
+        "eff_date_from", "eff_date_to", "eff_date", "term_date", mode="before"
+    )
     @classmethod
     def blank_date_to_none(cls, v):
         """An untouched date box posts "" -- treat it as no filter, not a 422."""
         if isinstance(v, str) and not v.strip():
             return None
         return v
+
+    @model_validator(mode="after")
+    def validate_eff_date_range(self) -> PASearchByMemberPath:
+        _require_ordered_dates(self.eff_date_from, self.eff_date_to)
+        return self
 
 
 class PAPagination(PaginationRequest):
@@ -237,10 +247,9 @@ class PASearchRequestByMemberPath(BaseModel, SearchRequest[PASearchByMemberPath]
         json_schema_extra={
             "example": {
                 "searchRequest": {
-                    "ndc": None,
-                    "effDate": None,
-                    "termDate": None,
-                    "last90Days": False,
+                    "ndc": "00074580302",
+                    "effDateFrom": "01/01/2026",
+                    "effDateTo": "12/31/2026",
                 },
                 "sort": {"sortBy": "effDate", "sortDir": "DESC"},
                 "pagination": {"page": 1, "pageSize": 20},

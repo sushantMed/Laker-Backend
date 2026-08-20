@@ -118,12 +118,12 @@ class PriorAuthRepository:
             stmt = stmt.where(PriorAuthModel.termdate <= term_date)
         if prescriber_npi:
             stmt = stmt.where(PriorAuthModel.prescriberid == prescriber_npi)
+        if eff_date_from:
+            stmt = stmt.where(PriorAuthModel.effdate >= eff_date_from)
+        if eff_date_to:
+            stmt = stmt.where(PriorAuthModel.effdate <= eff_date_to)
         # if status:
         #     stmt = stmt.where(_status_clause(status, today))
-        # if eff_date_from:
-        #     stmt = stmt.where(PriorAuthModel.effdate >= eff_date_from)
-        # if eff_date_to:
-        #     stmt = stmt.where(PriorAuthModel.effdate <= eff_date_to)
 
         return await self._paginate(stmt, page, page_size, sort_by, sort_dir)
 
