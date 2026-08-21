@@ -14,7 +14,7 @@ from pydantic import Field, field_validator, model_validator  # type:ignore
 
 from app.core.base_model import AppBaseModel as BaseModel
 from app.schemas.common_schema import SearchRequest
-from app.utils.pagination import PaginationRequest
+from app.utils.pagination import PaginationRequest, SortRequest
 
 # ── Shared config ────────────────────────────────────────────────────────────
 
@@ -196,35 +196,44 @@ class ClaimsByEntityQuery(BaseModel, PaginationRequest):
     end_date: date | None = Field(None, alias="filledDate")
 
 
+class ClaimMemberSortRequest(SortRequest):
+    """SortRequest with this endpoint's own defaults (dateFilled/DESC)
+    instead of SortRequest's generic id/ASC -- so an omitted `sort` key,
+    an empty `sort: {}`, and a partial `sort: {"sortBy": ...}` all fall
+    back to "most recent first" instead of silently reverting to id/ASC.
+    """
+
+    sort_by: str = Field(default="dateFilled", alias="sortBy")
+    sort_dir: str = Field(default="DESC", alias="sortDir", pattern="^(ASC|DESC)$")
+
+
 class ClaimSearchByMemberRequest(BaseModel):
     """
-    Request body schema for POST /members/{memberId}/claims/search.
+    Request body schema for POST /members/claims/search.
 
-    memberId comes from the path, not from here. All fields are optional
-    and sent as a JSON request body; page/pageSize remain query params.
+    memberId is part of this body (not a path param). personCode is accepted
+    for the frontend's convenience but is not validated or used server-side
+    -- memberId alone already uniquely identifies the member. page/pageSize
+    remain query params.
 
     Business rules:
     - startDate and endDate must be supplied together (both or neither), and
-      must not be combined with filledDate — they're alternate ways of
-      expressing date-filter intent and combining them is conflicting.
-      Providing both is rejected with a 422 rather than silently ignoring
-      the extra filters.
-    - filledDate accepts values in a few known formats (not just ISO)
-      because the current frontend sends US-style MM/DD/YYYY and sometimes
-      leaks its own placeholder text (e.g. "mm/dd/yyyy") as the literal
-      value when the field is left unset — see OptionalDateQuery in
-      app/schemas/common_types.py for the normalization/parsing logic.
+      startDate must be on or before endDate.
+    - sort defaults to dateFilled/DESC (most recent first) when omitted or
+      partially supplied -- see ClaimMemberSortRequest.
     """
 
     model_config = _CAMEL
 
+    member_id: str = Field(alias="memberId")
+    person_code: str | None = Field(None, alias="personCode")
     auth_num: str | None = Field(None, alias="authNum")
-    date_filled: date | None = Field(None, alias="filledDate")
     start_date: date | None = Field(None, alias="startDate")
     end_date: date | None = Field(None, alias="endDate")
     exclude_test_claims: bool = Field(True, alias="excludeTestClaims")
+    sort: ClaimMemberSortRequest = Field(default_factory=ClaimMemberSortRequest)
 
-    @field_validator("date_filled", "auth_num", mode="before")
+    @field_validator("auth_num", mode="before")
     @classmethod
     def blank_to_none(cls, v):
         if isinstance(v, str) and v.strip() == "":
@@ -233,15 +242,9 @@ class ClaimSearchByMemberRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_date_filters(self) -> ClaimSearchByMemberRequest:
-        """Reject requests that combine filledDate with startDate/endDate,
-        require startDate/endDate to be supplied together, and require
+        """Require startDate/endDate to be supplied together, and require
         startDate to be on or before endDate."""
         from app.core.exceptions import InvalidSearchCriteriaException
-
-        if self.date_filled and (self.start_date or self.end_date):
-            raise InvalidSearchCriteriaException(
-                "filledDate must not be provided together with startDate/endDate."
-            )
 
         if bool(self.start_date) != bool(self.end_date):
             raise InvalidSearchCriteriaException(

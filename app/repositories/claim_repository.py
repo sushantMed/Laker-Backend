@@ -191,7 +191,7 @@ class ClaimRepository:
         total = (await self._session.execute(count_stmt)).scalar_one()
 
         sort_column = _SORTABLE_COLUMNS.get(sort_by, _DEFAULT_SORT_COLUMN)
-        order_fn = desc if sort_dir == "desc" else asc
+        order_fn = desc if sort_dir.upper() == "DESC" else asc
         stmt = stmt.order_by(order_fn(sort_column))
 
         stmt = stmt.offset((page - 1) * page_size).limit(page_size)
