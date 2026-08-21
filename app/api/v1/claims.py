@@ -33,7 +33,6 @@ router = APIRouter(tags=["Claims"])
 
 
 CLAIM_RETRIEVAL_SUCCESS_MESSAGE = "Claims retrieved successfully."
-RECENT_CLAIM_RETRIEVAL_SUCCESS_MESSAGE = "Recent claims retrieved successfully."
 
 
 @router.post("/claims/search")
@@ -76,11 +75,7 @@ async def search_claims_for_member(
 
     return PagedApiResponse.ok(
         data=claims,
-        message=(
-            RECENT_CLAIM_RETRIEVAL_SUCCESS_MESSAGE
-            if request.recent
-            else CLAIM_RETRIEVAL_SUCCESS_MESSAGE
-        ),
+        message=CLAIM_RETRIEVAL_SUCCESS_MESSAGE,
     )
 
 

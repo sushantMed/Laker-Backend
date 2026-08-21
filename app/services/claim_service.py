@@ -15,12 +15,10 @@ a search and isn't listed as an error response for those routes.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cache.cache_service import CacheService
-from app.core.config import settings
 from app.core.exceptions import (
     ClaimNotFoundException,
     DrugNotFoundException,
@@ -170,9 +168,8 @@ class ClaimService:
         Same underlying query as C1, but memberId is taken from the path.
         Validates the member exists first -> 404 MemberNotFound.
 
-        When `recent` is true, the trailing `recent_claims_window_days`
-        window is computed here (not exposed as a request field) and used
-        as the lower bound of the dateFilled search.
+        startDate/endDate (dateFilled range) are taken as-is from the
+        request; there is no server-computed "recent" window.
 
         Results are sorted by dateFilled descending, most recent first.
         """
@@ -180,13 +177,8 @@ class ClaimService:
         if not member:
             raise MemberNotFoundException(f"Member '{member_id}' not found.")
 
-        date_filled = request.date_filled
-        date_filled_from = None
-        if request.recent:
-            date_filled_from = date.today() - timedelta(
-                days=settings.recent_claims_window_days
-            )
-            date_filled = date.today()
+        date_filled = request.date_filled or request.end_date
+        date_filled_from = request.start_date
 
         items, total = await self._repo.search(
             member_id=member_id,

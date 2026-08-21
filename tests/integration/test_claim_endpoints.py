@@ -498,7 +498,7 @@ class TestSearchClaimsForMember:
             "AUTH-SORT-OLDEST",
         ]
 
-    async def test_recent_search_returns_a_paged_response(
+    async def test_date_range_search_returns_a_paged_response(
         self, client: AsyncClient, db_session: AsyncSession
     ):
         member_id = "MBR-RECENT-SEARCH-01"
@@ -516,7 +516,10 @@ class TestSearchClaimsForMember:
 
         resp = await client.post(
             self._url(member_id),
-            json={"recent": True},
+            json={
+                "startDate": (date.today() - timedelta(days=90)).isoformat(),
+                "endDate": date.today().isoformat(),
+            },
             params={"pageSize": 10},
             headers=_auth_header(),
         )
@@ -529,12 +532,36 @@ class TestSearchClaimsForMember:
 
     # ── Validation errors ─────────────────────────────────────────────────────
 
-    async def test_member_search_rejects_recent_with_filled_date(
+    async def test_member_search_rejects_date_range_with_filled_date(
         self, client: AsyncClient
     ):
         resp = await client.post(
             self._url("MBR001"),
-            json={"recent": True, "filledDate": "2024-06-01"},
+            json={
+                "startDate": "2024-01-01",
+                "endDate": "2024-06-01",
+                "filledDate": "2024-06-01",
+            },
+            headers=_auth_header(),
+        )
+        assert resp.status_code in (400, 422)
+
+    async def test_member_search_rejects_start_date_without_end_date(
+        self, client: AsyncClient
+    ):
+        resp = await client.post(
+            self._url("MBR001"),
+            json={"startDate": "2024-01-01"},
+            headers=_auth_header(),
+        )
+        assert resp.status_code in (400, 422)
+
+    async def test_member_search_rejects_start_date_after_end_date(
+        self, client: AsyncClient
+    ):
+        resp = await client.post(
+            self._url("MBR001"),
+            json={"startDate": "2024-06-01", "endDate": "2024-01-01"},
             headers=_auth_header(),
         )
         assert resp.status_code in (400, 422)
@@ -640,7 +667,9 @@ class TestGetClaimsForMember:
 
 
 class TestGetRecentClaimsForMember:
-    """Tests for POST /api/v1/members/{memberId}/claims/search?recent=true."""
+    """Tests for POST /api/v1/members/{memberId}/claims/search with a
+    startDate/endDate range (the UI's mechanism for "recent" claims — it
+    sends startDate=today-90, endDate=today)."""
 
     def _url(self, memberId: str) -> str:
         return f"{BASE_PATH}/members/{memberId}/claims/search"
@@ -648,7 +677,10 @@ class TestGetRecentClaimsForMember:
     async def _recent_search(self, client: AsyncClient, member_id: str):
         return await client.post(
             self._url(member_id),
-            json={"recent": True},
+            json={
+                "startDate": (date.today() - timedelta(days=90)).isoformat(),
+                "endDate": date.today().isoformat(),
+            },
             headers=_auth_header(),
         )
 
@@ -677,7 +709,7 @@ class TestGetRecentClaimsForMember:
         auth_nums = [r["authNum"] for r in body["data"]]
         assert "AUTH-RECENT-01" in auth_nums
         assert "AUTH-OLD-01" not in auth_nums
-        assert body["message"] == "Recent claims retrieved successfully."
+        assert body["message"] == "Claims retrieved successfully."
 
     async def test_returns_recent_claim_count_via_pagination(
         self, client: AsyncClient, db_session: AsyncSession
@@ -736,7 +768,7 @@ class TestGetRecentClaimsForMember:
         assert real_claim.auth_num in auth_nums
         assert test_claim.auth_num not in auth_nums
 
-    async def test_rejects_recent_search_with_conflicting_filters(
+    async def test_rejects_date_range_search_with_conflicting_filters(
         self, client: AsyncClient, db_session: AsyncSession
     ):
         member_id = "MBR-RECENT-CONFLICT"
@@ -745,7 +777,11 @@ class TestGetRecentClaimsForMember:
 
         resp = await client.post(
             self._url(member_id),
-            json={"recent": True, "authNum": "AUTH-CONFLICT"},
+            json={
+                "startDate": (date.today() - timedelta(days=90)).isoformat(),
+                "endDate": date.today().isoformat(),
+                "filledDate": date.today().isoformat(),
+            },
             headers=_auth_header(),
         )
 
