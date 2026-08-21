@@ -27,6 +27,8 @@ from app.main import app
 from app.models.claim_model import ClaimModel
 from app.models.drug_model import DrugModel
 from app.models.member_model import MemberModel
+from app.models.net_model import NetModel
+from app.models.netlist_model import NetListModel
 from app.models.permission_model import UserPermissionModel
 from app.models.pharmacy_model import PharmacyModel
 from app.models.prescriber_model import PrescriberModel
@@ -403,8 +405,16 @@ async def seeded_lookups(db_session: AsyncSession):
                 phone=None,
                 fax=None,
             ),
-            ZipCodeModel(zip="62704", latitude=39.7817, longitude=-89.6501),
-            ZipCodeModel(zip="60601", latitude=41.8781, longitude=-87.6298),
+            ZipCodeModel(
+                zip="62704", latitude=39.7817, longitude=-89.6501, citytype="D"
+            ),
+            ZipCodeModel(
+                zip="60601", latitude=41.8781, longitude=-87.6298, citytype="D"
+            ),
+            NetModel(net_name="TEST NETWORK", client="YYY", net_num=1),
+            # Both seeded pharmacies are in-network by NABP (netlist type "P").
+            NetListModel(net_num=1, line_num=1, type="P", value="1234567"),
+            NetListModel(net_num=1, line_num=2, type="P", value="7654321"),
         ]
     )
     await db_session.flush()

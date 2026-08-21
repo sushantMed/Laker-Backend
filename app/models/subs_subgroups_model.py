@@ -9,10 +9,6 @@ from app.database.base import LookupBase
 class SubsSubgroupsModel(LookupBase):
     __tablename__ = "SUBSSUBGROUPS"
 
-    # The real SQLMGR DDL declares no primary key on this table. SUBSCRIBER +
-    # PC + LINENUM + SUBGROUP is used here as the ORM's mapped composite key
-    # (the natural key), mirroring how SUBSCOB/SUBSCRIBERELIGLIST are keyed --
-    # it is not enforced as a DB constraint, matching the source DDL exactly.
     subscriber: Mapped[str] = mapped_column("SUBSCRIBER", String(45), primary_key=True)
     pc: Mapped[str] = mapped_column("PC", String(2), primary_key=True)
     linenum: Mapped[int] = mapped_column("LINENUM", Numeric, primary_key=True)

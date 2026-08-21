@@ -1,0 +1,25 @@
+{
+  "_comment": "Mock seed data for the NET / NETLIST reference tables. Grants network eligibility (via NETLIST type 'P' = NABP) to the 10 pharmacies_seed.json pharmacies whose ZIP matches a zip_codes_seed.json entry, so PharmacyRepository.get_by_zip_code has something to return.",
+
+  "net": [
+    {
+      "net_name": "DEV NETWORK",
+      "client": "YYY",
+      "net_num": 1,
+      "net_description": "Dev/staging seed network"
+    }
+  ],
+
+  "netlist": [
+    { "net_num": 1, "line_num": 1, "type": "P", "value": "1133402" },
+    { "net_num": 1, "line_num": 2, "type": "P", "value": "1900467" },
+    { "net_num": 1, "line_num": 3, "type": "P", "value": "3608812" },
+    { "net_num": 1, "line_num": 4, "type": "P", "value": "2400214" },
+    { "net_num": 1, "line_num": 5, "type": "P", "value": "1510388" },
+    { "net_num": 1, "line_num": 6, "type": "P", "value": "5402891" },
+    { "net_num": 1, "line_num": 7, "type": "P", "value": "4901223" },
+    { "net_num": 1, "line_num": 8, "type": "P", "value": "0512367" },
+    { "net_num": 1, "line_num": 9, "type": "P", "value": "3311756" },
+    { "net_num": 1, "line_num": 10, "type": "P", "value": "2208934" }
+  ]
+}

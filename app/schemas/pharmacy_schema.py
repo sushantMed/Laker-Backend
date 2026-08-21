@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from pydantic import Field, field_validator, model_validator
 
 from app.core.base_model import AppBaseModel as BaseModel
@@ -8,6 +10,8 @@ from app.schemas.common_schema import SearchRequest
 from app.utils.pagination import PaginationRequest
 
 _CAMEL = {"populate_by_name": True, "from_attributes": True}
+
+_ZIP_CODE_RE = re.compile(r"^\d{5}(-?\d{4})?$")
 
 
 class PharmacyInfo(BaseModel):
@@ -75,7 +79,7 @@ class PharmacyLookupRequest(PaginationRequest):
     zip_code: str | None = Field(
         None,
         alias="zipCode",
-        description="A five-digit U.S. ZIP code.",
+        description="A five-digit U.S. ZIP code, optionally with a ZIP+4 suffix.",
     )
     radius: int | None = Field(10, ge=0)  # in miles
     is_24_hour: bool | None = Field(None, alias="is24Hour")
@@ -86,11 +90,14 @@ class PharmacyLookupRequest(PaginationRequest):
         if zip_code is None:
             return None
 
-        if not (len(zip_code) == 5 and zip_code.isdigit()):
+        if not _ZIP_CODE_RE.match(zip_code):
             raise InvalidSearchCriteriaException(
-                "zipCode must be a valid five-digit U.S. ZIP code (for example, 62704)."
+                "zipCode must be a valid U.S. ZIP or ZIP+4 code "
+                "(for example, 62704 or 62704-1234)."
             )
-        return zip_code
+        # The ZIP centroid lookup only stores five-digit ZIPs, so drop any
+        # ZIP+4 suffix once the full value has been validated.
+        return zip_code[:5]
 
     @model_validator(mode="after")
     def exactly_one_identifier(self) -> PharmacyLookupRequest:
