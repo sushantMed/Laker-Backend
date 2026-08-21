@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import math
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 
+from app.models.netlist_model import NetListModel
 from app.models.pharmacy_model import PharmacyModel
 from app.models.zip_code_model import ZipCodeModel
 from app.repositories.base_repository import BaseRepository
 from app.schemas.pharmacy_schema import PharmacySearch
+
+NETLIST_TYPE_PHARMACY = "P"
+NETLIST_TYPE_CHAIN = "C"
+ZIP_CITY_TYPE_DEFAULT = "D"
 
 EQUATOR_LAT_MILE = 69.172
 EARTH_RADIUS_MILES = 3963
@@ -106,26 +111,50 @@ class PharmacyRepository(BaseRepository[PharmacyModel]):
         min_lat, max_lat, min_long, max_long = _compute_bounding_box(
             latitude, longitude, radius
         )
+
+        # A pharmacy is only eligible if it (or its chain, via affiliation
+        # code) is explicitly listed in NETLIST -- mirrors the legacy
+        network_filter = or_(
+            PharmacyModel.nabp.in_(
+                select(NetListModel.value).where(
+                    NetListModel.type == NETLIST_TYPE_PHARMACY
+                )
+            ),
+            PharmacyModel.affiliation_code.in_(
+                select(NetListModel.value).where(
+                    NetListModel.type == NETLIST_TYPE_CHAIN
+                )
+            ),
+        )
+
+        # Distance is measured from the pharmacy's own ZIP centroid
+        pharmacy_zip5 = func.substr(PharmacyModel.zip, 1, 5)
         filters = [
-            PharmacyModel.latitude.is_not(None),
-            PharmacyModel.longitude.is_not(None),
-            PharmacyModel.latitude >= min_lat,
-            PharmacyModel.latitude <= max_lat,
-            PharmacyModel.longitude >= min_long,
-            PharmacyModel.longitude <= max_long,
+            ZipCodeModel.latitude.is_not(None),
+            ZipCodeModel.longitude.is_not(None),
+            ZipCodeModel.latitude >= min_lat,
+            ZipCodeModel.latitude <= max_lat,
+            ZipCodeModel.longitude >= min_long,
+            ZipCodeModel.longitude <= max_long,
+            ZipCodeModel.citytype == ZIP_CITY_TYPE_DEFAULT,
+            network_filter,
         ]
 
-        if is_24hr is not None:
-            filters.append(PharmacyModel.is_24_hour == is_24hr)
+        if is_24hr:
+            filters.append(PharmacyModel.is_24_hour == True)  # noqa: E712 (Oracle: IS only accepts NULL)
 
-        stmt = select(PharmacyModel).where(*filters)
+        stmt = (
+            select(PharmacyModel, ZipCodeModel.latitude, ZipCodeModel.longitude)
+            .join(ZipCodeModel, pharmacy_zip5 == ZipCodeModel.zip)
+            .where(*filters)
+        )
         result = await self.session.execute(stmt)
-        candidates = result.scalars().all()
+        candidates = result.all()
 
-        in_range: list[PharmacyModel] = []
-        for pharmacy in candidates:
+        in_range: list[tuple[float, PharmacyModel]] = []
+        for pharmacy, pharm_latitude, pharm_longitude in candidates:
             distance = _haversine_miles(
-                latitude, longitude, float(pharmacy.latitude), float(pharmacy.longitude)
+                latitude, longitude, float(pharm_latitude), float(pharm_longitude)
             )
             if distance <= radius:
                 pharmacy.distance_miles = round(distance, 2)

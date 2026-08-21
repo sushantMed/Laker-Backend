@@ -3,7 +3,9 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
+from app.models.netlist_model import NetListModel
 from app.models.pharmacy_model import PharmacyModel
+from app.models.zip_code_model import ZipCodeModel
 from tests.integration.conftest import AUTH
 
 
@@ -131,20 +133,17 @@ async def test_search_pharmacies_by_state(client, seeded_lookups):
 
 @pytest.mark.asyncio
 async def test_get_pharmacies_by_zip_within_radius(client, db_session, seeded_lookups):
-    pharmacies = {
-        pharmacy.nabp: pharmacy
-        for pharmacy in (
-            await db_session.scalars(
-                select(PharmacyModel).where(
-                    PharmacyModel.nabp.in_(["1234567", "7654321"])
-                )
-            )
-        )
-    }
-    pharmacies["1234567"].latitude = 39.7817
-    pharmacies["1234567"].longitude = -89.6501
-    pharmacies["7654321"].latitude = 41.8781
-    pharmacies["7654321"].longitude = -87.6298
+    # Distance is derived from the pharmacy's own ZIP centroid (joined via
+    # its first five digits), not any lat/long stored on the pharmacy row.
+    # 62705 sits ~8.2 miles north of the seeded 62704 centroid -- inside the
+    # default 10-mile radius but outside a 5-mile search.
+    db_session.add(
+        ZipCodeModel(zip="62705", latitude=39.9, longitude=-89.6501, citytype="D")
+    )
+    pharmacy = await db_session.scalar(
+        select(PharmacyModel).where(PharmacyModel.nabp == "7654321")
+    )
+    pharmacy.zip = "62705"
     await db_session.flush()
 
     resp = await client.get(
@@ -163,26 +162,70 @@ async def test_get_pharmacies_by_zip_within_radius(client, db_session, seeded_lo
 async def test_get_pharmacies_by_zip_with_zero_radius(
     client, db_session, seeded_lookups
 ):
-    pharmacies = {
-        pharmacy.nabp: pharmacy
-        for pharmacy in (
-            await db_session.scalars(
-                select(PharmacyModel).where(
-                    PharmacyModel.nabp.in_(["1234567", "7654321"])
-                )
-            )
-        )
-    }
-    pharmacies["1234567"].latitude = 39.7817
-    pharmacies["1234567"].longitude = -89.6501
-    # Within the normal 10-mile default, but outside a zero-mile search.
-    pharmacies["7654321"].latitude = 39.7917
-    pharmacies["7654321"].longitude = -89.6501
+    # 62706 sits ~0.7 miles from the seeded 62704 centroid -- within the
+    # normal 10-mile default, but outside a zero-mile search.
+    db_session.add(
+        ZipCodeModel(zip="62706", latitude=39.7917, longitude=-89.6501, citytype="D")
+    )
+    pharmacy = await db_session.scalar(
+        select(PharmacyModel).where(PharmacyModel.nabp == "7654321")
+    )
+    pharmacy.zip = "62706"
     await db_session.flush()
 
     resp = await client.get(
         "/api/v1/pharmacies",
         params={"zipCode": "62704", "radius": 0},
+        headers=AUTH,
+    )
+
+    assert resp.status_code == 200
+    assert [pharmacy["nabp"] for pharmacy in resp.json()["data"]] == ["1234567"]
+
+
+@pytest.mark.asyncio
+async def test_get_pharmacies_by_zip_excludes_out_of_network_pharmacy(
+    client, db_session, seeded_lookups
+):
+    """A pharmacy near the search center is excluded unless NETLIST lists its
+    NABP (type 'P') or its affiliation code (type 'C')."""
+    pharmacy = await db_session.scalar(
+        select(PharmacyModel).where(PharmacyModel.nabp == "1234567")
+    )
+    pharmacy.affiliation_code = None
+    await db_session.execute(
+        NetListModel.__table__.delete().where(NetListModel.value == "1234567")
+    )
+    await db_session.flush()
+
+    resp = await client.get(
+        "/api/v1/pharmacies",
+        params={"zipCode": "62704", "radius": 5},
+        headers=AUTH,
+    )
+
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_pharmacies_by_zip_matches_via_affiliation_code(
+    client, db_session, seeded_lookups
+):
+    """A pharmacy can also qualify via its chain affiliation code listed in
+    NETLIST under type 'C', even when its own NABP isn't listed."""
+    pharmacy = await db_session.scalar(
+        select(PharmacyModel).where(PharmacyModel.nabp == "1234567")
+    )
+    pharmacy.affiliation_code = "CHN"
+    await db_session.execute(
+        NetListModel.__table__.delete().where(NetListModel.value == "1234567")
+    )
+    db_session.add(NetListModel(net_num=1, line_num=3, type="C", value="CHN"))
+    await db_session.flush()
+
+    resp = await client.get(
+        "/api/v1/pharmacies",
+        params={"zipCode": "62704", "radius": 5},
         headers=AUTH,
     )
 
@@ -198,7 +241,7 @@ async def test_get_pharmacy_rejects_invalid_us_zip_code(client, seeded_lookups):
 
     assert resp.status_code == 400
     assert resp.json()["error"]["message"] == (
-        "zipCode must be a valid five-digit U.S. ZIP code (for example, 62704)."
+        "zipCode must be a valid U.S. ZIP or ZIP+4 code (for example, 62704 or 62704-1234)."
     )
 
 

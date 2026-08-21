@@ -55,6 +55,7 @@ python -m app.scripts.seed_members
 python -m app.scripts.seed_lookups
 python -m app.scripts.seed_pharmacies
 python -m app.scripts.seed_zip_codes
+python -m app.scripts.seed_networks
 python -m app.scripts.seed_claims
 python -m app.scripts.seed_eligibility
 ```
@@ -79,7 +80,7 @@ app/
 ├── services/                # Business logic layer, one per domain
 ├── schemas/                 # Pydantic request/response models
 ├── observability/            # Prometheus metrics, /internal/metrics, tracing stubs
-└── scripts/                  # seed_users / seed_members / seed_lookups / seed_pharmacies / seed_zip_codes / seed_claims / seed_eligibility (run manually, see below)
+└── scripts/                  # seed_users / seed_members / seed_lookups / seed_pharmacies / seed_zip_codes / seed_networks / seed_claims / seed_eligibility (run manually, see below)
 
 alembic/                   # DB migrations (script_location = alembic)
 tests/
@@ -190,6 +191,7 @@ docker compose exec api python -m app.scripts.seed_members      # plans, members
 docker compose exec api python -m app.scripts.seed_lookups      # drugs, prescribers
 docker compose exec api python -m app.scripts.seed_pharmacies   # pharmacies
 docker compose exec api python -m app.scripts.seed_zip_codes    # ZIPCODES reference table (pharmacy radius search)
+docker compose exec api python -m app.scripts.seed_networks     # NET / NETLIST (network eligibility for zip-radius search)
 docker compose exec api python -m app.scripts.seed_claims       # claims (references seeded members)
 docker compose exec api python -m app.scripts.seed_eligibility  # SUBSCRIBER + group/COB/subgroup eligibility (references seeded members)
 ```
@@ -202,6 +204,7 @@ python -m app.scripts.seed_members      # plans, members, addresses
 python -m app.scripts.seed_lookups      # drugs, prescribers
 python -m app.scripts.seed_pharmacies   # pharmacies
 python -m app.scripts.seed_zip_codes    # ZIPCODES reference table (pharmacy radius search)
+python -m app.scripts.seed_networks     # NET / NETLIST (network eligibility for zip-radius search)
 python -m app.scripts.seed_claims       # claims (references seeded members)
 python -m app.scripts.seed_eligibility  # SUBSCRIBER + group/COB/subgroup eligibility (references seeded members)
 ```
