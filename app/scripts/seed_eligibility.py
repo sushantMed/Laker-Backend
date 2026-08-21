@@ -1,8 +1,8 @@
 """
 Seed the legacy SUBSCRIBER / cardholder-eligibility lookup tables
 (SUBSCRIBER, GROUPS, SUBSCRIBERGROUPLIST, SUBSCOB, SUBSSUBGROUPS,
-SUBSCRIBERELIGLIST) from a JSON file. Safe to run on application startup,
-and safe to run multiple times.
+SUBSCRIBERELIGLIST, SUBSNOTES) from a JSON file. Safe to run on application
+startup, and safe to run multiple times.
 
 Behavior:
 - Only records that don't already exist in the DB (matched by their natural
@@ -30,6 +30,7 @@ from sqlalchemy import select
 from app.database.session import AsyncSessionLocal
 from app.models.groups_model import GroupsModel
 from app.models.member_model import Subscriber
+from app.models.subs_notes_model import SubsNotesModel
 from app.models.subs_subgroups_model import SubsSubgroupsModel
 from app.models.subscob_model import SubscobModel
 from app.models.subscriber_elig_list_model import SubscriberEligListModel
@@ -46,8 +47,20 @@ _SUBSCRIBER_GROUP_LIST_KEY = ("subscriber", "clientcode", "linenum")
 _SUBSCOB_KEY = ("subscriber", "pc", "linenum")
 _SUBS_SUBGROUPS_KEY = ("subscriber", "pc", "linenum", "subgroup")
 _SUBSCRIBER_ELIG_LIST_KEY = ("subscriber", "personcode", "clientcode", "linenum")
+_SUBS_NOTES_KEY = ("subscriber", "pc", "linenum")
 
-_DATE_FIELDS = ("startdt", "enddt", "changedt", "lastchanged", "dob", "termination")
+_DATE_FIELDS = (
+    "startdt",
+    "enddt",
+    "changedt",
+    "lastchanged",
+    "dob",
+    "termination",
+    "dt",
+    "timestamp",
+    "alertstartdate",
+    "alertenddate",
+)
 
 
 def load_seed_data(json_path: Path = _DEFAULT_SEED_FILE) -> dict:
@@ -125,8 +138,8 @@ async def _seed_table(
 
 async def seed_eligibility() -> None:
     """
-    Seed SUBSCRIBER, GROUPS, SUBSCRIBERGROUPLIST, SUBSCOB, SUBSSUBGROUPS
-    and SUBSCRIBERELIGLIST.
+    Seed SUBSCRIBER, GROUPS, SUBSCRIBERGROUPLIST, SUBSCOB, SUBSSUBGROUPS,
+    SUBSCRIBERELIGLIST and SUBSNOTES.
 
     Safe to run multiple times. Only records that don't already exist
     (matched by their natural key) are inserted; existing records are
@@ -178,6 +191,15 @@ async def seed_eligibility() -> None:
             SubscriberEligListModel,
             data.get("subscriberEligList", []),
             _SUBSCRIBER_ELIG_LIST_KEY,
+        )
+        await session.flush()
+
+        await _seed_table(
+            session,
+            "subs-notes",
+            SubsNotesModel,
+            data.get("subsNotes", []),
+            _SUBS_NOTES_KEY,
         )
         await session.flush()
 

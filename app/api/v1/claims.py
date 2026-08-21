@@ -57,9 +57,8 @@ async def get_claim(
     return ApiResponse.ok(data=detail, message="Claim retrieved successfully.")
 
 
-@router.post("/members/{memberId}/claims/search")
+@router.post("/members/claims/search")
 async def search_claims_for_member(
-    memberId: str,
     request: ClaimSearchByMemberRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: RequireUser(Perm.CLAIM_VIEW),  # type: ignore
@@ -67,7 +66,6 @@ async def search_claims_for_member(
     pageSize: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> PagedApiResponse[ClaimDetail]:
     claims = await ClaimService(session).search_claims_for_member(
-        memberId,
         request,
         page=page,
         page_size=pageSize,

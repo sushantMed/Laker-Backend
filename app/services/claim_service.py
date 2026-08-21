@@ -159,37 +159,37 @@ class ClaimService:
 
     async def search_claims_for_member(
         self,
-        member_id: str,
         request: ClaimSearchByMemberRequest,
         page: int,
         page_size: int,
     ) -> PagedResponse[ClaimDetail]:
         """
-        Same underlying query as C1, but memberId is taken from the path.
-        Validates the member exists first -> 404 MemberNotFound.
+        Same underlying query as C1, but memberId comes from the request
+        body. Validates the member exists first -> 404 MemberNotFound.
 
         startDate/endDate (dateFilled range) are taken as-is from the
-        request; there is no server-computed "recent" window.
+        request; there is no server-computed "recent" window. personCode
+        is accepted on the request but not used here -- memberId already
+        uniquely identifies the member.
 
-        Results are sorted by dateFilled descending, most recent first.
+        Sorted per request.sort (defaults to dateFilled/DESC, most recent
+        first, when the request omits it).
         """
+        member_id = request.member_id
         member = await self._member_repo.get_by_member_id(member_id)
         if not member:
             raise MemberNotFoundException(f"Member '{member_id}' not found.")
 
-        date_filled = request.date_filled or request.end_date
-        date_filled_from = request.start_date
-
         items, total = await self._repo.search(
             member_id=member_id,
             auth_num=request.auth_num,
-            date_filled=date_filled,
-            date_filled_from=date_filled_from,
+            date_filled=request.end_date,
+            date_filled_from=request.start_date,
             exclude_test_claims=request.exclude_test_claims,
             page=page,
             page_size=page_size,
-            sort_by="dateFilled",
-            sort_dir="desc",
+            sort_by=request.sort.sort_by,
+            sort_dir=request.sort.sort_dir,
         )
 
         return PagedResponse.of(
