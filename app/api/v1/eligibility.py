@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.permissions import RequireUser
 from app.core.rbac import Perm
 from app.database.session import get_db
+from app.schemas.comment_schema import CommentInfo
 from app.schemas.common_schema import ApiResponse
 from app.schemas.subs_subgroups_schema import SubsSubgroupInfo
 from app.schemas.subscob_schema import SubscobInfo
@@ -16,6 +17,7 @@ from app.schemas.subscriber_group_list_schema import (
     EligibilityUpdate,
     SubscriberGroupInfo,
 )
+from app.services.comment_service import CommentService
 from app.services.subs_subgroups_service import SubsSubgroupsService
 from app.services.subscob_service import SubscobService
 from app.services.subscriber_group_list_service import SubscriberGroupListService
@@ -25,6 +27,7 @@ router = APIRouter(prefix="/members", tags=["Cardholder Eligibility"])
 ELIGIBILITY_LIST_SUCCESS_MESSAGE = "Group-eligibility records retrieved successfully."
 COB_LIST_SUCCESS_MESSAGE = "COB records retrieved successfully."
 SUBGROUP_LIST_SUCCESS_MESSAGE = "Sub-group records retrieved successfully."
+COMMENT_LIST_SUCCESS_MESSAGE = "Comments retrieved successfully."
 
 
 @router.get(
@@ -105,3 +108,17 @@ async def list_subgroups(
 ) -> ApiResponse[list[SubsSubgroupInfo]]:
     data = await SubsSubgroupsService(session).list_subgroups(subscribernum, personcode)
     return ApiResponse.ok(data=data, message=SUBGROUP_LIST_SUCCESS_MESSAGE)
+
+
+@router.get(
+    "/comments",
+    status_code=status.HTTP_200_OK,
+)
+async def list_comments(
+    subscribernum: Annotated[str, Query()],
+    personcode: Annotated[str, Query()],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: RequireUser(Perm.MEMDENYNOTES_VIEW),
+) -> ApiResponse[list[CommentInfo]]:
+    data = await CommentService(session).list_comments(subscribernum, personcode)
+    return ApiResponse.ok(data=data, message=COMMENT_LIST_SUCCESS_MESSAGE)

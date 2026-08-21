@@ -7,6 +7,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.member_model import Subscriber
+from app.models.subs_notes_model import SubsNotesModel
 from app.models.subs_subgroups_model import SubsSubgroupsModel
 from app.models.subscob_model import SubscobModel
 from app.models.subscriber_group_list_model import SubscriberGroupListModel
@@ -307,6 +308,82 @@ async def test_list_subgroups_not_found(client):
 async def test_list_subgroups_requires_auth(raw_client, seeded_subgroup):
     resp = await raw_client.get(
         f"{BASE}/subgroups", params={"subscribernum": "MBR001", "personcode": "01"}
+    )
+
+    assert resp.status_code == 403
+
+
+# ── comments ─────────────────────────────────────────────────────────────────
+
+
+@pytest_asyncio.fixture()
+async def seeded_comments(db_session: AsyncSession, seeded_subscriber):
+    db_session.add_all(
+        [
+            SubsNotesModel(
+                subscriber="MBR001",
+                pc="01",
+                linenum=1,
+                dt=date(2026, 1, 1),
+                name="alice",
+                note="First note",
+            ),
+            SubsNotesModel(
+                subscriber="MBR001",
+                pc="01",
+                linenum=2,
+                dt=date(2026, 2, 1),
+                name="bob",
+                note="Second note",
+            ),
+        ]
+    )
+    await db_session.flush()
+
+
+@pytest.mark.asyncio
+async def test_list_comments_success(client, seeded_comments):
+    resp = await client.get(
+        f"{BASE}/comments",
+        params={"subscribernum": "MBR001", "personcode": "01"},
+        headers=AUTH,
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) == 2
+    # Newest (highest linenum) first.
+    assert data[0]["note"] == "Second note"
+    assert data[0]["user"] == "bob"
+    assert data[1]["note"] == "First note"
+
+
+@pytest.mark.asyncio
+async def test_list_comments_empty_returns_empty_list(client):
+    """Unlike cob/subgroups, no comments yet is a normal state, not a 404."""
+    resp = await client.get(
+        f"{BASE}/comments",
+        params={"subscribernum": "MBR001", "personcode": "01"},
+        headers=AUTH,
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["data"] == []
+
+
+@pytest.mark.asyncio
+async def test_list_comments_requires_personcode(client):
+    resp = await client.get(
+        f"{BASE}/comments", params={"subscribernum": "MBR001"}, headers=AUTH
+    )
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_comments_requires_auth(raw_client, seeded_comments):
+    resp = await raw_client.get(
+        f"{BASE}/comments", params={"subscribernum": "MBR001", "personcode": "01"}
     )
 
     assert resp.status_code == 403

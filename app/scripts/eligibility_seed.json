@@ -188,5 +188,44 @@
       "enddt": null,
       "changedt": "2023-06-01"
     }
+  ],
+
+  "subsNotes": [
+    {
+      "subscriber": "MBR001",
+      "pc": "01",
+      "linenum": 1,
+      "dt": "2022-01-05",
+      "name": "csimmons",
+      "note": "Card mailed to member's home address.",
+      "source": "Web"
+    },
+    {
+      "subscriber": "MBR001",
+      "pc": "01",
+      "linenum": 2,
+      "dt": "2023-03-14",
+      "name": "jbennett",
+      "note": "Member called to confirm eligibility for spouse.",
+      "source": "Web"
+    },
+    {
+      "subscriber": "MBR005",
+      "pc": "01",
+      "linenum": 1,
+      "dt": "2024-01-10",
+      "name": "csimmons",
+      "note": "Enrolled in Medicare Part D coordination.",
+      "source": "Web"
+    },
+    {
+      "subscriber": "MBR007",
+      "pc": "01",
+      "linenum": 1,
+      "dt": "2023-06-05",
+      "name": "jbennett",
+      "note": "New member welcome call completed.",
+      "source": "Web"
+    }
   ]
 }
