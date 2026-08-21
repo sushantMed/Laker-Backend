@@ -204,10 +204,11 @@ class ClaimSearchByMemberRequest(BaseModel):
     and sent as a JSON request body; page/pageSize remain query params.
 
     Business rules:
-    - If `recent` is True, none of authNum/filledDate may be supplied.
-      Providing both is treated as conflicting intent and rejected with a 422
-      rather than silently ignoring the extra filters. The actual trailing
-      recent-claims window is computed by ClaimService, not here.
+    - startDate and endDate must be supplied together (both or neither), and
+      must not be combined with filledDate — they're alternate ways of
+      expressing date-filter intent and combining them is conflicting.
+      Providing both is rejected with a 422 rather than silently ignoring
+      the extra filters.
     - filledDate accepts values in a few known formats (not just ISO)
       because the current frontend sends US-style MM/DD/YYYY and sometimes
       leaks its own placeholder text (e.g. "mm/dd/yyyy") as the literal
@@ -219,7 +220,8 @@ class ClaimSearchByMemberRequest(BaseModel):
 
     auth_num: str | None = Field(None, alias="authNum")
     date_filled: date | None = Field(None, alias="filledDate")
-    recent: bool = False
+    start_date: date | None = Field(None, alias="startDate")
+    end_date: date | None = Field(None, alias="endDate")
     exclude_test_claims: bool = Field(True, alias="excludeTestClaims")
 
     @field_validator("date_filled", "auth_num", mode="before")
@@ -230,14 +232,23 @@ class ClaimSearchByMemberRequest(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_recent_is_exclusive(self) -> ClaimSearchByMemberRequest:
-        """Reject requests that combine `recent=true` with any explicit filter."""
-        if self.recent and (self.auth_num or self.date_filled):
-            from app.core.exceptions import (
-                InvalidSearchCriteriaException,
+    def validate_date_filters(self) -> ClaimSearchByMemberRequest:
+        """Reject requests that combine filledDate with startDate/endDate,
+        require startDate/endDate to be supplied together, and require
+        startDate to be on or before endDate."""
+        from app.core.exceptions import InvalidSearchCriteriaException
+
+        if self.date_filled and (self.start_date or self.end_date):
+            raise InvalidSearchCriteriaException(
+                "filledDate must not be provided together with startDate/endDate."
             )
 
+        if bool(self.start_date) != bool(self.end_date):
             raise InvalidSearchCriteriaException(
-                "When recent=true, authNum and filledDate must not be provided."
+                "startDate and endDate must be provided together."
             )
+
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise InvalidSearchCriteriaException("startDate must not be after endDate.")
+
         return self
