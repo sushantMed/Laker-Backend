@@ -3,8 +3,13 @@ Seed the ZIPCODES reference table from zip_codes_seed.json.
 Safe to run on application startup, and safe to run multiple times.
 
 Behavior:
-- Only ZIPs that don't already exist in the DB (matched by ZIP) are
-  inserted. Existing rows are skipped, not re-inserted or updated.
+- New ZIPs (matched by zip) are inserted.
+- Existing ZIPs are otherwise left untouched, EXCEPT that a NULL citytype
+  is backfilled from the seed data if the seed record has one. CITYTYPE
+  ='D' is required by PharmacyRepository.get_by_zip_code's network-eligible
+  pharmacy match, so this lets re-running the seed populate it for ZIPs
+  that were inserted before that filter existed, without clobbering any
+  other field.
 - Each insert happens in its own SAVEPOINT, so a single bad/rejected
   record (e.g. a DB constraint violation) does not roll back the other
   valid records in the same run.
@@ -40,11 +45,13 @@ def load_seed_data(json_path: Path = _DEFAULT_SEED_FILE) -> dict:
 async def _seed_zip_codes(session, zip_codes_data: list[dict]) -> None:
     print("Seeding zip codes...")
 
-    existing_keys = set(
-        (await session.execute(select(getattr(ZipCodeModel, _ZIP_KEY)))).scalars().all()
-    )
+    existing_by_key: dict[str, ZipCodeModel] = {
+        getattr(zip_code, _ZIP_KEY): zip_code
+        for zip_code in (await session.execute(select(ZipCodeModel))).scalars().all()
+    }
 
     inserted = 0
+    updated = 0
     skipped_duplicate = 0
     skipped_malformed = 0
     skipped_db_error = 0
@@ -58,14 +65,24 @@ async def _seed_zip_codes(session, zip_codes_data: list[dict]) -> None:
             skipped_malformed += 1
             continue
 
-        if key in existing_keys:
-            skipped_duplicate += 1
+        existing_zip_code = existing_by_key.get(key)
+        if existing_zip_code is not None:
+            if (
+                existing_zip_code.citytype is None
+                and zip_code_data.get("citytype") is not None
+            ):
+                existing_zip_code.citytype = zip_code_data["citytype"]
+                updated += 1
+            else:
+                skipped_duplicate += 1
             continue
 
         try:
             async with session.begin_nested():
                 session.add(ZipCodeModel(**zip_code_data))
-            existing_keys.add(key)
+            existing_by_key[key] = (
+                None  # only need presence for later rows in this batch
+            )
             inserted += 1
         except Exception as e:
             print(f"Failed to insert zip code '{key}': {e}")
@@ -73,9 +90,9 @@ async def _seed_zip_codes(session, zip_codes_data: list[dict]) -> None:
             continue
 
     print(
-        f"{inserted} new zip code(s) inserted. "
-        f"Skipped {skipped_duplicate} duplicate(s), "
-        f"{skipped_malformed} malformed record(s), "
+        f"{inserted} new zip code(s) inserted, {updated} existing zip code(s) "
+        f"backfilled with citytype. Skipped {skipped_duplicate} unchanged "
+        f"duplicate(s), {skipped_malformed} malformed record(s), "
         f"{skipped_db_error} DB-rejected record(s)."
     )
 
@@ -84,8 +101,8 @@ async def seed_zip_codes() -> None:
     """
     Seed zip codes.
 
-    Safe to run multiple times. Only ZIPs that don't already exist are
-    inserted; existing rows are left untouched.
+    Safe to run multiple times. New records (matched by zip) are inserted;
+    existing records only get their citytype backfilled if missing.
     """
     data = load_seed_data()
 
