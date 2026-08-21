@@ -4,7 +4,7 @@ Integration tests for the Claims module.
 Covers all 7 endpoints:
   POST /api/v1/claims/search
   GET  /api/v1/claims/{authNum}
-  POST /api/v1/members/{memberId}/claims/search
+  POST /api/v1/members/claims/search
   GET  /api/v1/members/{memberId}/claims
   GET  /api/v1/pharmacies/{nabp}/claims
   GET  /api/v1/prescribers/{npi}/claims
@@ -373,10 +373,9 @@ class TestGetClaim:
 # POST /api/v1/claims/{memberId}/claims/search
 # ═════════════════════════════════════════════════════════════════════════════
 class TestSearchClaimsForMember:
-    """Tests for POST /api/v1/members/{memberId}/claims/search"""
+    """Tests for POST /api/v1/members/claims/search"""
 
-    def _url(self, memberId: str) -> str:
-        return f"{BASE_PATH}/members/{memberId}/claims/search"
+    URL = f"{BASE_PATH}/members/claims/search"
 
     async def test_search_returns_only_target_member_claims(
         self, client: AsyncClient, db_session: AsyncSession
@@ -389,12 +388,36 @@ class TestSearchClaimsForMember:
         other_claim = _make_claim(member_id="MBR-OTHER")
         await _seed(db_session, target_claim, other_claim)
         resp = await client.post(
-            self._url("MBR-TARGET"),
-            json={"excludeTestClaims": False},
+            self.URL,
+            json={"memberId": "MBR-TARGET", "excludeTestClaims": False},
             headers=_auth_header(),
         )
         assert resp.status_code == 200
         assert resp.json()["data"][0]["memberId"] == "MBR-TARGET"
+
+    async def test_member_search_accepts_person_code_in_payload(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """personCode is accepted but not validated/used server-side."""
+        db_session.add(_make_member(member_id="MBR-PC-01"))
+        await db_session.flush()
+
+        claim = _make_claim(member_id="MBR-PC-01")
+        await _seed(db_session, claim)
+
+        resp = await client.post(
+            self.URL,
+            json={
+                "memberId": "MBR-PC-01",
+                "personCode": "99",
+                "excludeTestClaims": False,
+            },
+            headers=_auth_header(),
+        )
+
+        assert resp.status_code == 200
+        auth_nums = [r["authNum"] for r in resp.json()["data"]]
+        assert claim.auth_num in auth_nums
 
     async def test_member_search_accepts_auth_num_in_payload(
         self, client: AsyncClient, db_session: AsyncSession
@@ -407,8 +430,12 @@ class TestSearchClaimsForMember:
         await _seed(db_session, c1, c2)
 
         resp = await client.post(
-            self._url("MBR-AN-01"),
-            json={"authNum": "AUTH-AN-FILTER", "excludeTestClaims": False},
+            self.URL,
+            json={
+                "memberId": "MBR-AN-01",
+                "authNum": "AUTH-AN-FILTER",
+                "excludeTestClaims": False,
+            },
             headers=_auth_header(),
         )
 
@@ -416,7 +443,7 @@ class TestSearchClaimsForMember:
         auth_nums = [r["authNum"] for r in resp.json()["data"]]
         assert "AUTH-AN-FILTER" in auth_nums
 
-    async def test_member_search_filters_by_filled_date(
+    async def test_member_search_filters_by_date_range(
         self, client: AsyncClient, db_session: AsyncSession
     ):
         db_session.add(_make_member(member_id="MBR-DR-01"))
@@ -429,9 +456,11 @@ class TestSearchClaimsForMember:
         await _seed(db_session, before_cutoff, after_cutoff)
 
         resp = await client.post(
-            self._url("MBR-DR-01"),
+            self.URL,
             json={
-                "filledDate": "2024-12-31",
+                "memberId": "MBR-DR-01",
+                "startDate": "2024-01-01",
+                "endDate": "2024-12-31",
                 "excludeTestClaims": False,
             },
             headers=_auth_header(),
@@ -447,14 +476,14 @@ class TestSearchClaimsForMember:
         db_session.add(_make_member(member_id="MBR-EMPTY-01"))
         await db_session.flush()
 
-        """No body criteria — should return all claims for the member."""
+        """No extra criteria — should return all claims for the member."""
         c1 = _make_claim(member_id="MBR-EMPTY-01")
         c2 = _make_claim(member_id="MBR-EMPTY-01")
         await _seed(db_session, c1, c2)
 
         resp = await client.post(
-            self._url("MBR-EMPTY-01"),
-            json={},
+            self.URL,
+            json={"memberId": "MBR-EMPTY-01"},
             headers=_auth_header(),
         )
         assert resp.status_code == 200
@@ -486,8 +515,8 @@ class TestSearchClaimsForMember:
         await _seed(db_session, oldest, newest, middle)
 
         resp = await client.post(
-            self._url("MBR-SORT-01"),
-            json={},
+            self.URL,
+            json={"memberId": "MBR-SORT-01"},
             headers=_auth_header(),
         )
         assert resp.status_code == 200
@@ -497,6 +526,66 @@ class TestSearchClaimsForMember:
             "AUTH-SORT-MIDDLE",
             "AUTH-SORT-OLDEST",
         ]
+
+    async def test_member_search_empty_sort_object_still_defaults_to_desc(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """An empty `sort: {}` (what a UI sort-widget with nothing selected
+        would send) must fall back to dateFilled/DESC, not SortRequest's
+        generic id/ASC."""
+        db_session.add(_make_member(member_id="MBR-SORT-03"))
+        await db_session.flush()
+
+        oldest = _make_claim(
+            member_id="MBR-SORT-03",
+            auth_num="AUTH-SORT3-OLDEST",
+            date_filled=date(2024, 1, 1),
+        )
+        newest = _make_claim(
+            member_id="MBR-SORT-03",
+            auth_num="AUTH-SORT3-NEWEST",
+            date_filled=date(2024, 6, 1),
+        )
+        await _seed(db_session, oldest, newest)
+
+        resp = await client.post(
+            self.URL,
+            json={"memberId": "MBR-SORT-03", "sort": {}},
+            headers=_auth_header(),
+        )
+        assert resp.status_code == 200
+        auth_nums = [r["authNum"] for r in resp.json()["data"]]
+        assert auth_nums == ["AUTH-SORT3-NEWEST", "AUTH-SORT3-OLDEST"]
+
+    async def test_member_search_sort_payload_overrides_default(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        db_session.add(_make_member(member_id="MBR-SORT-02"))
+        await db_session.flush()
+
+        oldest = _make_claim(
+            member_id="MBR-SORT-02",
+            auth_num="AUTH-SORT2-OLDEST",
+            date_filled=date(2024, 1, 1),
+        )
+        newest = _make_claim(
+            member_id="MBR-SORT-02",
+            auth_num="AUTH-SORT2-NEWEST",
+            date_filled=date(2024, 6, 1),
+        )
+        await _seed(db_session, oldest, newest)
+
+        resp = await client.post(
+            self.URL,
+            json={
+                "memberId": "MBR-SORT-02",
+                "sort": {"sortBy": "dateFilled", "sortDir": "ASC"},
+            },
+            headers=_auth_header(),
+        )
+        assert resp.status_code == 200
+        auth_nums = [r["authNum"] for r in resp.json()["data"]]
+        assert auth_nums == ["AUTH-SORT2-OLDEST", "AUTH-SORT2-NEWEST"]
 
     async def test_date_range_search_returns_a_paged_response(
         self, client: AsyncClient, db_session: AsyncSession
@@ -515,8 +604,9 @@ class TestSearchClaimsForMember:
         await _seed(db_session, *claims)
 
         resp = await client.post(
-            self._url(member_id),
+            self.URL,
             json={
+                "memberId": member_id,
                 "startDate": (date.today() - timedelta(days=90)).isoformat(),
                 "endDate": date.today().isoformat(),
             },
@@ -532,26 +622,16 @@ class TestSearchClaimsForMember:
 
     # ── Validation errors ─────────────────────────────────────────────────────
 
-    async def test_member_search_rejects_date_range_with_filled_date(
-        self, client: AsyncClient
-    ):
-        resp = await client.post(
-            self._url("MBR001"),
-            json={
-                "startDate": "2024-01-01",
-                "endDate": "2024-06-01",
-                "filledDate": "2024-06-01",
-            },
-            headers=_auth_header(),
-        )
-        assert resp.status_code in (400, 422)
+    async def test_member_search_requires_member_id(self, client: AsyncClient):
+        resp = await client.post(self.URL, json={}, headers=_auth_header())
+        assert resp.status_code == 422
 
     async def test_member_search_rejects_start_date_without_end_date(
         self, client: AsyncClient
     ):
         resp = await client.post(
-            self._url("MBR001"),
-            json={"startDate": "2024-01-01"},
+            self.URL,
+            json={"memberId": "MBR001", "startDate": "2024-01-01"},
             headers=_auth_header(),
         )
         assert resp.status_code in (400, 422)
@@ -560,8 +640,12 @@ class TestSearchClaimsForMember:
         self, client: AsyncClient
     ):
         resp = await client.post(
-            self._url("MBR001"),
-            json={"startDate": "2024-06-01", "endDate": "2024-01-01"},
+            self.URL,
+            json={
+                "memberId": "MBR001",
+                "startDate": "2024-06-01",
+                "endDate": "2024-01-01",
+            },
             headers=_auth_header(),
         )
         assert resp.status_code in (400, 422)
@@ -667,17 +751,17 @@ class TestGetClaimsForMember:
 
 
 class TestGetRecentClaimsForMember:
-    """Tests for POST /api/v1/members/{memberId}/claims/search with a
-    startDate/endDate range (the UI's mechanism for "recent" claims — it
-    sends startDate=today-90, endDate=today)."""
+    """Tests for POST /api/v1/members/claims/search with a startDate/endDate
+    range (the UI's mechanism for "recent" claims — it sends
+    startDate=today-90, endDate=today)."""
 
-    def _url(self, memberId: str) -> str:
-        return f"{BASE_PATH}/members/{memberId}/claims/search"
+    URL = f"{BASE_PATH}/members/claims/search"
 
     async def _recent_search(self, client: AsyncClient, member_id: str):
         return await client.post(
-            self._url(member_id),
+            self.URL,
             json={
+                "memberId": member_id,
                 "startDate": (date.today() - timedelta(days=90)).isoformat(),
                 "endDate": date.today().isoformat(),
             },
@@ -768,7 +852,7 @@ class TestGetRecentClaimsForMember:
         assert real_claim.auth_num in auth_nums
         assert test_claim.auth_num not in auth_nums
 
-    async def test_rejects_date_range_search_with_conflicting_filters(
+    async def test_rejects_date_range_search_with_start_after_end(
         self, client: AsyncClient, db_session: AsyncSession
     ):
         member_id = "MBR-RECENT-CONFLICT"
@@ -776,11 +860,11 @@ class TestGetRecentClaimsForMember:
         await db_session.flush()
 
         resp = await client.post(
-            self._url(member_id),
+            self.URL,
             json={
-                "startDate": (date.today() - timedelta(days=90)).isoformat(),
-                "endDate": date.today().isoformat(),
-                "filledDate": date.today().isoformat(),
+                "memberId": member_id,
+                "startDate": date.today().isoformat(),
+                "endDate": (date.today() - timedelta(days=90)).isoformat(),
             },
             headers=_auth_header(),
         )
